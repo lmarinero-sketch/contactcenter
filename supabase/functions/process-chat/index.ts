@@ -44,19 +44,25 @@ El chatbot presenta opciones al inicio de la conversación. El árbol conocido e
 - Nivel 3 (si elige A>A): A) Turnos de consultas, B) Turnos de Tomografía/Ecografía/Mamografía/Densitometría/Rayos X, C) Volver
 
 INSTRUCCIONES:
-1. Analiza el TONO del agente (cordial, profesional, informal, brusco, empático)
+1. Analiza el TONO del agente HUMANO (cordial, profesional, informal, brusco, empático) — ignora los mensajes del bot
 2. Detecta la INTENCIÓN principal del cliente (turno, reclamo, consulta, autorización, información, emergencia, etc.)
 3. Evalúa el SENTIMIENTO del cliente (positivo, neutral, negativo, frustrado)
 4. Identifica el CAMINO del chatbot que eligió el paciente analizando los mensajes del bot y las respuestas del cliente
-5. Extrae PALABRAS CLAVE relevantes
+5. Extrae PALABRAS CLAVE relevantes:
+   - "customer_keywords": palabras clave de los mensajes del CLIENTE
+   - "agent_keywords": palabras clave SOLO de los mensajes del AGENTE HUMANO (NO incluir palabras del bot automático)
 6. Genera un RESUMEN breve de la conversación
 7. Sugiere MEJORAS si corresponde
 
-IMPORTANTE sobre el camino del bot:
-- Analiza los mensajes del bot para detectar cuándo presenta opciones
-- Analiza la respuesta del cliente (puede ser "A", "B", la opción escrita, o un mensaje libre)
-- Mapea cada elección al árbol conocido
-- Si el cliente escribió un mensaje libre en lugar de elegir una opción, indícalo
+IMPORTANTE:
+- Los mensajes marcados como (BOT) son del asistente virtual automático. NO uses estos para evaluar tono, protocolo, ni para agent_keywords.
+- Los mensajes marcados como (AGENTE HUMANO) son del agente real. USA estos para evaluar tono, protocolo, saludo, despedida y agent_keywords.
+- Si no hay mensajes de AGENTE HUMANO, deja agent_keywords vacío y evalúa el tono como "N/A".
+- Sobre el camino del bot:
+  - Analiza los mensajes del bot para detectar cuándo presenta opciones
+  - Analiza la respuesta del cliente (puede ser "A", "B", la opción escrita, o un mensaje libre)
+  - Mapea cada elección al árbol conocido
+  - Si el cliente escribió un mensaje libre en lugar de elegir una opción, indícalo
 
 Responde SIEMPRE con un JSON válido con esta estructura exacta (sin markdown, sin texto adicional):`;
 
@@ -79,16 +85,22 @@ const ANALYSIS_SCHEMA = `{
   "bot_second_choice": "string o null - segunda opción elegida",
   "bot_third_choice": "string o null - tercera opción elegida",
   "customer_keywords": ["palabra1", "palabra2"],
-  "agent_keywords": ["palabra1", "palabra2"],
+  "agent_keywords": ["palabra1", "palabra2 - SOLO de mensajes del AGENTE HUMANO, NO del bot"],
   "conversation_summary": "string - resumen de 1-2 oraciones",
   "improvement_suggestions": ["sugerencia1"]
 }`;
 
-async function analyzeWithOpenAI(messages, ticketContext) {
+async function analyzeWithOpenAI(messages: any[], ticketContext: any, botNames: Set<string>) {
     const formattedMessages = messages
-        .sort((a, b) => a.message_order - b.message_order)
-        .map((msg) => {
-            const role = msg.action === "IN" ? "CLIENTE" : "BOT/AGENTE";
+        .sort((a: any, b: any) => a.message_order - b.message_order)
+        .map((msg: any) => {
+            if (msg.action === "IN") {
+                return `[${msg.message_order}] (CLIENTE) ${msg.sender_name}: "${msg.message}"`;
+            }
+            // Distinguish BOT from HUMAN AGENT in OUT messages
+            const senderLower = (msg.sender_name || "").toLowerCase();
+            const isBot = botNames.has(senderLower);
+            const role = isBot ? "BOT" : "AGENTE HUMANO";
             return `[${msg.message_order}] (${role}) ${msg.sender_name}: "${msg.message}"`;
         })
         .join("\n");
@@ -269,8 +281,8 @@ Deno.serve(async (req) => {
         // Calculate timings (with bot/human distinction)
         const timings = calculateTimings(messages, botNames);
 
-        // Analyze with OpenAI
-        const { analysis, tokensUsed } = await analyzeWithOpenAI(messages, ticket);
+        // Analyze with OpenAI (pass botNames for message tagging)
+        const { analysis, tokensUsed } = await analyzeWithOpenAI(messages, ticket, botNames);
 
         // Store analysis
         const analysisRecord = {
