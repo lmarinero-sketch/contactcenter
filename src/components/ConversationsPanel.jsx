@@ -302,13 +302,7 @@ export default function ConversationsPanel({ initialTicketId, onTicketConsumed }
 
                                         <div className="analysis-grid">
                                             <div className="analysis-item">
-                                                <Tip text="Score de Protocolo (0 a 10): mide si el agente siguió las pautas del Sanatorio. Incluye: saludo, presentación, escucha activa, resolución y despedida. 10 = protocolo completo.">
-                                                    Protocolo
-                                                </Tip>
-                                                <span className="badge neutral">{detailData.analysis.agent_protocol_score}/10</span>
-                                            </div>
-                                            <div className="analysis-item">
-                                                <Tip text="Si el agente saluda y se despide correctamente del paciente. Es parte del protocolo de atención del Sanatorio.">
+                                                <Tip text="Si el agente saluda y se despide correctamente del paciente.">
                                                     Saludo / Despedida
                                                 </Tip>
                                                 <span style={{ fontSize: '12px' }}>

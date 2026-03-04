@@ -28,6 +28,10 @@ CONTEXTO CRÍTICO DEL FLUJO DE ATENCIÓN:
 
 Debes ser constructivo pero honesto. Usa datos concretos cuando puedas.
 Centra tu análisis SOLO en lo que el agente humano hace: su tono, sus respuestas, su efectividad, su empatía, etc.
+Además, analiza la ORTOGRAFÍA del agente:
+- Los acentos faltantes (tildes) se TOLERAN y no deben considerarse errores graves.
+- SÍ son errores graves: palabras con H mal usada (ej: "ola" en vez de "hola", "aver" en vez de "a ver"), confusión B/V, S/C/Z mal usadas, letras faltantes o de más que cambian la palabra.
+- Reporta errores con la palabra incorrecta, la corrección, y cuántas veces aparece.
 Responde SIEMPRE en español y en JSON válido (sin markdown, sin texto adicional).`;
 
 const ANALYSIS_SCHEMA = `{
@@ -51,9 +55,26 @@ const ANALYSIS_SCHEMA = `{
       "descripcion": "string - cómo implementar la mejora"
     }
   ],
+  "frases_clave": [
+    {
+      "frase": "string - frase textual que usa frecuentemente el agente",
+      "tipo": "cordial|profesional|informal|problemática",
+      "frecuencia": "alta|media|baja",
+      "comentario": "string - por qué es relevante esta frase"
+    }
+  ],
+  "errores_ortograficos": [
+    {
+      "palabra_incorrecta": "string - la palabra tal como la escribe el agente",
+      "correccion": "string - la forma correcta",
+      "cantidad": 1,
+      "gravedad": "grave|leve",
+      "ejemplo_contexto": "string - fragmento del mensaje donde aparece"
+    }
+  ],
   "perfil_comunicacion": {
     "estilo_dominante": "string - descripción del estilo de comunicación",
-    "palabras_frecuentes": ["string - top 5 palabras que más usa"],
+    "frases_frecuentes": ["string - top 5 frases o expresiones que más usa"],
     "nivel_empatia": "alto|medio|bajo",
     "nivel_proactividad": "alto|medio|bajo"
   },
@@ -99,7 +120,6 @@ Deno.serve(async (req) => {
           overall_sentiment,
           sentiment_score,
           agent_tone,
-          agent_protocol_score,
           agent_greeting,
           agent_farewell,
           agent_response_quality,
@@ -167,7 +187,6 @@ Deno.serve(async (req) => {
             total_chats: tickets.length,
             sentiments: {} as Record<string, number>,
             avg_sentiment: 0,
-            avg_protocol: 0,
             tones: {} as Record<string, number>,
             greeting_rate: 0,
             farewell_rate: 0,
@@ -180,7 +199,6 @@ Deno.serve(async (req) => {
         };
 
         let sentimentSum = 0, sentimentCount = 0;
-        let protocolSum = 0, protocolCount = 0;
         let responseSum = 0, responseCount = 0;
         let greetings = 0, farewells = 0;
 
@@ -190,7 +208,6 @@ Deno.serve(async (req) => {
                 stats.sentiments[a.overall_sentiment] = (stats.sentiments[a.overall_sentiment] || 0) + 1;
             }
             if (a.sentiment_score !== null) { sentimentSum += a.sentiment_score; sentimentCount++; }
-            if (a.agent_protocol_score !== null) { protocolSum += a.agent_protocol_score; protocolCount++; }
             if (a.first_response_time_seconds) { responseSum += a.first_response_time_seconds; responseCount++; }
             if (a.agent_greeting) greetings++;
             if (a.agent_farewell) farewells++;
@@ -213,7 +230,6 @@ Deno.serve(async (req) => {
         }
 
         stats.avg_sentiment = sentimentCount > 0 ? +(sentimentSum / sentimentCount).toFixed(2) : 0;
-        stats.avg_protocol = protocolCount > 0 ? +(protocolSum / protocolCount).toFixed(1) : 0;
         stats.avg_response_time = responseCount > 0 ? Math.round(responseSum / responseCount) : 0;
         stats.greeting_rate = tickets.length > 0 ? +((greetings / tickets.length) * 100).toFixed(0) : 0;
         stats.farewell_rate = tickets.length > 0 ? +((farewells / tickets.length) * 100).toFixed(0) : 0;

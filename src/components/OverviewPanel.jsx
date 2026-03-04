@@ -103,7 +103,6 @@ export default function OverviewPanel({ onNavigateToChat }) {
     const getSemaphore = (metric, value) => {
         switch (metric) {
             case 'sentiment': return value >= 0.3 ? 'green' : value >= 0 ? 'yellow' : 'red'
-            case 'protocol': return value >= 8 ? 'green' : value >= 6 ? 'yellow' : 'red'
             case 'transfer': return value <= 30 ? 'green' : value <= 60 ? 'yellow' : 'red'
             case 'response': return value <= 30 ? 'green' : value <= 120 ? 'yellow' : 'red'
             case 'handoff': return value <= 300 ? 'green' : value <= 900 ? 'yellow' : 'red' // 5min / 15min
@@ -120,7 +119,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
             agente: p.agent_name || 'Bot',
             sentimiento: p.analysis?.overall_sentiment,
             score_sentimiento: p.analysis?.sentiment_score,
-            protocolo: p.analysis?.agent_protocol_score,
+            protocolo: 'N/A',
             intencion: p.analysis?.detected_intent,
             resumen: p.analysis?.conversation_summary,
             razones: p.reasons.join('; '),
@@ -164,13 +163,6 @@ export default function OverviewPanel({ onNavigateToChat }) {
                             {stats.avgSentiment}
                         </div>
                         <div className="exec-kpi-label">Sentimiento Prom.</div>
-                    </div>
-                    <div className="exec-kpi">
-                        <div className="exec-kpi-value">
-                            <span className={`semaphore ${getSemaphore('protocol', stats.avgProtocol)}`}></span>
-                            {stats.avgProtocol}<span style={{ fontSize: '14px', color: '#94a3b8' }}>/10</span>
-                        </div>
-                        <div className="exec-kpi-label">Protocolo Prom.</div>
                     </div>
                     <div className="exec-kpi">
                         <div className="exec-kpi-value">
@@ -226,13 +218,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
                     </div>
                 </div>
 
-                <div className="kpi-card">
-                    <div className="kpi-icon blue"><Shield size={22} /></div>
-                    <div className="kpi-info">
-                        <div className="kpi-label" title="Promedio de cumplimiento de protocolo de los agentes (0 a 10). Evalúa saludo, presentación, escucha activa, resolución y despedida.">Score Protocolo</div>
-                        <div className="kpi-value">{stats.avgProtocol}<span style={{ fontSize: '14px', color: '#94a3b8' }}>/10</span></div>
-                    </div>
-                </div>
+
 
                 <div className="kpi-card">
                     <div className="kpi-icon yellow"><Clock size={22} /></div>

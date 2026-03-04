@@ -101,13 +101,7 @@ export default function AgentsPanel() {
         return <span className="badge negative">Negativo ({score})</span>
     }
 
-    const getProtocolBadge = (score) => {
-        if (score === null || score === undefined) return <span className="badge neutral">N/A</span>
-        const num = parseFloat(score)
-        if (num >= 8) return <span className="badge positive">{score}/10</span>
-        if (num >= 5) return <span className="badge warning">{score}/10</span>
-        return <span className="badge negative">{score}/10</span>
-    }
+
 
     const getToneBadge = (tone) => {
         const toneMap = {
@@ -125,7 +119,7 @@ export default function AgentsPanel() {
             agente: a.agent_name,
             total_chats: a.total_chats,
             sentimiento_prom: a.avg_sentiment,
-            protocolo_prom: a.avg_protocol,
+            protocolo_prom: 'N/A',
             tono_dominante: a.dominant_tone,
             tasa_saludo: a.greeting_rate + '%',
             tasa_despedida: a.farewell_rate + '%',
@@ -158,7 +152,6 @@ export default function AgentsPanel() {
                             <th>Agente</th>
                             <th title="Cantidad total de conversaciones atendidas por este agente">Total Chats</th>
                             <th title="Promedio de satisfacción de los pacientes atendidos por este agente. Va de -1.0 (muy insatisfecho) a +1.0 (muy satisfecho).">Sentimiento</th>
-                            <th title="Score de cumplimiento de protocolo del Sanatorio (0 a 10). Evalúa saludo, presentación, escucha activa, resolución y despedida.">Protocolo</th>
                             <th title="Tono predominante del agente en sus conversaciones: cordial, profesional, empático, informal o brusco.">Tono Dominante</th>
                             <th title="Porcentaje de conversaciones en las que el agente saludó correctamente al paciente.">Saluda</th>
                             <th title="Porcentaje de conversaciones en las que el agente se despidió correctamente del paciente.">Se despide</th>
@@ -189,21 +182,10 @@ export default function AgentsPanel() {
                                                 {agent.agent_name?.charAt(0) || '?'}
                                             </div>
                                             <span style={{ fontWeight: 600 }}>{agent.agent_name}</span>
-                                            {agent.avg_protocol !== null && parseFloat(agent.avg_protocol) < 7 && (
-                                                <span className="quality-alert warning" title="Protocolo por debajo de 7/10">
-                                                    <AlertTriangle size={10} /> Protocolo
-                                                </span>
-                                            )}
-                                            {agent.avg_sentiment !== null && parseFloat(agent.avg_sentiment) < 0 && (
-                                                <span className="quality-alert danger" title="Sentimiento promedio negativo">
-                                                    <AlertTriangle size={10} /> Sentimiento
-                                                </span>
-                                            )}
                                         </div>
                                     </td>
                                     <td><strong>{agent.total_chats}</strong></td>
                                     <td>{getSentimentBadge(agent.avg_sentiment)}</td>
-                                    <td>{getProtocolBadge(agent.avg_protocol)}</td>
                                     <td>{getToneBadge(agent.dominant_tone)}</td>
                                     <td>{agent.greeting_rate}%</td>
                                     <td>{agent.farewell_rate}%</td>
@@ -361,7 +343,7 @@ function AgentDetail({ agent }) {
 
     // Radar chart data
     const radarData = [
-        { metric: 'Protocolo', value: parseFloat(agent.avg_protocol) || 0, max: 10 },
+        { metric: 'Calidad', value: Math.max(0, ((parseFloat(agent.avg_sentiment) || 0) + 1) * 5), max: 10 },
         { metric: 'Sentimiento', value: ((parseFloat(agent.avg_sentiment) || 0) + 1) * 5, max: 10 },
         { metric: 'Saludo', value: parseFloat(agent.greeting_rate) / 10, max: 10 },
         { metric: 'Despedida', value: parseFloat(agent.farewell_rate) / 10, max: 10 },
@@ -671,6 +653,110 @@ function AgentDetail({ agent }) {
                                 </div>
                             </div>
 
+                            {/* Key Phrases */}
+                            {(aiProfile.frases_clave || []).length > 0 && (
+                                <div style={{ marginBottom: '24px' }}>
+                                    <h4 style={{
+                                        fontSize: '13px', fontWeight: 700, color: '#1e293b',
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        marginBottom: '12px'
+                                    }}>
+                                        💬 Frases Clave del Agente
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {aiProfile.frases_clave.map((f, i) => {
+                                            const typeColors = {
+                                                cordial: { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
+                                                profesional: { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' },
+                                                informal: { bg: '#fffbeb', border: '#fde68a', color: '#92400e' },
+                                                'problemática': { bg: '#fef2f2', border: '#fecaca', color: '#991b1b' },
+                                            }
+                                            const style = typeColors[f.tipo] || typeColors.profesional
+                                            return (
+                                                <div key={i} style={{
+                                                    padding: '10px 16px', borderRadius: '10px',
+                                                    background: style.bg, border: `1px solid ${style.border}`,
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px'
+                                                }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <span style={{ fontSize: '13px', fontWeight: 600, color: style.color }}>
+                                                            "{f.frase}"
+                                                        </span>
+                                                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                                            {f.comentario}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                                                        <span style={{
+                                                            fontSize: '10px', padding: '2px 8px',
+                                                            borderRadius: '100px', background: style.color + '15',
+                                                            color: style.color, fontWeight: 600, textTransform: 'capitalize'
+                                                        }}>{f.tipo}</span>
+                                                        <span style={{
+                                                            fontSize: '10px', padding: '2px 8px',
+                                                            borderRadius: '100px', background: '#f1f5f9',
+                                                            color: '#64748b', fontWeight: 500
+                                                        }}>Frecuencia: {f.frecuencia}</span>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Spelling Errors */}
+                            {(aiProfile.errores_ortograficos || []).length > 0 && (
+                                <div style={{ marginBottom: '24px' }}>
+                                    <h4 style={{
+                                        fontSize: '13px', fontWeight: 700, color: '#dc2626',
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        marginBottom: '12px'
+                                    }}>
+                                        ✏️ Errores Ortográficos Detectados
+                                    </h4>
+                                    <div style={{
+                                        borderRadius: '10px', border: '1px solid #fecaca',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                            <thead>
+                                                <tr style={{ background: '#fef2f2' }}>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', color: '#991b1b', fontWeight: 600 }}>Escribió</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', color: '#166534', fontWeight: 600 }}>Correcto</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>Veces</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600 }}>Gravedad</th>
+                                                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#64748b' }}>Contexto</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {aiProfile.errores_ortograficos.map((err, i) => (
+                                                    <tr key={i} style={{ borderTop: '1px solid #fecaca' }}>
+                                                        <td style={{ padding: '8px 12px', color: '#dc2626', fontWeight: 600 }}>
+                                                            <s>{err.palabra_incorrecta}</s>
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', color: '#16a34a', fontWeight: 600 }}>
+                                                            {err.correccion}
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                                            {err.cantidad}x
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                                            <span className={`badge ${err.gravedad === 'grave' ? 'negative' : 'warning'}`}>
+                                                                {err.gravedad}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '8px 12px', color: '#64748b', fontSize: '11px', fontStyle: 'italic' }}>
+                                                            "...{err.ejemplo_contexto}..."
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Communication Profile */}
                             {aiProfile.perfil_comunicacion && (
                                 <div style={{
@@ -695,10 +781,10 @@ function AgentDetail({ agent }) {
                                         </div>
                                         <div>
                                             <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, marginBottom: '4px' }}>
-                                                Palabras Frecuentes
+                                                Frases Frecuentes
                                             </div>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                {(aiProfile.perfil_comunicacion.palabras_frecuentes || []).map(w => (
+                                                {(aiProfile.perfil_comunicacion.frases_frecuentes || aiProfile.perfil_comunicacion.palabras_frecuentes || []).map(w => (
                                                     <span key={w} style={{
                                                         fontSize: '11px', padding: '2px 10px',
                                                         borderRadius: '100px', background: '#ede9fe',

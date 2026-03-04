@@ -86,10 +86,6 @@ export async function fetchOverviewStats(dateFrom = null, dateTo = null) {
         ? (sentimentScores.reduce((a, b) => a + b, 0) / sentimentScores.length).toFixed(2)
         : 0
 
-    const protocolScores = analyses?.filter(a => a.agent_protocol_score !== null).map(a => a.agent_protocol_score) || []
-    const avgProtocol = protocolScores.length > 0
-        ? (protocolScores.reduce((a, b) => a + b, 0) / protocolScores.length).toFixed(1)
-        : 0
 
     const responseTimes = analyses?.filter(a => a.first_response_time_seconds !== null).map(a => a.first_response_time_seconds) || []
     const avgResponseTime = responseTimes.length > 0
@@ -204,7 +200,7 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
                 agent_name: name,
                 total_chats: 0,
                 sentiments: [],
-                protocol_scores: [],
+                protocol_scores: [], // deprecated, kept for compat
                 tones: {},
                 response_times: [],
                 handoff_times: [],
@@ -226,7 +222,6 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
         const analysis = ticket.cc_analysis?.[0] || ticket.cc_analysis
         if (analysis) {
             if (analysis.sentiment_score !== null) agent.sentiments.push(analysis.sentiment_score)
-            if (analysis.agent_protocol_score !== null) agent.protocol_scores.push(analysis.agent_protocol_score)
             if (analysis.agent_tone) agent.tones[analysis.agent_tone] = (agent.tones[analysis.agent_tone] || 0) + 1
             if (analysis.first_response_time_seconds) agent.response_times.push(analysis.first_response_time_seconds)
             if (analysis.agent_greeting) agent.greetings++
@@ -247,9 +242,7 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
         avg_sentiment: agent.sentiments.length > 0
             ? (agent.sentiments.reduce((a, b) => a + b, 0) / agent.sentiments.length).toFixed(2)
             : null,
-        avg_protocol: agent.protocol_scores.length > 0
-            ? (agent.protocol_scores.reduce((a, b) => a + b, 0) / agent.protocol_scores.length).toFixed(1)
-            : null,
+        avg_protocol: null,
         avg_response_time: agent.response_times.length > 0
             ? Math.round(agent.response_times.reduce((a, b) => a + b, 0) / agent.response_times.length)
             : null,
@@ -335,7 +328,6 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
             cc_analysis (
                 overall_sentiment,
                 sentiment_score,
-                agent_protocol_score,
                 agent_tone,
                 detected_intent,
                 conversation_summary
@@ -355,7 +347,6 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
         if (!analysis) return false
         return (
             analysis.sentiment_score !== null && analysis.sentiment_score < -0.3 ||
-            analysis.agent_protocol_score !== null && analysis.agent_protocol_score < 5 ||
             analysis.overall_sentiment === 'frustrated' ||
             analysis.overall_sentiment === 'negative'
         )
@@ -366,7 +357,6 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
             analysis,
             reasons: [
                 analysis?.sentiment_score < -0.3 ? `Sentimiento bajo (${analysis.sentiment_score.toFixed(2)})` : null,
-                analysis?.agent_protocol_score < 5 ? `Protocolo bajo (${analysis.agent_protocol_score}/10)` : null,
                 analysis?.overall_sentiment === 'frustrated' ? 'Paciente frustrado' : null,
                 analysis?.overall_sentiment === 'negative' ? 'Experiencia negativa' : null,
             ].filter(Boolean)
