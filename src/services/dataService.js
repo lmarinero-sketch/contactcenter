@@ -514,6 +514,7 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
                 handoff_times: [],
                 greetings: 0,
                 farewells: 0,
+                agent_participated: 0,
                 keywords: {},
                 intents: {},
             }
@@ -532,8 +533,14 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
             if (analysis.sentiment_score !== null) agent.sentiments.push(analysis.sentiment_score)
             if (analysis.agent_tone) agent.tones[analysis.agent_tone] = (agent.tones[analysis.agent_tone] || 0) + 1
             if (analysis.first_response_time_seconds) agent.response_times.push(analysis.first_response_time_seconds)
-            if (analysis.agent_greeting) agent.greetings++
-            if (analysis.agent_farewell) agent.farewells++
+
+            // Only count greeting/farewell when agent actually participated
+            const agentParticipated = analysis.agent_tone && analysis.agent_tone !== 'N/A'
+            if (agentParticipated) {
+                agent.agent_participated++
+                if (analysis.agent_greeting) agent.greetings++
+                if (analysis.agent_farewell) agent.farewells++
+            }
             if (analysis.detected_intent) agent.intents[analysis.detected_intent] = (agent.intents[analysis.detected_intent] || 0) + 1
 
             if (analysis.agent_keywords) {
@@ -559,8 +566,8 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
             : null,
         max_handoff_time: agent.handoff_times.length > 0 ? Math.max(...agent.handoff_times) : null,
         min_handoff_time: agent.handoff_times.length > 0 ? Math.min(...agent.handoff_times) : null,
-        greeting_rate: agent.total_chats > 0 ? ((agent.greetings / agent.total_chats) * 100).toFixed(0) : 0,
-        farewell_rate: agent.total_chats > 0 ? ((agent.farewells / agent.total_chats) * 100).toFixed(0) : 0,
+        greeting_rate: agent.agent_participated > 0 ? ((agent.greetings / agent.agent_participated) * 100).toFixed(0) : 0,
+        farewell_rate: agent.agent_participated > 0 ? ((agent.farewells / agent.agent_participated) * 100).toFixed(0) : 0,
         top_keywords: Object.entries(agent.keywords).sort((a, b) => b[1] - a[1]).slice(0, 10),
         dominant_tone: Object.entries(agent.tones).sort((a, b) => b[1] - a[1])?.[0]?.[0] || 'N/A',
     })).sort((a, b) => b.total_chats - a.total_chats)
