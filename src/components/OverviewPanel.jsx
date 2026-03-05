@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
     MessageSquare, Smile, Clock,
     TrendingUp, TrendingDown, AlertTriangle, Download, Zap, ChevronRight, Timer,
@@ -9,7 +9,7 @@ import {
     PieChart, Pie, Cell, AreaChart, Area, Legend, LineChart, Line, ComposedChart,
     ReferenceLine
 } from 'recharts'
-import { fetchOverviewStats, fetchProblematicChats, exportToCSV } from '../services/dataService'
+import { fetchOverviewRawData, computeOverviewStats, exportToCSV } from '../services/dataService'
 import { format } from 'date-fns'
 import DateFilter from './DateFilter'
 
@@ -21,7 +21,7 @@ const SENTIMENT_COLORS = {
 }
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-const HEATMAP_HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7:00 to 20:00
+const HEATMAP_HOURS = Array.from({ length: 14 }, (_, i) => i + 7)
 
 function getHeatmapColor(value, max) {
     if (value === 0) return '#f8fafc'
@@ -33,31 +33,37 @@ function getHeatmapColor(value, max) {
 }
 
 export default function OverviewPanel({ onNavigateToChat }) {
-    const [stats, setStats] = useState(null)
+    // Raw data — loaded ONCE
+    const [rawData, setRawData] = useState(null)
     const [loading, setLoading] = useState(true)
+
+    // Filter state — changes trigger instant recalc, no fetch
     const [dateFrom, setDateFrom] = useState(null)
     const [dateTo, setDateTo] = useState(null)
-    const [problems, setProblems] = useState([])
 
+    // Load raw data once on mount
     useEffect(() => {
-        loadAll()
-    }, [dateFrom, dateTo])
-
-    async function loadAll() {
-        try {
-            setLoading(true)
-            const [statsData, problemsData] = await Promise.all([
-                fetchOverviewStats(dateFrom, dateTo),
-                fetchProblematicChats(dateFrom, dateTo),
-            ])
-            setStats(statsData)
-            setProblems(problemsData)
-        } catch (err) {
-            console.error('Error loading overview:', err)
-        } finally {
-            setLoading(false)
+        async function load() {
+            try {
+                setLoading(true)
+                const data = await fetchOverviewRawData()
+                setRawData(data)
+            } catch (err) {
+                console.error('Error loading overview:', err)
+            } finally {
+                setLoading(false)
+            }
         }
-    }
+        load()
+    }, [])
+
+    // Compute stats instantly when filters change — no spinner, no refetch
+    const stats = useMemo(() => {
+        if (!rawData) return null
+        return computeOverviewStats(rawData.allTickets, rawData.allAnalyses, dateFrom, dateTo)
+    }, [rawData, dateFrom, dateTo])
+
+    const problems = stats?.problematicChats || []
 
     const handleDateChange = (from, to) => {
         setDateFrom(from)
@@ -97,7 +103,6 @@ export default function OverviewPanel({ onNavigateToChat }) {
         hour: `${hour.toString().padStart(2, '0')}:00`, chats: count,
     }))
 
-    // Day of week data
     const reorderedDays = [1, 2, 3, 4, 5, 6, 0]
     const maxDayCount = Math.max(...(stats.dailyDist || [0]))
     const dailyData = reorderedDays.map(dayIndex => ({
@@ -106,23 +111,15 @@ export default function OverviewPanel({ onNavigateToChat }) {
         fill: stats.dailyDist?.[dayIndex] === maxDayCount && maxDayCount > 0 ? '#0d9488' : '#5eead4',
     }))
 
-    // Weekly trend data with forecast
     const trendData = (stats.weeklyTrend || []).map(w => ({
-        name: w.label,
-        chats: w.chats,
+        name: w.label, chats: w.chats,
     }))
 
-    // Sentiment trend
     const sentTrendData = (stats.sentimentTrend || []).map(w => ({
-        name: w.label,
-        score: w.avgScore,
-        negativeRate: w.negativeRate,
+        name: w.label, score: w.avgScore, negativeRate: w.negativeRate,
     }))
 
-    // Forecast data
     const forecastData = stats.forecast || []
-
-    // Heatmap max value
     const heatmapMax = Math.max(...(stats.heatmapData || []).flat().filter(Boolean), 1)
 
     const formatSeconds = (seconds) => {
@@ -141,7 +138,6 @@ export default function OverviewPanel({ onNavigateToChat }) {
         }
     }
 
-    // Export handler
     const handleExport = () => {
         if (!problems.length) return
         exportToCSV(problems.map(p => ({
@@ -255,7 +251,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                     <YAxis tick={{ fontSize: 11 }} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
                                     <Area type="monotone" dataKey="chats" stroke="#1a6bb5" fill="#1a6bb5" fillOpacity={0.12} strokeWidth={2.5}
-                                        name="Chats" dot={{ r: 4, fill: '#1a6bb5' }} />
+                                        name="Chats" dot={{ r: 4, fill: '#1a6bb5' }} animationDuration={600} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -287,7 +283,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                             return item ? `${label} ${item.date}` : label
                                         }}
                                     />
-                                    <Bar dataKey="predicted" fill="#8b5cf6" radius={[6, 6, 0, 0]} name="predicted" />
+                                    <Bar dataKey="predicted" fill="#8b5cf6" radius={[6, 6, 0, 0]} name="predicted" animationDuration={600} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -301,18 +297,16 @@ export default function OverviewPanel({ onNavigateToChat }) {
                     <div className="card-header">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <CalendarDays size={16} color="#0d9488" />
-                            <h3 style={{ margin: 0 }} title="Mapa de calor: cruza día de la semana con hora del día para identificar picos de demanda.">Mapa de Calor — Demanda</h3>
+                            <h3 style={{ margin: 0 }}>Mapa de Calor — Demanda</h3>
                         </div>
                     </div>
                     <div className="card-body">
                         <div className="heatmap-container">
                             <div className="heatmap-grid">
-                                {/* Header row - hours */}
                                 <div className="heatmap-label"></div>
                                 {HEATMAP_HOURS.map(h => (
                                     <div key={h} className="heatmap-hour-label">{h}</div>
                                 ))}
-                                {/* Data rows - days (Mon to Sun) */}
                                 {[1, 2, 3, 4, 5, 6, 0].map(dayIdx => (
                                     <>
                                         <div key={`label-${dayIdx}`} className="heatmap-day-label">{DAY_LABELS[dayIdx]}</div>
@@ -322,7 +316,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                                 <div
                                                     key={`${dayIdx}-${h}`}
                                                     className="heatmap-cell"
-                                                    style={{ background: getHeatmapColor(val, heatmapMax) }}
+                                                    style={{ background: getHeatmapColor(val, heatmapMax), transition: 'background 0.4s ease' }}
                                                     title={`${DAY_LABELS[dayIdx]} ${h}:00 — ${val} chats`}
                                                 >
                                                     {val > 0 && <span className="heatmap-cell-value">{val}</span>}
@@ -361,7 +355,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                         contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                                         formatter={(value) => [`${value} chats`, 'Cantidad']}
                                     />
-                                    <Bar dataKey="chats" radius={[6, 6, 0, 0]}>
+                                    <Bar dataKey="chats" radius={[6, 6, 0, 0]} animationDuration={600}>
                                         {dailyData.map((entry, i) => (
                                             <Cell key={i} fill={entry.fill} />
                                         ))}
@@ -393,9 +387,9 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
                                     <ReferenceLine yAxisId="left" y={0} stroke="#94a3b8" strokeDasharray="3 3" />
                                     <Area yAxisId="left" type="monotone" dataKey="score" stroke="#10b981" fill="#10b981" fillOpacity={0.1}
-                                        strokeWidth={2} name="Score promedio" dot={{ r: 3 }} />
+                                        strokeWidth={2} name="Score promedio" dot={{ r: 3 }} animationDuration={600} />
                                     <Line yAxisId="right" type="monotone" dataKey="negativeRate" stroke="#ef4444"
-                                        strokeWidth={2} name="% Negativos" dot={{ r: 3 }} strokeDasharray="4 2" />
+                                        strokeWidth={2} name="% Negativos" dot={{ r: 3 }} strokeDasharray="4 2" animationDuration={600} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -404,14 +398,14 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
                 <div className="card">
                     <div className="card-header">
-                        <h3 title="Proporción de pacientes con experiencia positiva, neutra, negativa o frustrada.">Distribución de Sentimiento</h3>
+                        <h3>Distribución de Sentimiento</h3>
                     </div>
                     <div className="card-body">
                         <div className="chart-container">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie data={sentimentData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value"
-                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} animationDuration={600}>
                                         {sentimentData.map((entry, i) => (
                                             <Cell key={i} fill={entry.color} />
                                         ))}
@@ -457,7 +451,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
                 <div className="card">
                     <div className="card-header">
-                        <h3 title="Motivos más frecuentes por los cuales los pacientes se comunican.">Intenciones Detectadas</h3>
+                        <h3>Intenciones Detectadas</h3>
                     </div>
                     <div className="card-body">
                         <div className="chart-container">
@@ -467,7 +461,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                     <XAxis type="number" tick={{ fontSize: 11 }} />
                                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                                    <Bar dataKey="value" fill="#1a6bb5" radius={[0, 4, 4, 0]} />
+                                    <Bar dataKey="value" fill="#1a6bb5" radius={[0, 4, 4, 0]} animationDuration={600} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -492,11 +486,15 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                         <div className="bot-path-label">{p.path}</div>
                                         <div className="bot-path-bar-container">
                                             <div className="bot-path-bar"
-                                                style={{ width: `${Math.min(p.rate, 100)}%`, background: p.rate > 80 ? '#ef4444' : p.rate > 50 ? '#f59e0b' : '#10b981' }}
+                                                style={{
+                                                    width: `${Math.min(p.rate, 100)}%`,
+                                                    background: p.rate > 80 ? '#ef4444' : p.rate > 50 ? '#f59e0b' : '#10b981',
+                                                    transition: 'width 0.6s ease, background 0.4s ease',
+                                                }}
                                             />
                                         </div>
                                         <div className="bot-path-stats">
-                                            <span style={{ fontWeight: 700, color: p.rate > 80 ? '#ef4444' : '#1e293b' }}>{p.rate}%</span>
+                                            <span style={{ fontWeight: 700, color: p.rate > 80 ? '#ef4444' : '#1e293b', transition: 'color 0.3s' }}>{p.rate}%</span>
                                             <span style={{ fontSize: '11px', color: '#94a3b8' }}>({p.transferred}/{p.total})</span>
                                         </div>
                                     </div>
@@ -510,7 +508,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
                 <div className="card">
                     <div className="card-header">
-                        <h3 title="Distribución de la cantidad de chats recibidos por cada hora del día.">Chats por Hora del Día</h3>
+                        <h3>Chats por Hora del Día</h3>
                     </div>
                     <div className="card-body">
                         <div className="chart-container">
@@ -520,7 +518,8 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                     <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={2} />
                                     <YAxis tick={{ fontSize: 11 }} />
                                     <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                                    <Area type="monotone" dataKey="chats" stroke="#1a6bb5" fill="#1a6bb5" fillOpacity={0.15} strokeWidth={2} />
+                                    <Area type="monotone" dataKey="chats" stroke="#1a6bb5" fill="#1a6bb5" fillOpacity={0.15} strokeWidth={2}
+                                        animationDuration={600} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
