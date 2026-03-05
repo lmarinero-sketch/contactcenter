@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Bot, ArrowRight, CheckCircle, XCircle } from 'lucide-react'
+import { Bot, ArrowRight, CheckCircle, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchBotTreeStats } from '../services/dataService'
 
-const COLORS = ['#1a6bb5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+const LEVEL_COLORS = {
+    1: ['#1a6bb5', '#10b981', '#8b5cf6'],
+    2: ['#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#2563eb', '#64748b'],
+    3: ['#f59e0b', '#06b6d4', '#64748b'],
+}
 
 // Known tree structure
 const BOT_TREE_CONFIG = {
@@ -26,6 +30,54 @@ const BOT_TREE_CONFIG = {
         { key: 'B', label: 'Turnos de Tomografía, Ecografía, Mamografía, Densitometría y Rayos X' },
         { key: 'C', label: 'Volver al menú anterior' },
     ],
+}
+
+function TreeNode({ option, count, total, color, level, children, defaultOpen = false }) {
+    const [open, setOpen] = useState(defaultOpen)
+    const pct = total > 0 ? ((count / total) * 100) : 0
+    const hasChildren = !!children
+
+    return (
+        <div className={`tree-branch tree-branch--level-${level}`}>
+            <div
+                className={`tree-card tree-card--level-${level}`}
+                style={{ '--accent-color': color }}
+                onClick={() => hasChildren && setOpen(!open)}
+            >
+                <div className="tree-card-left">
+                    <div className="tree-card-key" style={{ background: color }}>
+                        {option.key}
+                    </div>
+                    <div className="tree-card-content">
+                        <div className="tree-card-label">{option.label}</div>
+                        <div className="tree-card-bar">
+                            <div
+                                className="tree-card-bar-fill"
+                                style={{ width: `${Math.max(pct, 1)}%`, background: color }}
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div className="tree-card-right">
+                    <div className="tree-card-stats">
+                        <span className="tree-card-count">{count}</span>
+                        <span className="tree-card-pct">{pct.toFixed(1)}%</span>
+                    </div>
+                    {hasChildren && (
+                        <div className="tree-card-toggle">
+                            {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </div>
+                    )}
+                </div>
+            </div>
+            {hasChildren && open && (
+                <div className="tree-children">
+                    <div className="tree-connector-line" style={{ borderColor: color + '40' }} />
+                    {children}
+                </div>
+            )}
+        </div>
+    )
 }
 
 export default function ChatbotPanel() {
@@ -62,29 +114,17 @@ export default function ChatbotPanel() {
         )
     }
 
-    // Calculate percentages for tree visualization
     const total = stats.totalAnalyzed || 1
 
-    const getCount = (choices, label) => {
-        return choices[label] || 0
-    }
-
-    const getPercentage = (choices, label) => {
-        const count = getCount(choices, label)
-        return ((count / total) * 100).toFixed(1)
-    }
-
-    const firstChoiceData = Object.entries(stats.firstChoices)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, value]) => ({ name, value }))
+    const getCount = (choices, label) => choices[label] || 0
 
     const secondChoiceData = Object.entries(stats.secondChoices)
         .sort((a, b) => b[1] - a[1])
-        .map(([name, value]) => ({ name, value }))
+        .map(([name, value]) => ({ name: name.length > 30 ? name.substring(0, 28) + '…' : name, value, fullName: name }))
 
     const thirdChoiceData = Object.entries(stats.thirdChoices)
         .sort((a, b) => b[1] - a[1])
-        .map(([name, value]) => ({ name, value }))
+        .map(([name, value]) => ({ name: name.length > 35 ? name.substring(0, 33) + '…' : name, value, fullName: name }))
 
     return (
         <div className="fade-in">
@@ -131,90 +171,70 @@ export default function ChatbotPanel() {
                     <span style={{ fontSize: '12px', color: '#94a3b8' }}>Basado en {stats.totalAnalyzed} conversaciones</span>
                 </div>
                 <div className="bot-tree">
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a6bb5', marginBottom: '12px' }}>
+                    <div className="tree-prompt">
+                        <Bot size={14} />
                         "¿Cómo te puedo ayudar? Selecciona una opción"
                     </div>
 
                     {/* Level 1 */}
                     {BOT_TREE_CONFIG.level1.map((option, i) => {
                         const count = getCount(stats.firstChoices, option.label)
-                        const pct = getPercentage(stats.firstChoices, option.label)
+                        const color = LEVEL_COLORS[1][i]
                         return (
-                            <div key={option.key}>
-                                <div className="tree-node" style={{ borderLeft: `3px solid ${COLORS[i]}` }}>
-                                    <div className="tree-node-label">
-                                        <div className="tree-node-key">{option.key}</div>
-                                        {option.label}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <div className="tree-node-count">{count}</div>
-                                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>{pct}%</span>
-                                    </div>
-                                </div>
-                                <div className="tree-node-bar">
-                                    <div className="tree-node-bar-fill" style={{ width: `${pct}%` }}></div>
-                                </div>
-
-                                {/* Level 2 for option A */}
+                            <TreeNode
+                                key={option.key}
+                                option={option}
+                                count={count}
+                                total={total}
+                                color={color}
+                                level={1}
+                                defaultOpen={option.key === 'A'}
+                            >
                                 {option.key === 'A' && (
-                                    <div className="tree-level">
-                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', margin: '12px 0 8px', padding: '0 8px' }}>
+                                    <>
+                                        <div className="tree-prompt tree-prompt--sub">
                                             "Por favor selecciona una de estas opciones"
                                         </div>
                                         {BOT_TREE_CONFIG.level2_A.map((sub, j) => {
                                             const subCount = getCount(stats.secondChoices, sub.label)
-                                            const subPct = total > 0 ? ((subCount / total) * 100).toFixed(1) : 0
+                                            const subColor = LEVEL_COLORS[2][j]
                                             return (
-                                                <div key={sub.key}>
-                                                    <div className="tree-node">
-                                                        <div className="tree-node-label">
-                                                            <div className="tree-node-key" style={{ background: COLORS[(j + 1) % COLORS.length] }}>{sub.key}</div>
-                                                            {sub.label}
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            <div className="tree-node-count">{subCount}</div>
-                                                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>{subPct}%</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="tree-node-bar">
-                                                        <div className="tree-node-bar-fill" style={{ width: `${subPct * 3}%`, background: COLORS[(j + 1) % COLORS.length] }}></div>
-                                                    </div>
-
-                                                    {/* Level 3 for A > A (Solicitar turnos) */}
+                                                <TreeNode
+                                                    key={sub.key}
+                                                    option={sub}
+                                                    count={subCount}
+                                                    total={total}
+                                                    color={subColor}
+                                                    level={2}
+                                                    defaultOpen={sub.key === 'A'}
+                                                >
                                                     {sub.key === 'A' && (
-                                                        <div className="tree-level">
-                                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', margin: '12px 0 8px', padding: '0 8px' }}>
+                                                        <>
+                                                            <div className="tree-prompt tree-prompt--sub">
                                                                 "Selecciona el tipo de turno que necesitas"
                                                             </div>
                                                             {BOT_TREE_CONFIG.level3_A_A.map((third, k) => {
                                                                 const thirdCount = getCount(stats.thirdChoices, third.label)
-                                                                const thirdPct = total > 0 ? ((thirdCount / total) * 100).toFixed(1) : 0
+                                                                const thirdColor = LEVEL_COLORS[3][k]
                                                                 return (
-                                                                    <div key={third.key}>
-                                                                        <div className="tree-node">
-                                                                            <div className="tree-node-label">
-                                                                                <div className="tree-node-key" style={{ background: COLORS[(k + 3) % COLORS.length] }}>{third.key}</div>
-                                                                                <span style={{ fontSize: '12px' }}>{third.label}</span>
-                                                                            </div>
-                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                                                <div className="tree-node-count">{thirdCount}</div>
-                                                                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>{thirdPct}%</span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="tree-node-bar">
-                                                                            <div className="tree-node-bar-fill" style={{ width: `${thirdPct * 5}%`, background: COLORS[(k + 3) % COLORS.length] }}></div>
-                                                                        </div>
-                                                                    </div>
+                                                                    <TreeNode
+                                                                        key={third.key}
+                                                                        option={third}
+                                                                        count={thirdCount}
+                                                                        total={total}
+                                                                        color={thirdColor}
+                                                                        level={3}
+                                                                    />
                                                                 )
                                                             })}
-                                                        </div>
+                                                        </>
                                                     )}
-                                                </div>
+                                                </TreeNode>
                                             )
                                         })}
-                                    </div>
+                                    </>
                                 )}
-                            </div>
+                            </TreeNode>
                         )
                     })}
                 </div>
@@ -224,19 +244,27 @@ export default function ChatbotPanel() {
             <div className="grid-2">
                 <div className="card">
                     <div className="card-header">
-                        <h3>Primera Elección (Nivel 1)</h3>
+                        <h3>Segunda Elección (Nivel 2)</h3>
                     </div>
                     <div className="card-body">
-                        <div className="chart-container">
+                        <div style={{ width: '100%', height: Math.max(250, secondChoiceData.length * 40) }}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={firstChoiceData}>
+                                <BarChart data={secondChoiceData} layout="vertical" margin={{ left: 10, right: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                                    <YAxis tick={{ fontSize: 11 }} />
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                        {firstChoiceData.map((entry, i) => (
-                                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                                    <XAxis type="number" tick={{ fontSize: 11 }} />
+                                    <YAxis
+                                        dataKey="name"
+                                        type="category"
+                                        tick={{ fontSize: 11 }}
+                                        width={180}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                                        formatter={(value, _, props) => [value, props.payload.fullName || 'Cantidad']}
+                                    />
+                                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                                        {secondChoiceData.map((entry, i) => (
+                                            <Cell key={i} fill={LEVEL_COLORS[2][i % LEVEL_COLORS[2].length]} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -247,19 +275,27 @@ export default function ChatbotPanel() {
 
                 <div className="card">
                     <div className="card-header">
-                        <h3>Segunda Elección (Nivel 2)</h3>
+                        <h3>Tercera Elección (Nivel 3)</h3>
                     </div>
                     <div className="card-body">
-                        <div className="chart-container">
+                        <div style={{ width: '100%', height: Math.max(250, thirdChoiceData.length * 45) }}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={secondChoiceData} layout="vertical">
+                                <BarChart data={thirdChoiceData} layout="vertical" margin={{ left: 10, right: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                                     <XAxis type="number" tick={{ fontSize: 11 }} />
-                                    <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={140} />
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
+                                    <YAxis
+                                        dataKey="name"
+                                        type="category"
+                                        tick={{ fontSize: 11 }}
+                                        width={200}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                                        formatter={(value, _, props) => [value, props.payload.fullName || 'Cantidad']}
+                                    />
                                     <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                        {secondChoiceData.map((entry, i) => (
-                                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                                        {thirdChoiceData.map((entry, i) => (
+                                            <Cell key={i} fill={LEVEL_COLORS[3][i % LEVEL_COLORS[3].length]} />
                                         ))}
                                     </Bar>
                                 </BarChart>
