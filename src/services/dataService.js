@@ -1,5 +1,40 @@
 import { supabase } from '../lib/supabase'
 
+// ===================== HELPER: FETCH ALL ROWS (bypass 1000-row default) =====================
+const BATCH_SIZE = 1000
+
+async function fetchAllRows(tableName, selectColumns, filters = []) {
+    let allData = []
+    let offset = 0
+    let hasMore = true
+
+    while (hasMore) {
+        let query = supabase
+            .from(tableName)
+            .select(selectColumns)
+            .range(offset, offset + BATCH_SIZE - 1)
+
+        // Apply any filters
+        for (const f of filters) {
+            if (f.type === 'not') query = query.not(f.column, f.op, f.value)
+            else if (f.type === 'eq') query = query.eq(f.column, f.value)
+            else if (f.type === 'gte') query = query.gte(f.column, f.value)
+            else if (f.type === 'lte') query = query.lte(f.column, f.value)
+            else if (f.type === 'in') query = query.in(f.column, f.value)
+            else if (f.type === 'order') query = query.order(f.column, f.options)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+
+        allData = allData.concat(data || [])
+        hasMore = (data?.length || 0) === BATCH_SIZE
+        offset += BATCH_SIZE
+    }
+
+    return allData
+}
+
 // ===================== TICKETS =====================
 export async function fetchTickets({ limit = 50, offset = 0, agent = null, dateFrom = null, dateTo = null } = {}) {
     let query = supabase
@@ -62,19 +97,16 @@ export async function fetchTicketDetail(ticketId) {
 
 // ===================== OVERVIEW STATS =====================
 
-// 1️⃣  Fetch raw data ONCE — no date filters, fast single load
+// 1️⃣  Fetch raw data ONCE — no date filters, fetch ALL rows (no 1000-row cap)
 export async function fetchOverviewRawData() {
-    const [
-        { data: allTickets },
-        { data: allAnalyses },
-    ] = await Promise.all([
-        supabase.from('cc_tickets').select('ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name'),
-        supabase.from('cc_analysis').select('ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds'),
+    const [allTickets, allAnalyses] = await Promise.all([
+        fetchAllRows('cc_tickets', 'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name'),
+        fetchAllRows('cc_analysis', 'ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds'),
     ])
 
     return {
-        allTickets: allTickets || [],
-        allAnalyses: allAnalyses || [],
+        allTickets,
+        allAnalyses,
     }
 }
 
@@ -468,9 +500,13 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
 
 // ===================== AGENT STATS =====================
 export async function fetchAgentStats(dateFrom = null, dateTo = null) {
-    let query = supabase
-        .from('cc_tickets')
-        .select(`
+    const filters = [
+        { type: 'not', column: 'agent_name', op: 'is', value: null },
+    ]
+    if (dateFrom) filters.push({ type: 'gte', column: 'received_at', value: dateFrom })
+    if (dateTo) filters.push({ type: 'lte', column: 'received_at', value: dateTo })
+
+    const data = await fetchAllRows('cc_tickets', `
       agent_id,
       agent_name,
       transferred_to_agent,
@@ -489,14 +525,7 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
         detected_intent,
         agent_keywords
       )
-    `)
-        .not('agent_name', 'is', null)
-
-    if (dateFrom) query = query.gte('received_at', dateFrom)
-    if (dateTo) query = query.lte('received_at', dateTo)
-
-    const { data, error } = await query
-    if (error) throw error
+    `, filters)
 
     // Group by agent
     const agentMap = {}
@@ -575,23 +604,20 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
 
 // ===================== BOT TREE STATS =====================
 export async function fetchBotTreeStats(dateFrom = null, dateTo = null) {
-    let query = supabase
-        .from('cc_analysis')
-        .select('bot_first_choice, bot_second_choice, bot_third_choice, bot_resolution, bot_path_depth')
+    const filters = []
 
     if (dateFrom || dateTo) {
         // We need to join with tickets for date filtering
-        const ticketQuery = supabase.from('cc_tickets').select('ticket_id')
-        if (dateFrom) ticketQuery.gte('received_at', dateFrom)
-        if (dateTo) ticketQuery.lte('received_at', dateTo)
-        const { data: filteredTickets } = await ticketQuery
-        if (filteredTickets) {
-            query = query.in('ticket_id', filteredTickets.map(t => t.ticket_id))
+        const ticketFilters = []
+        if (dateFrom) ticketFilters.push({ type: 'gte', column: 'received_at', value: dateFrom })
+        if (dateTo) ticketFilters.push({ type: 'lte', column: 'received_at', value: dateTo })
+        const filteredTickets = await fetchAllRows('cc_tickets', 'ticket_id', ticketFilters)
+        if (filteredTickets.length > 0) {
+            filters.push({ type: 'in', column: 'ticket_id', value: filteredTickets.map(t => t.ticket_id) })
         }
     }
 
-    const { data, error } = await query
-    if (error) throw error
+    const data = await fetchAllRows('cc_analysis', 'bot_first_choice, bot_second_choice, bot_third_choice, bot_resolution, bot_path_depth', filters)
 
     // First choice distribution
     const firstChoices = {}
@@ -619,43 +645,40 @@ export async function fetchBotTreeStats(dateFrom = null, dateTo = null) {
 
 // ===================== UNIQUE AGENTS =====================
 export async function fetchAgentList() {
-    const { data, error } = await supabase
-        .from('cc_tickets')
-        .select('agent_name')
-        .not('agent_name', 'is', null)
+    const data = await fetchAllRows('cc_tickets', 'agent_name', [
+        { type: 'not', column: 'agent_name', op: 'is', value: null },
+    ])
 
-    if (error) throw error
-
-    const unique = [...new Set(data?.map(d => d.agent_name).filter(Boolean))]
+    const unique = [...new Set(data.map(d => d.agent_name).filter(Boolean))]
     return unique.sort()
 }
 
 // ===================== PROBLEMATIC CHATS =====================
 // ===================== RISK TICKET IDS (lightweight) =====================
 export async function fetchRiskTicketIds() {
-    const { data, error } = await supabase
-        .from('cc_analysis')
-        .select('ticket_id, overall_sentiment, sentiment_score')
-
-    if (error) throw error
+    const data = await fetchAllRows('cc_analysis', 'ticket_id, overall_sentiment, sentiment_score')
 
     const riskIds = new Set()
-        ; (data || []).forEach(a => {
-            if (
-                a.overall_sentiment === 'frustrated' ||
-                a.overall_sentiment === 'negative' ||
-                (a.sentiment_score !== null && a.sentiment_score < -0.3)
-            ) {
-                riskIds.add(a.ticket_id)
-            }
-        })
+    data.forEach(a => {
+        if (
+            a.overall_sentiment === 'frustrated' ||
+            a.overall_sentiment === 'negative' ||
+            (a.sentiment_score !== null && a.sentiment_score < -0.3)
+        ) {
+            riskIds.add(a.ticket_id)
+        }
+    })
     return riskIds
 }
 
 export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
-    let query = supabase
-        .from('cc_tickets')
-        .select(`
+    const filters = [
+        { type: 'order', column: 'received_at', options: { ascending: false } },
+    ]
+    if (dateFrom) filters.push({ type: 'gte', column: 'received_at', value: dateFrom })
+    if (dateTo) filters.push({ type: 'lte', column: 'received_at', value: dateTo })
+
+    const data = await fetchAllRows('cc_tickets', `
             ticket_id,
             agent_name,
             customer_name,
@@ -668,14 +691,7 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
                 detected_intent,
                 conversation_summary
             )
-        `)
-        .order('received_at', { ascending: false })
-
-    if (dateFrom) query = query.gte('received_at', dateFrom)
-    if (dateTo) query = query.lte('received_at', dateTo)
-
-    const { data, error } = await query
-    if (error) throw error
+        `, filters)
 
     // Filter for problematic conversations
     return (data || []).filter(ticket => {

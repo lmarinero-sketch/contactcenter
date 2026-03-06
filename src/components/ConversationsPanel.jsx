@@ -88,12 +88,21 @@ export default function ConversationsPanel({ initialTicketId, onTicketConsumed }
     async function loadRiskTickets() {
         try {
             setLoading(true)
-            // Fetch a larger batch to find risk ones
-            const { tickets: data } = await fetchTickets({
-                limit: 1000, offset: 0,
-                agent: filterAgent || null,
-            })
-            const riskOnly = data.filter(t => riskIds.has(t.ticket_id))
+            // Paginate to fetch ALL tickets (bypass Supabase 1000-row default)
+            let allData = []
+            let offset = 0
+            const BATCH = 1000
+            let hasMore = true
+            while (hasMore) {
+                const { tickets: batch } = await fetchTickets({
+                    limit: BATCH, offset,
+                    agent: filterAgent || null,
+                })
+                allData = allData.concat(batch)
+                hasMore = batch.length === BATCH
+                offset += BATCH
+            }
+            const riskOnly = allData.filter(t => riskIds.has(t.ticket_id))
             setRiskTicketsCache(riskOnly)
         } catch (err) { console.error('Error loading risk tickets:', err) }
         finally { setLoading(false) }
