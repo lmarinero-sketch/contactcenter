@@ -182,7 +182,12 @@ export default function OverviewPanel({ onNavigateToChat }) {
                 <div className="exec-kpis">
                     <div className="exec-kpi">
                         <div className="exec-kpi-value">{stats.totalChats}</div>
-                        <div className="exec-kpi-label">Chats Totales</div>
+                        <div className="exec-kpi-label">Chats Únicos</div>
+                        {stats.totalTickets && stats.totalTickets !== stats.totalChats && (
+                            <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                                {stats.totalTickets} conversaciones
+                            </div>
+                        )}
                     </div>
                     <div className="exec-kpi">
                         <div className="exec-kpi-value">

@@ -100,7 +100,7 @@ export async function fetchTicketDetail(ticketId) {
 // 1️⃣  Fetch raw data ONCE — no date filters, fetch ALL rows (no 1000-row cap)
 export async function fetchOverviewRawData() {
     const [allTickets, allAnalyses] = await Promise.all([
-        fetchAllRows('cc_tickets', 'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name'),
+        fetchAllRows('cc_tickets', 'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name, customer_phone'),
         fetchAllRows('cc_analysis', 'ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds'),
     ])
 
@@ -126,9 +126,12 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     const analyses = allAnalyses.filter(a => ticketIds.has(a.ticket_id))
 
     // ─── BASIC KPIs ───
-    const totalChats = tickets.length
+    // Each unique phone number = 1 unique chat (same person contacting multiple times counts as 1)
+    const uniquePhones = new Set(tickets.map(t => t.customer_phone).filter(Boolean))
+    const totalChats = uniquePhones.size || tickets.length // fallback if no phones
+    const totalTickets = tickets.length  // keep raw ticket count for reference
     const transferred = tickets.filter(t => t.transferred_to_agent).length
-    const transferRate = totalChats > 0 ? parseFloat(((transferred / totalChats) * 100).toFixed(1)) : 0
+    const transferRate = totalTickets > 0 ? parseFloat(((transferred / totalTickets) * 100).toFixed(1)) : 0
 
     const sentimentScores = analyses.filter(a => a.sentiment_score !== null).map(a => a.sentiment_score)
     const avgSentiment = sentimentScores.length > 0
@@ -230,6 +233,7 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     })
 
     // ─── WEEKLY TREND (using ALL tickets, last 8 weeks) ───
+    // Count unique phones per week (1 phone = 1 chat regardless of ticket count)
     const now = new Date()
     const weeklyTrend = []
     for (let w = 7; w >= 0; w--) {
@@ -240,11 +244,13 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         weekEnd.setDate(weekStart.getDate() + 6)
         weekEnd.setHours(23, 59, 59, 999)
 
-        const weekChats = allTickets.filter(t => {
+        const weekTickets = allTickets.filter(t => {
             if (!t.chat_started_at) return false
             const d = new Date(t.chat_started_at)
             return d >= weekStart && d <= weekEnd
-        }).length
+        })
+        const weekUniquePhones = new Set(weekTickets.map(t => t.customer_phone).filter(Boolean))
+        const weekChats = weekUniquePhones.size || weekTickets.length
 
         const label = `${weekStart.getDate()}/${weekStart.getMonth() + 1}`
         weeklyTrend.push({ label, chats: weekChats, weekStart: weekStart.toISOString() })
@@ -309,11 +315,13 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
             const refEnd = new Date(refDate)
             refEnd.setHours(23, 59, 59, 999)
 
-            const count = allTickets.filter(t => {
+            const dayTickets = allTickets.filter(t => {
                 if (!t.chat_started_at) return false
                 const td = new Date(t.chat_started_at)
                 return td >= refStart && td <= refEnd
-            }).length
+            })
+            const dayUniquePhones = new Set(dayTickets.map(t => t.customer_phone).filter(Boolean))
+            const count = dayUniquePhones.size || dayTickets.length
             historicalCounts.push(count)
         }
 
@@ -351,7 +359,8 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
             agentLoadToday[t.agent_name] = (agentLoadToday[t.agent_name] || 0) + 1
         }
     })
-    const totalToday = todayTickets.length
+    const todayUniquePhones = new Set(todayTickets.map(t => t.customer_phone).filter(Boolean))
+    const totalToday = todayUniquePhones.size || todayTickets.length
     Object.entries(agentLoadToday).forEach(([name, count]) => {
         if (totalToday > 3 && count / totalToday > 0.5) {
             alerts.push({
@@ -473,6 +482,7 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
 
     return {
         totalChats,
+        totalTickets,
         transferRate,
         avgSentiment,
         avgHandoffTime,
