@@ -23,26 +23,26 @@ def _generate_document_summary(text: str, filename: str) -> str:
     Returns a summary string that will be prepended to each chunk.
     """
     try:
-        # Take first 4000 chars for summary (enough to understand the document)
-        sample = text[:4000]
+        # Take first 2000 chars for summary (fast processing)
+        sample = text[:2000]
 
         response = openai_client.chat.completions.create(
             model=RERANK_MODEL,  # gpt-4o-mini — cheap and fast
             temperature=0,
-            max_tokens=300,
-            timeout=30,
+            max_tokens=150,
+            timeout=10,
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "Generá un resumen conciso del documento en 2-3 oraciones. "
-                        "Incluí: tipo de documento, tema principal, y datos clave. "
-                        "Respondé SOLO el resumen, sin encabezados ni explicaciones."
+                        "Generá un resumen conciso del documento en 1-2 oraciones. "
+                        "Incluí: tipo de documento y tema principal. "
+                        "Respondé SOLO el resumen, sin encabezados."
                     )
                 },
                 {
                     "role": "user",
-                    "content": f"Documento: {filename}\n\nContenido (extracto):\n{sample}"
+                    "content": f"Documento: {filename}\n\n{sample}"
                 }
             ]
         )
