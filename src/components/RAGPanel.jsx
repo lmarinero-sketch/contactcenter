@@ -492,7 +492,7 @@ export default function RAGPanel() {
                             {backendOnline === null ? 'Verificando...' : backendOnline ? 'Backend Online' : 'Backend Offline'}
                         </span>
                         <span className="badge info" style={{ marginLeft: 8 }}>
-                            {documents.length} docs
+                            {totalFiles} docs
                         </span>
                     </div>
                 </div>
