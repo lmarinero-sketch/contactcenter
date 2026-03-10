@@ -3,11 +3,11 @@ import {
     Send, Upload, FileText, Trash2, MessageSquare,
     Plus, Loader2, ChevronRight, Brain, BookOpen,
     AlertCircle, CheckCircle, File, X, Clock,
-    Search, Sparkles, Layers, BarChart3
+    Search, Sparkles, Layers, BarChart3, FolderOpen, Tag
 } from 'lucide-react'
 import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
-    deleteRAGConversation, uploadRAGDocument, listRAGDocuments,
+    deleteRAGConversation, uploadRAGDocument, uploadRAGBatch, listRAGDocuments,
     deleteRAGDocument, checkRAGHealth
 } from '../api/ragClient'
 
@@ -39,6 +39,8 @@ export default function RAGPanel() {
 
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
+    const folderInputRef = useRef(null)
+    const [uploadTag, setUploadTag] = useState('')
 
     // Check backend health on mount
     useEffect(() => {
@@ -130,29 +132,44 @@ export default function RAGPanel() {
         }
     }
 
-    // Handle file upload
+    // Handle file upload (single or multiple)
     async function handleFileUpload(event) {
-        const file = event.target.files[0]
-        if (!file) return
+        const files = Array.from(event.target.files || [])
+        if (!files.length) return
 
         setIsUploading(true)
-        setUploadProgress(`Procesando "${file.name}"...`)
         setError(null)
 
-        try {
-            const result = await uploadRAGDocument(file)
-            setUploadProgress('')
-            loadDocuments()
-            // Show success briefly
-            setUploadProgress(`✅ "${file.name}" — ${result.total_chunks} chunks creados`)
-            setTimeout(() => setUploadProgress(''), 4000)
-        } catch (e) {
-            setError(e.message || 'Error al subir documento')
-            setUploadProgress('')
-        } finally {
-            setIsUploading(false)
-            if (fileInputRef.current) fileInputRef.current.value = ''
+        if (files.length === 1) {
+            // Single file upload
+            setUploadProgress(`Procesando "${files[0].name}"...`)
+            try {
+                const result = await uploadRAGDocument(files[0], uploadTag)
+                loadDocuments()
+                setUploadProgress(`✅ "${files[0].name}" — ${result.total_chunks} chunks creados`)
+                setTimeout(() => setUploadProgress(''), 4000)
+            } catch (e) {
+                setError(e.message || 'Error al subir documento')
+                setUploadProgress('')
+            }
+        } else {
+            // Batch upload
+            setUploadProgress(`Procesando ${files.length} archivos...`)
+            try {
+                const result = await uploadRAGBatch(files, uploadTag)
+                loadDocuments()
+                setUploadProgress(`✅ ${result.processed} procesados, ${result.total_chunks} chunks — ${result.failed} fallidos, ${result.skipped} omitidos`)
+                setTimeout(() => setUploadProgress(''), 6000)
+            } catch (e) {
+                setError(e.message || 'Error al subir archivos')
+                setUploadProgress('')
+            }
         }
+
+        setIsUploading(false)
+        setUploadTag('')
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        if (folderInputRef.current) folderInputRef.current.value = ''
     }
 
     // Delete document
@@ -292,15 +309,48 @@ export default function RAGPanel() {
                                     accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm"
                                     style={{ display: 'none' }}
                                     disabled={isUploading}
+                                    multiple
                                 />
-                                <button
-                                    className="btn btn-secondary rag-upload-btn"
-                                    onClick={() => fileInputRef.current?.click()}
+                                <input
+                                    ref={folderInputRef}
+                                    type="file"
+                                    onChange={handleFileUpload}
+                                    style={{ display: 'none' }}
                                     disabled={isUploading}
-                                >
-                                    {isUploading ? <Loader2 size={14} className="rag-spin" /> : <Upload size={14} />}
-                                    {isUploading ? 'Procesando...' : 'Subir Documento'}
-                                </button>
+                                    webkitdirectory=""
+                                    directory=""
+                                    multiple
+                                />
+                                <div className="rag-upload-buttons">
+                                    <button
+                                        className="btn btn-secondary rag-upload-btn"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isUploading}
+                                    >
+                                        {isUploading ? <Loader2 size={14} className="rag-spin" /> : <Upload size={14} />}
+                                        {isUploading ? 'Procesando...' : 'Archivos'}
+                                    </button>
+                                    <button
+                                        className="btn btn-secondary rag-upload-btn"
+                                        onClick={() => folderInputRef.current?.click()}
+                                        disabled={isUploading}
+                                        title="Subir carpeta completa"
+                                    >
+                                        <FolderOpen size={14} />
+                                        Carpeta
+                                    </button>
+                                </div>
+                                <div className="rag-tag-input">
+                                    <Tag size={12} />
+                                    <input
+                                        type="text"
+                                        placeholder="Etiqueta (opcional)"
+                                        value={uploadTag}
+                                        onChange={(e) => setUploadTag(e.target.value)}
+                                        disabled={isUploading}
+                                        className="rag-tag-field"
+                                    />
+                                </div>
                                 {uploadProgress && (
                                     <div className="rag-upload-status">{uploadProgress}</div>
                                 )}
@@ -322,6 +372,7 @@ export default function RAGPanel() {
                                             <span className="rag-doc-name">{doc.filename}</span>
                                             <span className="rag-doc-meta">
                                                 {doc.total_chunks} chunks · {formatFileSize(doc.file_size)}
+                                                {doc.tag && <span className="rag-doc-tag">{doc.tag}</span>}
                                             </span>
                                         </div>
                                         <button

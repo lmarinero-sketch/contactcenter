@@ -1,6 +1,7 @@
 /**
  * RAG API Client — Functions to interact with the RAG backend
  * Sanatorio Argentino - Contact Center
+ * V3: Batch upload, tag support, filtered search
  * 
  * In development: uses Vite proxy (/rag-api → localhost:8000/api)
  * In production:  uses VITE_RAG_API_URL env var (Render URL)
@@ -47,9 +48,13 @@ export async function deleteRAGConversation(conversationId) {
 
 // === Documents ===
 
-export async function uploadRAGDocument(file, onProgress = null) {
+/**
+ * Upload a single document with optional tag
+ */
+export async function uploadRAGDocument(file, tag = '') {
     const formData = new FormData();
     formData.append('file', file);
+    if (tag) formData.append('tag', tag);
 
     const response = await fetch(`${RAG_API_BASE}/upload`, {
         method: 'POST',
@@ -62,8 +67,35 @@ export async function uploadRAGDocument(file, onProgress = null) {
     return response.json();
 }
 
-export async function listRAGDocuments() {
-    const response = await fetch(`${RAG_API_BASE}/documents`);
+/**
+ * Upload multiple files at once with a shared tag
+ * @param {FileList|File[]} files - Array of files to upload
+ * @param {string} tag - Shared tag for grouping
+ * @param {function} onProgress - Callback with progress updates
+ */
+export async function uploadRAGBatch(files, tag = '', onProgress = null) {
+    const formData = new FormData();
+    for (const file of files) {
+        formData.append('files', file);
+    }
+    if (tag) formData.append('tag', tag);
+
+    if (onProgress) onProgress({ stage: 'uploading', current: 0, total: files.length });
+
+    const response = await fetch(`${RAG_API_BASE}/upload-batch`, {
+        method: 'POST',
+        body: formData,
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Error al subir archivos' }));
+        throw new Error(error.detail || 'Error al subir lote de documentos');
+    }
+    return response.json();
+}
+
+export async function listRAGDocuments(tag = '') {
+    const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
+    const response = await fetch(`${RAG_API_BASE}/documents${params}`);
     if (!response.ok) throw new Error('Error al cargar documentos');
     return response.json();
 }
@@ -73,6 +105,14 @@ export async function deleteRAGDocument(filename) {
         method: 'DELETE',
     });
     if (!response.ok) throw new Error('Error al eliminar documento');
+    return response.json();
+}
+
+export async function deleteRAGDocumentsByTag(tag) {
+    const response = await fetch(`${RAG_API_BASE}/documents/by-tag?tag=${encodeURIComponent(tag)}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Error al eliminar documentos por tag');
     return response.json();
 }
 

@@ -98,7 +98,8 @@ CREATE OR REPLACE FUNCTION rag_hybrid_search(
   match_count INT DEFAULT 15,
   full_text_weight FLOAT DEFAULT 1.0,
   semantic_weight FLOAT DEFAULT 1.0,
-  rrf_k INT DEFAULT 60
+  rrf_k INT DEFAULT 60,
+  filter_tag TEXT DEFAULT ''
 )
 RETURNS TABLE (
   id BIGINT,
@@ -117,6 +118,7 @@ WITH semantic_search AS (
     1 - (d.embedding <=> query_embedding) AS similarity,
     ROW_NUMBER() OVER (ORDER BY d.embedding <=> query_embedding) AS rank_ix
   FROM rag_documents d
+  WHERE (filter_tag = '' OR d.metadata->>'tag' = filter_tag)
   ORDER BY d.embedding <=> query_embedding
   LIMIT match_count * 2
 ),
@@ -138,8 +140,9 @@ keyword_search AS (
       ) DESC
     ) AS rank_ix
   FROM rag_documents d
-  WHERE d.fts @@ plainto_tsquery('spanish', query_text)
-     OR d.fts @@ plainto_tsquery('simple', query_text)
+  WHERE (filter_tag = '' OR d.metadata->>'tag' = filter_tag)
+    AND (d.fts @@ plainto_tsquery('spanish', query_text)
+      OR d.fts @@ plainto_tsquery('simple', query_text))
   ORDER BY fts_rank DESC
   LIMIT match_count * 2
 )

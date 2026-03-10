@@ -72,10 +72,12 @@ def hybrid_search(query: str, query_embedding: list[float],
                   match_count: int = MATCH_COUNT,
                   full_text_weight: float = 1.0,
                   semantic_weight: float = 1.0,
-                  rrf_k: int = 60) -> list[dict]:
+                  rrf_k: int = 60,
+                  filter_tag: str = "") -> list[dict]:
     """
     Execute hybrid search combining vector similarity + full-text search.
     Uses the rag_hybrid_search SQL function with RRF.
+    Optionally filters by document tag.
     """
     result = supabase.rpc("rag_hybrid_search", {
         "query_text": query,
@@ -84,6 +86,7 @@ def hybrid_search(query: str, query_embedding: list[float],
         "full_text_weight": full_text_weight,
         "semantic_weight": semantic_weight,
         "rrf_k": rrf_k,
+        "filter_tag": filter_tag,
     }).execute()
 
     return result.data or []
