@@ -3,7 +3,7 @@
  * Sanatorio Argentino - Contact Center
  * 
  * In development: uses Vite proxy (/rag-api → localhost:8000/api)
- * In production:  uses VITE_RAG_API_URL env var (Railway URL)
+ * In production:  uses VITE_RAG_API_URL env var (Render URL)
  */
 
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api';
