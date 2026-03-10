@@ -153,12 +153,13 @@ export default function RAGPanel() {
                 setUploadProgress('')
             }
         } else {
-            // Batch upload
-            setUploadProgress(`Procesando ${files.length} archivos...`)
+            // Batch upload — one by one with progress
             try {
-                const result = await uploadRAGBatch(files, uploadTag)
+                const result = await uploadRAGBatch(files, uploadTag, (progress) => {
+                    setUploadProgress(`Subiendo ${progress.current}/${progress.total}: "${progress.filename}"...`)
+                })
                 loadDocuments()
-                setUploadProgress(`✅ ${result.processed} procesados, ${result.total_chunks} chunks — ${result.failed} fallidos, ${result.skipped} omitidos`)
+                setUploadProgress(`\u2705 ${result.processed} procesados, ${result.total_chunks} chunks - ${result.failed} fallidos, ${result.skipped} omitidos`)
                 setTimeout(() => setUploadProgress(''), 6000)
             } catch (e) {
                 setError(e.message || 'Error al subir archivos')

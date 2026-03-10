@@ -74,23 +74,37 @@ export async function uploadRAGDocument(file, tag = '') {
  * @param {function} onProgress - Callback with progress updates
  */
 export async function uploadRAGBatch(files, tag = '', onProgress = null) {
-    const formData = new FormData();
-    for (const file of files) {
-        formData.append('files', file);
-    }
-    if (tag) formData.append('tag', tag);
+    const results = [];
+    let processed = 0, failed = 0, skipped = 0;
+    const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm'];
 
-    if (onProgress) onProgress({ stage: 'uploading', current: 0, total: files.length });
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
 
-    const response = await fetch(`${RAG_API_BASE}/upload-batch`, {
-        method: 'POST',
-        body: formData,
-    });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Error al subir archivos' }));
-        throw new Error(error.detail || 'Error al subir lote de documentos');
+        if (!supportedExts.includes(ext)) {
+            skipped++;
+            results.push({ filename: file.name, status: 'skipped' });
+            continue;
+        }
+
+        if (onProgress) onProgress({ current: i + 1, total: files.length, filename: file.name });
+
+        try {
+            const result = await uploadRAGDocument(file, tag);
+            processed++;
+            results.push({ filename: file.name, status: 'ok', ...result });
+        } catch (e) {
+            failed++;
+            results.push({ filename: file.name, status: 'error', error: e.message });
+        }
     }
-    return response.json();
+
+    return {
+        processed, failed, skipped,
+        total_chunks: results.reduce((sum, r) => sum + (r.total_chunks || 0), 0),
+        results,
+    };
 }
 
 export async function listRAGDocuments(tag = '') {
