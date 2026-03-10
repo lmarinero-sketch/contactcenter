@@ -79,17 +79,28 @@ def hybrid_search(query: str, query_embedding: list[float],
     Uses the rag_hybrid_search SQL function with RRF.
     Optionally filters by document tag.
     """
-    result = supabase.rpc("rag_hybrid_search", {
+    # Try with filter_tag first; if SQL function doesn't support it yet, retry without
+    params = {
         "query_text": query,
         "query_embedding": query_embedding,
         "match_count": match_count,
         "full_text_weight": full_text_weight,
         "semantic_weight": semantic_weight,
         "rrf_k": rrf_k,
-        "filter_tag": filter_tag,
-    }).execute()
+    }
 
-    return result.data or []
+    try:
+        params_with_tag = {**params, "filter_tag": filter_tag}
+        result = supabase.rpc("rag_hybrid_search", params_with_tag).execute()
+        return result.data or []
+    except Exception as e:
+        print(f"hybrid_search with filter_tag failed ({e}), retrying without...")
+        try:
+            result = supabase.rpc("rag_hybrid_search", params).execute()
+            return result.data or []
+        except Exception as e2:
+            print(f"hybrid_search failed completely: {e2}")
+            return []
 
 
 def vector_search(query_embedding: list[float],
