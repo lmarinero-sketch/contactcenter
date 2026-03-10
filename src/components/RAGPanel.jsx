@@ -3,12 +3,14 @@ import {
     Send, Upload, FileText, Trash2, MessageSquare,
     Plus, Loader2, ChevronRight, Brain, BookOpen,
     AlertCircle, CheckCircle, File, X, Clock,
-    Search, Sparkles, Layers, BarChart3, FolderOpen, Tag
+    Search, Sparkles, Layers, BarChart3, FolderOpen, Tag,
+    Download, FolderPlus, ArrowLeft, Home, Folder
 } from 'lucide-react'
 import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
-    deleteRAGConversation, uploadRAGDocument, uploadRAGBatch, listRAGDocuments,
-    deleteRAGDocument, checkRAGHealth
+    deleteRAGConversation, uploadRAGDocument, uploadRAGBatch,
+    listRAGFiles, downloadRAGFile, createRAGFolder, deleteRAGFile,
+    deleteRAGFolder, checkRAGHealth
 } from '../api/ragClient'
 
 // Simple markdown-ish renderer (bold, lists, sources)
@@ -30,23 +32,29 @@ export default function RAGPanel() {
     const [messages, setMessages] = useState([])
     const [inputValue, setInputValue] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-    const [documents, setDocuments] = useState([])
     const [isUploading, setIsUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState('')
     const [error, setError] = useState(null)
     const [backendOnline, setBackendOnline] = useState(null)
     const [showSidebar, setShowSidebar] = useState(true)
 
+    // File manager state
+    const [fileItems, setFileItems] = useState([])
+    const [currentFolder, setCurrentFolder] = useState('')
+    const [totalFiles, setTotalFiles] = useState(0)
+    const [uploadTag, setUploadTag] = useState('')
+    const [showNewFolder, setShowNewFolder] = useState(false)
+    const [newFolderName, setNewFolderName] = useState('')
+
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
     const folderInputRef = useRef(null)
-    const [uploadTag, setUploadTag] = useState('')
 
     // Check backend health on mount
     useEffect(() => {
         checkRAGHealth().then(setBackendOnline)
         loadConversations()
-        loadDocuments()
+        loadFiles()
     }, [])
 
     // Scroll to bottom on new messages
@@ -64,14 +72,35 @@ export default function RAGPanel() {
         }
     }
 
-    // Load documents
-    async function loadDocuments() {
+    // Load files for current folder
+    async function loadFiles(folder) {
+        const f = folder !== undefined ? folder : currentFolder
         try {
-            const data = await listRAGDocuments()
-            setDocuments(data.documents || [])
+            const data = await listRAGFiles(f)
+            setFileItems(data.items || [])
+            setTotalFiles(data.total_files || 0)
         } catch (e) {
-            console.error('Error loading documents:', e)
+            console.error('Error loading files:', e)
         }
+    }
+
+    // Navigate to folder
+    function navigateToFolder(folderPath) {
+        setCurrentFolder(folderPath)
+        loadFiles(folderPath)
+    }
+
+    // Go back one level
+    function goBack() {
+        const parts = currentFolder.split('/').filter(Boolean)
+        parts.pop()
+        navigateToFolder(parts.join('/'))
+    }
+
+    // Get breadcrumb parts
+    function getBreadcrumbs() {
+        if (!currentFolder) return []
+        return currentFolder.split('/').filter(Boolean)
     }
 
     // Select a conversation
@@ -141,25 +170,23 @@ export default function RAGPanel() {
         setError(null)
 
         if (files.length === 1) {
-            // Single file upload
             setUploadProgress(`Procesando "${files[0].name}"...`)
             try {
-                const result = await uploadRAGDocument(files[0], uploadTag)
-                loadDocuments()
-                setUploadProgress(`✅ "${files[0].name}" — ${result.total_chunks} chunks creados`)
+                const result = await uploadRAGDocument(files[0], currentFolder, uploadTag)
+                loadFiles()
+                setUploadProgress(`✅ "${files[0].name}" — ${result.total_chunks} chunks`)
                 setTimeout(() => setUploadProgress(''), 4000)
             } catch (e) {
                 setError(e.message || 'Error al subir documento')
                 setUploadProgress('')
             }
         } else {
-            // Batch upload — one by one with progress
             try {
-                const result = await uploadRAGBatch(files, uploadTag, (progress) => {
-                    setUploadProgress(`Subiendo ${progress.current}/${progress.total}: "${progress.filename}"...`)
+                const result = await uploadRAGBatch(files, currentFolder, uploadTag, (p) => {
+                    setUploadProgress(`Subiendo ${p.current}/${p.total}: "${p.filename}"...`)
                 })
-                loadDocuments()
-                setUploadProgress(`\u2705 ${result.processed} procesados, ${result.total_chunks} chunks - ${result.failed} fallidos, ${result.skipped} omitidos`)
+                loadFiles()
+                setUploadProgress(`✅ ${result.processed} procesados, ${result.total_chunks} chunks - ${result.failed} fallidos, ${result.skipped} omitidos`)
                 setTimeout(() => setUploadProgress(''), 6000)
             } catch (e) {
                 setError(e.message || 'Error al subir archivos')
@@ -173,12 +200,47 @@ export default function RAGPanel() {
         if (folderInputRef.current) folderInputRef.current.value = ''
     }
 
-    // Delete document
-    async function handleDeleteDocument(filename) {
-        if (!confirm(`¿Eliminar "${filename}" y todos sus chunks?`)) return
+    // Delete file
+    async function handleDeleteFile(item) {
+        const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
+        if (!confirm(`¿Eliminar "${item.name}"?`)) return
         try {
-            await deleteRAGDocument(filename)
-            loadDocuments()
+            await deleteRAGFile(path)
+            loadFiles()
+        } catch (e) {
+            setError(e.message)
+        }
+    }
+
+    // Delete folder
+    async function handleDeleteFolder(item) {
+        if (!confirm(`¿Eliminar carpeta "${item.name}" y todo su contenido?`)) return
+        try {
+            await deleteRAGFolder(item.path)
+            loadFiles()
+        } catch (e) {
+            setError(e.message)
+        }
+    }
+
+    // Create folder
+    async function handleCreateFolder() {
+        if (!newFolderName.trim()) return
+        try {
+            await createRAGFolder(newFolderName.trim(), currentFolder)
+            setNewFolderName('')
+            setShowNewFolder(false)
+            loadFiles()
+        } catch (e) {
+            setError(e.message)
+        }
+    }
+
+    // Download file
+    async function handleDownload(item) {
+        try {
+            const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
+            await downloadRAGFile(path)
         } catch (e) {
             setError(e.message)
         }
@@ -259,7 +321,7 @@ export default function RAGPanel() {
                             onClick={() => setActiveTab('documents')}
                         >
                             <FileText size={14} />
-                            Docs ({documents.length})
+                            Archivos ({totalFiles})
                         </button>
                     </div>
 
@@ -299,91 +361,109 @@ export default function RAGPanel() {
                         </div>
                     )}
 
-                    {/* Document list */}
+                    {/* File Manager */}
                     {activeTab === 'documents' && (
                         <div className="rag-doc-list">
-                            <div className="rag-upload-area">
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    onChange={handleFileUpload}
+                            {/* Toolbar */}
+                            <div className="rag-fm-toolbar">
+                                <input ref={fileInputRef} type="file" onChange={handleFileUpload}
                                     accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm"
-                                    style={{ display: 'none' }}
-                                    disabled={isUploading}
-                                    multiple
-                                />
-                                <input
-                                    ref={folderInputRef}
-                                    type="file"
-                                    onChange={handleFileUpload}
-                                    style={{ display: 'none' }}
-                                    disabled={isUploading}
-                                    webkitdirectory=""
-                                    directory=""
-                                    multiple
-                                />
-                                <div className="rag-upload-buttons">
-                                    <button
-                                        className="btn btn-secondary rag-upload-btn"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={isUploading}
-                                    >
-                                        {isUploading ? <Loader2 size={14} className="rag-spin" /> : <Upload size={14} />}
-                                        {isUploading ? 'Procesando...' : 'Archivos'}
+                                    style={{ display: 'none' }} disabled={isUploading} multiple />
+                                <input ref={folderInputRef} type="file" onChange={handleFileUpload}
+                                    style={{ display: 'none' }} disabled={isUploading}
+                                    webkitdirectory="" directory="" multiple />
+                                <div className="rag-fm-actions">
+                                    <button className="rag-fm-btn" onClick={() => fileInputRef.current?.click()}
+                                        disabled={isUploading} title="Subir archivos">
+                                        {isUploading ? <Loader2 size={13} className="rag-spin" /> : <Upload size={13} />}
                                     </button>
-                                    <button
-                                        className="btn btn-secondary rag-upload-btn"
-                                        onClick={() => folderInputRef.current?.click()}
-                                        disabled={isUploading}
-                                        title="Subir carpeta completa"
-                                    >
-                                        <FolderOpen size={14} />
-                                        Carpeta
+                                    <button className="rag-fm-btn" onClick={() => folderInputRef.current?.click()}
+                                        disabled={isUploading} title="Subir carpeta">
+                                        <FolderOpen size={13} />
+                                    </button>
+                                    <button className="rag-fm-btn" onClick={() => setShowNewFolder(!showNewFolder)} title="Nueva carpeta">
+                                        <FolderPlus size={13} />
                                     </button>
                                 </div>
                                 <div className="rag-tag-input">
-                                    <Tag size={12} />
-                                    <input
-                                        type="text"
-                                        placeholder="Etiqueta (opcional)"
-                                        value={uploadTag}
+                                    <Tag size={11} />
+                                    <input type="text" placeholder="Tag" value={uploadTag}
                                         onChange={(e) => setUploadTag(e.target.value)}
-                                        disabled={isUploading}
-                                        className="rag-tag-field"
-                                    />
+                                        disabled={isUploading} className="rag-tag-field" />
                                 </div>
-                                {uploadProgress && (
-                                    <div className="rag-upload-status">{uploadProgress}</div>
-                                )}
                             </div>
 
-                            {documents.length === 0 ? (
+                            {/* New folder form */}
+                            {showNewFolder && (
+                                <div className="rag-fm-newfolder">
+                                    <input type="text" placeholder="Nombre de carpeta"
+                                        value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                                        className="rag-fm-newfolder-input" autoFocus />
+                                    <button className="rag-fm-btn-sm" onClick={handleCreateFolder}><CheckCircle size={12} /></button>
+                                    <button className="rag-fm-btn-sm" onClick={() => { setShowNewFolder(false); setNewFolderName('') }}><X size={12} /></button>
+                                </div>
+                            )}
+
+                            {uploadProgress && <div className="rag-upload-status">{uploadProgress}</div>}
+
+                            {/* Breadcrumbs */}
+                            <div className="rag-fm-breadcrumbs">
+                                <button className="rag-fm-crumb" onClick={() => navigateToFolder('')}>
+                                    <Home size={12} />
+                                </button>
+                                {getBreadcrumbs().map((part, i) => {
+                                    const path = getBreadcrumbs().slice(0, i + 1).join('/')
+                                    return (
+                                        <span key={path} className="rag-fm-crumb-item">
+                                            <ChevronRight size={10} />
+                                            <button className="rag-fm-crumb" onClick={() => navigateToFolder(path)}>
+                                                {part}
+                                            </button>
+                                        </span>
+                                    )
+                                })}
+                            </div>
+
+                            {/* File list */}
+                            {fileItems.length === 0 ? (
                                 <div className="rag-empty-state">
                                     <BookOpen size={32} />
-                                    <p>No hay documentos cargados</p>
-                                    <span>Subí PDFs, Word, Excel, CSV, etc.</span>
+                                    <p>{currentFolder ? 'Carpeta vacía' : 'No hay archivos'}</p>
+                                    <span>Subí archivos para que la IA pueda consultarlos</span>
                                 </div>
                             ) : (
-                                documents.map(doc => (
-                                    <div key={doc.filename} className="rag-doc-item">
-                                        <div className="rag-doc-icon">
-                                            {FILE_ICONS[doc.file_type] || '📄'}
+                                fileItems.map(item => (
+                                    item.type === 'folder' ? (
+                                        <div key={item.path} className="rag-doc-item rag-folder-item"
+                                            onClick={() => navigateToFolder(item.path)} style={{ cursor: 'pointer' }}>
+                                            <div className="rag-doc-icon"><Folder size={18} color="#3b82f6" /></div>
+                                            <div className="rag-doc-info">
+                                                <span className="rag-doc-name">{item.name}</span>
+                                                <span className="rag-doc-meta">Carpeta</span>
+                                            </div>
+                                            <button className="rag-doc-delete" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(item) }} title="Eliminar carpeta">
+                                                <Trash2 size={12} />
+                                            </button>
                                         </div>
-                                        <div className="rag-doc-info">
-                                            <span className="rag-doc-name">{doc.filename}</span>
-                                            <span className="rag-doc-meta">
-                                                {doc.total_chunks} chunks · {formatFileSize(doc.file_size)}
-                                                {doc.tag && <span className="rag-doc-tag">{doc.tag}</span>}
-                                            </span>
+                                    ) : (
+                                        <div key={item.name} className="rag-doc-item">
+                                            <div className="rag-doc-icon">{FILE_ICONS[item.file_type] || '📄'}</div>
+                                            <div className="rag-doc-info">
+                                                <span className="rag-doc-name">{item.name}</span>
+                                                <span className="rag-doc-meta">
+                                                    {item.total_chunks} chunks · {formatFileSize(item.file_size)}
+                                                    {item.tag && <span className="rag-doc-tag">{item.tag}</span>}
+                                                </span>
+                                            </div>
+                                            <button className="rag-doc-action" onClick={() => handleDownload(item)} title="Descargar">
+                                                <Download size={12} />
+                                            </button>
+                                            <button className="rag-doc-delete" onClick={() => handleDeleteFile(item)} title="Eliminar">
+                                                <Trash2 size={12} />
+                                            </button>
                                         </div>
-                                        <button
-                                            className="rag-doc-delete"
-                                            onClick={() => handleDeleteDocument(doc.filename)}
-                                            title="Eliminar documento"
-                                        >
-                                            <Trash2 size={12} />
-                                        </button>
-                                    </div>
+                                    )
                                 ))
                             )}
                         </div>

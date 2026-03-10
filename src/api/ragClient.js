@@ -1,10 +1,7 @@
 /**
- * RAG API Client — Functions to interact with the RAG backend
+ * RAG API Client — File Manager + Chat
  * Sanatorio Argentino - Contact Center
- * V3: Batch upload, tag support, filtered search
- * 
- * In development: uses Vite proxy (/rag-api → localhost:8000/api)
- * In production:  uses VITE_RAG_API_URL env var (Render URL)
+ * V4: Google Drive-like file management + RAG search
  */
 
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api';
@@ -46,14 +43,15 @@ export async function deleteRAGConversation(conversationId) {
     return response.json();
 }
 
-// === Documents ===
+// === File Manager ===
 
 /**
- * Upload a single document with optional tag
+ * Upload a single document to a folder
  */
-export async function uploadRAGDocument(file, tag = '') {
+export async function uploadRAGDocument(file, folder = '', tag = '') {
     const formData = new FormData();
     formData.append('file', file);
+    if (folder) formData.append('folder', folder);
     if (tag) formData.append('tag', tag);
 
     const response = await fetch(`${RAG_API_BASE}/upload`, {
@@ -68,12 +66,9 @@ export async function uploadRAGDocument(file, tag = '') {
 }
 
 /**
- * Upload multiple files at once with a shared tag
- * @param {FileList|File[]} files - Array of files to upload
- * @param {string} tag - Shared tag for grouping
- * @param {function} onProgress - Callback with progress updates
+ * Upload multiple files sequentially to a folder
  */
-export async function uploadRAGBatch(files, tag = '', onProgress = null) {
+export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = null) {
     const results = [];
     let processed = 0, failed = 0, skipped = 0;
     const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm'];
@@ -91,7 +86,7 @@ export async function uploadRAGBatch(files, tag = '', onProgress = null) {
         if (onProgress) onProgress({ current: i + 1, total: files.length, filename: file.name });
 
         try {
-            const result = await uploadRAGDocument(file, tag);
+            const result = await uploadRAGDocument(file, folder, tag);
             processed++;
             results.push({ filename: file.name, status: 'ok', ...result });
         } catch (e) {
@@ -107,6 +102,67 @@ export async function uploadRAGBatch(files, tag = '', onProgress = null) {
     };
 }
 
+/**
+ * List files and folders in a path (Google Drive-like)
+ */
+export async function listRAGFiles(folder = '') {
+    const params = folder ? `?folder=${encodeURIComponent(folder)}` : '';
+    const response = await fetch(`${RAG_API_BASE}/files${params}`);
+    if (!response.ok) throw new Error('Error al cargar archivos');
+    return response.json();
+}
+
+/**
+ * Get download URL for a file
+ */
+export async function downloadRAGFile(path) {
+    const response = await fetch(`${RAG_API_BASE}/files/download?path=${encodeURIComponent(path)}`);
+    if (!response.ok) throw new Error('Error al descargar archivo');
+    const data = await response.json();
+    // Open download URL in new tab
+    if (data.download_url) {
+        window.open(data.download_url, '_blank');
+    }
+    return data;
+}
+
+/**
+ * Create a folder
+ */
+export async function createRAGFolder(name, parent = '') {
+    const params = new URLSearchParams({ name });
+    if (parent) params.append('parent', parent);
+    const response = await fetch(`${RAG_API_BASE}/folders?${params}`, {
+        method: 'POST',
+    });
+    if (!response.ok) throw new Error('Error al crear carpeta');
+    return response.json();
+}
+
+/**
+ * Delete a file
+ */
+export async function deleteRAGFile(path) {
+    const response = await fetch(`${RAG_API_BASE}/files?path=${encodeURIComponent(path)}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Error al eliminar archivo');
+    return response.json();
+}
+
+/**
+ * Delete a folder and all contents
+ */
+export async function deleteRAGFolder(path) {
+    const response = await fetch(`${RAG_API_BASE}/folders?path=${encodeURIComponent(path)}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Error al eliminar carpeta');
+    return response.json();
+}
+
+// === Legacy ===
+
 export async function listRAGDocuments(tag = '') {
     const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
     const response = await fetch(`${RAG_API_BASE}/documents${params}`);
@@ -119,14 +175,6 @@ export async function deleteRAGDocument(filename) {
         method: 'DELETE',
     });
     if (!response.ok) throw new Error('Error al eliminar documento');
-    return response.json();
-}
-
-export async function deleteRAGDocumentsByTag(tag) {
-    const response = await fetch(`${RAG_API_BASE}/documents/by-tag?tag=${encodeURIComponent(tag)}`, {
-        method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Error al eliminar documentos por tag');
     return response.json();
 }
 
