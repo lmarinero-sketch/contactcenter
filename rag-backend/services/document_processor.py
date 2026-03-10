@@ -95,9 +95,84 @@ def _extract_pdf(file_path: str) -> str:
     except Exception as e:
         print(f"PDF: PyPDF2 failed: {e}")
 
-    # Strategy 3: OCR for scanned PDFs
-    print(f"PDF: No meaningful text found, attempting OCR...")
+    # Strategy 3: OpenAI Vision for scanned PDFs (more accurate than Tesseract)
+    print(f"PDF: No meaningful text found, trying OpenAI Vision...")
+    vision_result = _extract_pdf_vision(file_path)
+    if _is_meaningful_text(vision_result):
+        return vision_result
+
+    # Strategy 4: Tesseract OCR (last resort, free but less accurate)
+    print(f"PDF: Vision failed or unavailable, trying Tesseract OCR...")
     return _extract_pdf_ocr(file_path)
+
+
+def _extract_pdf_vision(file_path: str, max_pages: int = 10) -> str:
+    """
+    Extract text from PDF pages using GPT-4o Vision.
+    Converts pages to images and sends them to OpenAI's vision API.
+    Limited to max_pages to control costs.
+    """
+    try:
+        import base64
+        from pdf2image import convert_from_path
+        from config import openai_client, CHAT_MODEL
+
+        images = convert_from_path(file_path, dpi=200)
+        print(f"Vision: Processing {min(len(images), max_pages)}/{len(images)} pages...")
+
+        pages = []
+        for i, image in enumerate(images[:max_pages], 1):
+            # Convert PIL image to base64
+            import io as _io
+            buffer = _io.BytesIO()
+            image.save(buffer, format="PNG")
+            img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            try:
+                response = openai_client.chat.completions.create(
+                    model=CHAT_MODEL,
+                    max_tokens=2000,
+                    timeout=60,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        "Extraé TODO el texto de esta página de documento. "
+                                        "Mantené la estructura original (títulos, párrafos, listas, tablas). "
+                                        "Respondé SOLO con el texto extraído, sin comentarios."
+                                    )
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{img_base64}",
+                                        "detail": "high"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                )
+                text = response.choices[0].message.content.strip()
+                if text:
+                    pages.append(f"[Página {i}]\n{text}")
+                print(f"Vision: Page {i} processed ({len(text)} chars)")
+            except Exception as e:
+                print(f"Vision: Page {i} failed: {e}")
+
+        result = "\n\n".join(pages)
+        print(f"Vision: Total extracted: {len(result)} chars from {len(pages)} pages")
+        return result
+
+    except ImportError as e:
+        print(f"Vision: Missing dependency: {e}")
+        return ""
+    except Exception as e:
+        print(f"Vision extraction failed: {e}")
+        return ""
 
 
 def _extract_pdf_ocr(file_path: str) -> str:
