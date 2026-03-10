@@ -16,6 +16,13 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+def _sanitize_filename(filename: str) -> str:
+    """Extract just the filename from a path (folder uploads send full relative paths)."""
+    # Browser folder uploads send paths like 'folder/subfolder/file.pdf'
+    # We only want 'file.pdf'
+    return os.path.basename(filename.replace('\\', '/').replace('/', os.sep))
+
+
 def _process_single_file(file_path: str, filename: str, tag: str = "") -> dict:
     """Process a single file: extract, chunk, embed, store. Returns result dict."""
     ext = os.path.splitext(filename)[1].lower()
@@ -74,10 +81,10 @@ async def upload_document(
 ):
     """
     Upload a single document with optional tag for categorization.
-    Extract text, chunk, generate embeddings, and store in Supabase.
     """
-    filename = file.filename
+    filename = _sanitize_filename(file.filename)
     ext = os.path.splitext(filename)[1].lower()
+    print(f"Upload: {file.filename} -> {filename} (ext={ext})")
 
     if ext not in SUPPORTED_EXTENSIONS:
         raise HTTPException(
@@ -126,8 +133,9 @@ async def upload_batch(
     failed = 0
 
     for file in files:
-        filename = file.filename
+        filename = _sanitize_filename(file.filename)
         ext = os.path.splitext(filename)[1].lower()
+        print(f"Batch: {file.filename} -> {filename} (ext={ext})")
 
         # Skip unsupported files silently
         if ext not in SUPPORTED_EXTENSIONS:
