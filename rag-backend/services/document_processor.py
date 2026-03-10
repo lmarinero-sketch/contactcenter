@@ -25,29 +25,78 @@ def extract_text(file_path: str) -> str:
     return clean_text(raw_text)
 
 
+def _is_meaningful_text(text: str) -> bool:
+    """Check if extracted text has real content (not just DocuSign IDs, headers, etc.)"""
+    if not text:
+        return False
+    # Filter out lines that are only DocuSign envelope IDs or whitespace
+    meaningful_lines = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        # Skip DocuSign envelope ID lines
+        if 'DocuSign Envelope ID' in line:
+            continue
+        # Skip very short lines (page numbers, etc.)
+        if len(line) < 5:
+            continue
+        meaningful_lines.append(line)
+    return len('\n'.join(meaningful_lines)) > 100
+
+
 def _extract_pdf(file_path: str) -> str:
     """
-    Extract text from PDF. First tries PyPDF2 (fast, for text-based PDFs).
-    If no text is found, falls back to OCR using Tesseract (for scanned PDFs).
+    Extract text from PDF using multiple strategies:
+    1. pdfplumber (best for complex/signed PDFs like DocuSign)
+    2. PyPDF2 (fallback for simpler PDFs)
+    3. OCR via Tesseract (last resort for scanned PDFs)
     """
-    from PyPDF2 import PdfReader
+    # Strategy 1: pdfplumber (handles DocuSign, complex layouts)
+    try:
+        import pdfplumber
+        pages = []
+        with pdfplumber.open(file_path) as pdf:
+            for i, page in enumerate(pdf.pages, 1):
+                text = page.extract_text()
+                if text and text.strip():
+                    # Filter DocuSign envelope IDs
+                    clean_lines = [l for l in text.split('\n')
+                                   if 'DocuSign Envelope ID' not in l]
+                    clean_text = '\n'.join(clean_lines).strip()
+                    if clean_text:
+                        pages.append(f"[P\u00e1gina {i}]\n{clean_text}")
+        extracted = "\n\n".join(pages)
+        if _is_meaningful_text(extracted):
+            print(f"PDF: Extracted {len(extracted)} chars via pdfplumber")
+            return extracted
+    except ImportError:
+        print("PDF: pdfplumber not installed, trying PyPDF2...")
+    except Exception as e:
+        print(f"PDF: pdfplumber failed: {e}, trying PyPDF2...")
 
-    reader = PdfReader(file_path)
-    pages = []
-    for i, page in enumerate(reader.pages, 1):
-        text = page.extract_text()
-        if text and text.strip():
-            pages.append(f"[Página {i}]\n{text.strip()}")
+    # Strategy 2: PyPDF2 (fallback)
+    try:
+        from PyPDF2 import PdfReader
+        reader = PdfReader(file_path)
+        pages = []
+        for i, page in enumerate(reader.pages, 1):
+            text = page.extract_text()
+            if text and text.strip():
+                clean_lines = [l for l in text.split('\n')
+                               if 'DocuSign Envelope ID' not in l]
+                clean_text = '\n'.join(clean_lines).strip()
+                if clean_text:
+                    pages.append(f"[P\u00e1gina {i}]\n{clean_text}")
+        extracted = "\n\n".join(pages)
+        if _is_meaningful_text(extracted):
+            print(f"PDF: Extracted {len(extracted)} chars via PyPDF2")
+            return extracted
+    except Exception as e:
+        print(f"PDF: PyPDF2 failed: {e}")
 
-    extracted = "\n\n".join(pages)
-
-    # If PyPDF2 extracted meaningful text, return it
-    if extracted and len(extracted.strip()) > 50:
-        print(f"PDF: Extracted {len(extracted)} chars via PyPDF2 (text-based)")
-        return extracted
-
-    # Fallback: OCR for scanned PDFs
-    print(f"PDF: No text found via PyPDF2, attempting OCR...")
+    # Strategy 3: OCR for scanned PDFs
+    print(f"PDF: No meaningful text found, attempting OCR...")
     return _extract_pdf_ocr(file_path)
 
 
