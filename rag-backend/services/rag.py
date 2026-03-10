@@ -96,12 +96,15 @@ def _rerank_single_document(question: str, doc: dict) -> dict | None:
                     "content": (
                         "Evaluá la relevancia del siguiente fragmento de documento para "
                         "responder la pregunta del usuario. "
+                        "El fragmento puede ser texto narrativo O datos tabulares (filas con key:value, "
+                        "columnas de Excel, listas de registros). Los datos tabulares que contienen "
+                        "términos relacionados a la pregunta son MUY relevantes aunque no 'respondan' directamente. "
                         "Respondé SOLO con JSON: {\"score\": 0-10, \"reason\": \"explicación breve\"}"
                     )
                 },
                 {
                     "role": "user",
-                    "content": f"Pregunta: {question}\n\nFragmento:\n{doc['content'][:800]}"
+                    "content": f"Pregunta: {question}\n\nFragmento:\n{doc['content'][:1500]}"
                 }
             ]
         )
@@ -116,7 +119,7 @@ def _rerank_single_document(question: str, doc: dict) -> dict | None:
             match = re.search(r'"score"\s*:\s*(\d+(?:\.\d+)?)', text)
             score = float(match.group(1)) if match else 0
 
-        if score >= 3:  # Only keep if score >= 3
+        if score >= 1:  # Keep if score >= 1 (was 3, too aggressive for tabular data)
             doc_copy = dict(doc)
             doc_copy["rerank_score"] = score
             return doc_copy
@@ -164,6 +167,7 @@ def _generate_final_answer(question: str, documents: list[dict],
                            conversation_history: list[dict]) -> str:
     """
     Step 6: Final answer generation with strict source citation.
+    Optimized for both narrative text and tabular/Excel data.
     """
     # Build context from documents
     context_parts = []
@@ -178,15 +182,17 @@ def _generate_final_answer(question: str, documents: list[dict],
     context = "\n\n".join(context_parts)
 
     system_prompt = f"""Sos un asistente preciso de consulta documental para Sanatorio Argentino.
-Tu función es responder preguntas EXCLUSIVAMENTE usando la información del [CONTEXTO] proporcionado.
+Tu función es responder preguntas usando la información del [CONTEXTO] proporcionado.
 
-REGLAS ESTRICTAS:
-1. SOLO usá información del [CONTEXTO]. NO uses conocimiento externo.
-2. Si la respuesta NO está en el contexto, respondé: "No tengo suficiente información en los documentos proporcionados para responder esta pregunta."
-3. SIEMPRE citá la fuente: **(Fuente: nombre_archivo.pdf)**
-4. Si la información está repartida en varios fragmentos, sintetizá coherentemente.
-5. Respondé en español, de forma clara y profesional.
-6. Usá formato markdown para estructurar la respuesta (listas, negritas, etc.)
+REGLAS:
+1. Usá SOLO información del [CONTEXTO]. NO uses conocimiento externo.
+2. El contexto puede incluir datos tabulares (Excel con pares clave:valor) — interpretá estos datos como registros estructurados.
+3. Si encontrás datos relacionados, aunque sean parciales, presentalos organizados. NO digas "no tengo información" si hay datos relevantes.
+4. SOLO respondé "No tengo suficiente información" si el contexto realmente NO contiene NADA relacionado a la pregunta.
+5. SIEMPRE citá la fuente: **(Fuente: nombre_archivo)**
+6. Si la información está repartida en varios fragmentos, sintetizá coherentemente.
+7. Respondé en español, de forma clara y profesional.
+8. Usá formato markdown para estructurar la respuesta (listas, tablas, negritas, etc.)
 
 [CONTEXTO]
 {context}"""
@@ -309,9 +315,15 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
     reranked = _rerank_documents(question, unique_docs)
     pipeline_info["reranked_kept"] = len(reranked)
 
+    # FALLBACK: If re-ranking filtered everything, use top docs by vector similarity
     if not reranked:
-        answer = "No tengo suficiente información en los documentos proporcionados para responder esta pregunta con precisión."
-        return _build_response(answer, [], pipeline_info, question, conversation_id)
+        print("Re-ranking filtered all documents — falling back to top docs by similarity")
+        fallback_docs = unique_docs[:RERANK_TOP_K]
+        for doc in fallback_docs:
+            doc["rerank_score"] = 0  # Mark as un-reranked
+        reranked = fallback_docs
+        pipeline_info["reranked_kept"] = len(reranked)
+        pipeline_info["rerank_fallback"] = True
 
     # === STEP 6: Generate Final Answer ===
     # Load conversation history if we have a conversation_id

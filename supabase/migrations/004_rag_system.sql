@@ -121,14 +121,25 @@ WITH semantic_search AS (
   LIMIT match_count * 2
 ),
 keyword_search AS (
+  -- Use plainto_tsquery (more permissive than websearch_to_tsquery)
+  -- Search with both 'spanish' and 'simple' configs to catch technical terms
   SELECT
     d.id,
     d.content,
     d.metadata,
-    ts_rank_cd(d.fts, websearch_to_tsquery('spanish', query_text)) AS fts_rank,
-    ROW_NUMBER() OVER (ORDER BY ts_rank_cd(d.fts, websearch_to_tsquery('spanish', query_text)) DESC) AS rank_ix
+    GREATEST(
+      ts_rank_cd(d.fts, plainto_tsquery('spanish', query_text)),
+      ts_rank_cd(d.fts, plainto_tsquery('simple', query_text))
+    ) AS fts_rank,
+    ROW_NUMBER() OVER (
+      ORDER BY GREATEST(
+        ts_rank_cd(d.fts, plainto_tsquery('spanish', query_text)),
+        ts_rank_cd(d.fts, plainto_tsquery('simple', query_text))
+      ) DESC
+    ) AS rank_ix
   FROM rag_documents d
-  WHERE d.fts @@ websearch_to_tsquery('spanish', query_text)
+  WHERE d.fts @@ plainto_tsquery('spanish', query_text)
+     OR d.fts @@ plainto_tsquery('simple', query_text)
   ORDER BY fts_rank DESC
   LIMIT match_count * 2
 )

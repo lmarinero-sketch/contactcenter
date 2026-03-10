@@ -2,7 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies
+# Install system dependencies for OCR (Tesseract + Spanish lang) and PDF rendering (Poppler)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-spa \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -12,8 +19,8 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p /app/uploads
 
-# Expose port (Railway injects PORT env var)
+# Expose port
 EXPOSE 8000
 
-# Start the server — Railway provides PORT via env, default to 8000
+# Start the server
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -1,5 +1,6 @@
 """
 Document Processor — Extracts text from various file formats
+Includes OCR fallback for scanned PDFs using Tesseract
 """
 import os
 import re
@@ -25,7 +26,10 @@ def extract_text(file_path: str) -> str:
 
 
 def _extract_pdf(file_path: str) -> str:
-    """Extract text from PDF using PyPDF2."""
+    """
+    Extract text from PDF. First tries PyPDF2 (fast, for text-based PDFs).
+    If no text is found, falls back to OCR using Tesseract (for scanned PDFs).
+    """
     from PyPDF2 import PdfReader
 
     reader = PdfReader(file_path)
@@ -34,7 +38,44 @@ def _extract_pdf(file_path: str) -> str:
         text = page.extract_text()
         if text and text.strip():
             pages.append(f"[Página {i}]\n{text.strip()}")
-    return "\n\n".join(pages)
+
+    extracted = "\n\n".join(pages)
+
+    # If PyPDF2 extracted meaningful text, return it
+    if extracted and len(extracted.strip()) > 50:
+        print(f"PDF: Extracted {len(extracted)} chars via PyPDF2 (text-based)")
+        return extracted
+
+    # Fallback: OCR for scanned PDFs
+    print(f"PDF: No text found via PyPDF2, attempting OCR...")
+    return _extract_pdf_ocr(file_path)
+
+
+def _extract_pdf_ocr(file_path: str) -> str:
+    """Extract text from scanned PDF using Tesseract OCR."""
+    try:
+        from pdf2image import convert_from_path
+        import pytesseract
+
+        # Convert PDF pages to images
+        images = convert_from_path(file_path, dpi=300)
+        print(f"OCR: Converting {len(images)} pages...")
+
+        pages = []
+        for i, image in enumerate(images, 1):
+            # Run Tesseract OCR with Spanish + English
+            text = pytesseract.image_to_string(image, lang='spa+eng')
+            if text and text.strip():
+                pages.append(f"[Página {i} — OCR]\n{text.strip()}")
+            print(f"OCR: Page {i}/{len(images)} processed ({len(text)} chars)")
+
+        result = "\n\n".join(pages)
+        print(f"OCR: Total extracted: {len(result)} chars from {len(pages)} pages")
+        return result
+
+    except Exception as e:
+        print(f"OCR failed: {e}")
+        return ""
 
 
 def _extract_docx(file_path: str) -> str:
@@ -60,7 +101,11 @@ def _extract_docx(file_path: str) -> str:
 
 
 def _extract_excel(file_path: str) -> str:
-    """Extract text from Excel files."""
+    """
+    Extract text from Excel files with semantic context.
+    Each row includes column headers as key-value pairs so the LLM
+    understands what each cell means (critical for RAG retrieval).
+    """
     from openpyxl import load_workbook
 
     wb = load_workbook(file_path, data_only=True)
@@ -68,11 +113,52 @@ def _extract_excel(file_path: str) -> str:
 
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
-        parts.append(f"[Hoja: {sheet_name}]")
-        for row in ws.iter_rows(values_only=True):
-            cells = [str(c).strip() for c in row if c is not None and str(c).strip()]
-            if cells:
-                parts.append(" | ".join(cells))
+        parts.append(f"\n=== Hoja: {sheet_name} ===\n")
+
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            continue
+
+        # Detect headers: first non-empty row
+        headers = None
+        data_start = 0
+        for i, row in enumerate(rows):
+            cells = [str(c).strip() if c is not None else "" for c in row]
+            non_empty = [c for c in cells if c]
+            if len(non_empty) >= 2:  # At least 2 non-empty cells = likely header
+                headers = cells
+                data_start = i + 1
+                break
+
+        if headers:
+            # Output header line for context
+            header_line = " | ".join([h for h in headers if h])
+            parts.append(f"Columnas: {header_line}\n")
+
+            # Output each data row as key-value pairs for semantic clarity
+            for row in rows[data_start:]:
+                cells = [str(c).strip() if c is not None else "" for c in row]
+                # Skip completely empty rows
+                non_empty = [c for c in cells if c]
+                if not non_empty:
+                    continue
+
+                # Build key-value representation
+                kv_parts = []
+                for j, cell_val in enumerate(cells):
+                    if cell_val and j < len(headers) and headers[j]:
+                        kv_parts.append(f"{headers[j]}: {cell_val}")
+                    elif cell_val:
+                        kv_parts.append(cell_val)
+
+                if kv_parts:
+                    parts.append(" | ".join(kv_parts))
+        else:
+            # No headers detected, fallback to plain extraction
+            for row in rows:
+                cells = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
 
     return "\n".join(parts)
 
