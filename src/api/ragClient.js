@@ -1,9 +1,12 @@
 /**
  * RAG API Client — Functions to interact with the RAG backend
  * Sanatorio Argentino - Contact Center
+ * 
+ * In development: uses Vite proxy (/rag-api → localhost:8000/api)
+ * In production:  uses VITE_RAG_API_URL env var (Railway URL)
  */
 
-const RAG_API_BASE = '/rag-api';
+const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api';
 
 // === Chat ===
 
