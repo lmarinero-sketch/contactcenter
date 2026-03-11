@@ -12,7 +12,7 @@ const NAV_ITEMS = [
 ]
 
 const TOOL_ITEMS = [
-    { id: 'rag', label: 'Asistente IA', icon: Brain },
+    { id: 'rag', label: 'Simon IA', icon: Brain },
 ]
 
 export default function Sidebar({ activeView, onViewChange }) {

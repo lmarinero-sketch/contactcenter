@@ -12,7 +12,7 @@ const VIEW_TITLES = {
     agents: 'Performance de Agentes',
     chatbot: 'Chatbot Analytics',
     conversations: 'Conversaciones',
-    rag: 'Asistente IA Documental',
+    rag: 'Simon IA',
 }
 
 const VIEW_DESCRIPTIONS = {

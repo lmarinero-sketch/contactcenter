@@ -33,8 +33,8 @@ export default function RAGHelp({ onClose }) {
                             <BookOpen size={22} />
                         </div>
                         <div>
-                            <h2>¿Cómo funciona el Asistente IA?</h2>
-                            <p>Guía visual del sistema RAG de Sanatorio Argentino</p>
+                            <h2>¿Cómo funciona Simon?</h2>
+                            <p>Guía visual del sistema RAG — Sanatorio Argentino</p>
                         </div>
                     </div>
                     <button className="rag-help-close" onClick={onClose}>

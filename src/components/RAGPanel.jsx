@@ -43,6 +43,11 @@ export default function RAGPanel() {
     const [showSidebar, setShowSidebar] = useState(true)
     const [showHelp, setShowHelp] = useState(false)
 
+    // Session state — Simon boot sequence
+    const [sessionStarted, setSessionStarted] = useState(false)
+    const [bootPhase, setBootPhase] = useState('idle') // idle | waking | connecting | loading | ready | error
+    const [bootTimer, setBootTimer] = useState(0)
+
     // File manager state
     const [fileItems, setFileItems] = useState([])
     const [currentFolder, setCurrentFolder] = useState('')
@@ -58,14 +63,58 @@ export default function RAGPanel() {
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
     const folderInputRef = useRef(null)
+    const bootTimerRef = useRef(null)
 
-    // Check backend health on mount
-    useEffect(() => {
-        checkRAGHealth().then(setBackendOnline)
-        loadConversations()
-        loadFiles()
-        loadLearningStats()
-    }, [])
+    // Start Simon boot sequence
+    async function startSimon() {
+        setSessionStarted(true)
+        setBootPhase('waking')
+        setBootTimer(0)
+
+        // Start timer
+        const startTime = Date.now()
+        bootTimerRef.current = setInterval(() => {
+            setBootTimer(Math.floor((Date.now() - startTime) / 1000))
+        }, 1000)
+
+        // Phase 1: Wake up server
+        const maxAttempts = 30 // ~60 seconds max
+        let online = false
+        for (let i = 0; i < maxAttempts; i++) {
+            online = await checkRAGHealth()
+            if (online) break
+            await new Promise(r => setTimeout(r, 2000))
+        }
+
+        if (!online) {
+            setBootPhase('error')
+            setBackendOnline(false)
+            clearInterval(bootTimerRef.current)
+            return
+        }
+
+        setBackendOnline(true)
+
+        // Phase 2: Connect AI
+        setBootPhase('connecting')
+        await new Promise(r => setTimeout(r, 800))
+
+        // Phase 3: Load data
+        setBootPhase('loading')
+        await Promise.all([
+            loadConversations(),
+            loadFiles(),
+            loadLearningStats(),
+        ])
+
+        // Phase 4: Ready!
+        setBootPhase('ready')
+        clearInterval(bootTimerRef.current)
+
+        // Auto-dismiss after brief delay
+        await new Promise(r => setTimeout(r, 1200))
+        setBootPhase('done')
+    }
 
     // Load learning stats
     async function loadLearningStats() {
@@ -440,6 +489,96 @@ export default function RAGPanel() {
         '.xml': '🔧', '.html': '🌐', '.htm': '🌐',
     }
 
+    // === WELCOME / BOOT SCREEN ===
+    if (bootPhase !== 'done') {
+        return (
+            <div className="simon-welcome">
+                <div className="simon-welcome-card">
+                    <div className="simon-avatar-container">
+                        <img src="/simon-avatar.png" alt="Simon" className="simon-avatar" />
+                        <div className="simon-avatar-glow" />
+                    </div>
+                    <h1 className="simon-name">Simon</h1>
+                    <p className="simon-subtitle">Asistente IA Documental</p>
+                    <p className="simon-desc">
+                        Consultá documentos del Sanatorio Argentino con inteligencia artificial.
+                        Respuestas precisas con citación de fuentes.
+                    </p>
+
+                    {/* Pre-boot state */}
+                    {bootPhase === 'idle' && (
+                        <>
+                            <button className="simon-start-btn" onClick={startSimon}>
+                                <Brain size={18} />
+                                Iniciar charla con Simon
+                            </button>
+                            <div className="simon-sleep-info">
+                                <Clock size={13} />
+                                <span>
+                                    Simon se apaga tras <strong>15 min</strong> de inactividad y
+                                    demora entre <strong>30–60 seg</strong> en volver a encenderse
+                                </span>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Boot phases */}
+                    {bootPhase !== 'idle' && bootPhase !== 'error' && (
+                        <div className="simon-boot">
+                            <div className="simon-boot-phases">
+                                <div className={`simon-boot-phase ${bootPhase === 'waking' ? 'active' : (bootPhase !== 'waking' ? 'done' : '')}`}>
+                                    <div className="simon-boot-dot" />
+                                    <span>Despertando servidor...</span>
+                                    {bootPhase === 'waking' && <Loader2 size={12} className="rag-spin" />}
+                                    {bootPhase !== 'waking' && <CheckCircle size={12} />}
+                                </div>
+                                <div className={`simon-boot-phase ${bootPhase === 'connecting' ? 'active' : (['loading', 'ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
+                                    <div className="simon-boot-dot" />
+                                    <span>Conectando IA...</span>
+                                    {bootPhase === 'connecting' && <Loader2 size={12} className="rag-spin" />}
+                                    {['loading', 'ready', 'done'].includes(bootPhase) && <CheckCircle size={12} />}
+                                </div>
+                                <div className={`simon-boot-phase ${bootPhase === 'loading' ? 'active' : (['ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
+                                    <div className="simon-boot-dot" />
+                                    <span>Cargando documentos...</span>
+                                    {bootPhase === 'loading' && <Loader2 size={12} className="rag-spin" />}
+                                    {['ready', 'done'].includes(bootPhase) && <CheckCircle size={12} />}
+                                </div>
+                                <div className={`simon-boot-phase ${bootPhase === 'ready' ? 'active done' : ''}`}>
+                                    <div className="simon-boot-dot" />
+                                    <span>¡Simon está listo!</span>
+                                    {bootPhase === 'ready' && <Sparkles size={12} />}
+                                </div>
+                            </div>
+                            <div className="simon-boot-timer">
+                                <Clock size={11} />
+                                {bootTimer}s
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Error state */}
+                    {bootPhase === 'error' && (
+                        <div className="simon-boot-error">
+                            <AlertCircle size={18} />
+                            <div>
+                                <strong>No se pudo conectar con Simon</strong>
+                                <p>El servidor puede estar en mantenimiento. Intentá de nuevo en unos minutos.</p>
+                            </div>
+                            <button className="simon-retry-btn" onClick={() => { setBootPhase('idle'); setSessionStarted(false); }}>
+                                Reintentar
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="simon-welcome-footer">
+                    Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.0
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="rag-container">
             {/* Left: Conversation Sidebar */}
@@ -628,8 +767,8 @@ export default function RAGPanel() {
                         <ChevronRight size={16} style={{ transform: showSidebar ? 'rotate(180deg)' : 'none' }} />
                     </button>
                     <div className="rag-status-info">
-                        <Brain size={16} />
-                        <span className="rag-status-title">Asistente IA Documental</span>
+                        <img src="/simon-avatar.png" alt="Simon" className="rag-simon-mini" />
+                        <span className="rag-status-title">Simon</span>
                     </div>
                     <div className="rag-status-indicators">
                         <span className={`rag-status-dot ${backendOnline ? 'online' : 'offline'}`} />
@@ -660,9 +799,9 @@ export default function RAGPanel() {
                     {messages.length === 0 && !isLoading ? (
                         <div className="rag-welcome">
                             <div className="rag-welcome-icon">
-                                <Brain size={48} />
+                                <img src="/simon-avatar.png" alt="Simon" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
                             </div>
-                            <h3>Asistente IA Documental</h3>
+                            <h3>Simon</h3>
                             <p>Preguntá lo que necesites sobre los documentos cargados. Las respuestas incluyen citación de fuentes.</p>
                             <div className="rag-welcome-features">
                                 <div className="rag-feature">
