@@ -315,8 +315,9 @@ def _calc_disambiguation(messages: list[dict]) -> dict:
 
 
 def _calc_hourly_distribution(messages: list[dict]) -> list[dict]:
-    """Calculate query distribution by hour of day."""
+    """Calculate AVERAGE query distribution by hour of day (per day, not totals)."""
     hourly = Counter()
+    unique_days = set()
     
     for msg in messages:
         if msg.get("role") != "user":
@@ -326,7 +327,10 @@ def _calc_hourly_distribution(messages: list[dict]) -> list[dict]:
             # Adjust to Argentina timezone (UTC-3)
             dt_ar = dt - timedelta(hours=3)
             hourly[dt_ar.hour] += 1
+            unique_days.add(dt_ar.strftime("%Y-%m-%d"))
         except (KeyError, ValueError):
             continue
     
-    return [{"hour": h, "queries": hourly.get(h, 0)} for h in range(24)]
+    num_days = max(len(unique_days), 1)
+    
+    return [{"hour": h, "queries": round(hourly.get(h, 0) / num_days, 1)} for h in range(24)]
