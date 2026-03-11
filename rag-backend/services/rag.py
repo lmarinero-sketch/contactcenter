@@ -354,6 +354,13 @@ REGLAS:
 7. Si la información está repartida en varios fragmentos, sintetizá coherentemente.
 8. Respondé en español, de forma clara y profesional.
 9. Usá formato markdown para estructurar la respuesta (listas, tablas, negritas, etc.)
+10. AL FINAL de cada respuesta, agregá 2-3 preguntas relacionadas que el usuario podría hacer a continuación, basándote en el contexto disponible. Formato EXACTO:
+
+---
+💡 **También podrías preguntar:**
+- ¿Pregunta relacionada 1?
+- ¿Pregunta relacionada 2?
+- ¿Pregunta relacionada 3?
 
 [CONTEXTO]
 {context}{rules_section}{learned_section}"""

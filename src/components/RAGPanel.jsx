@@ -12,7 +12,7 @@ import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
     deleteRAGConversation, uploadRAGDocument, uploadRAGBatch,
     listRAGFiles, downloadRAGFile, createRAGFolder, deleteRAGFile,
-    deleteRAGFolder, checkRAGHealth
+    deleteRAGFolder, checkRAGHealth, fetchSuggestions
 } from '../api/ragClient'
 import RAGHelp from './RAGHelp'
 
@@ -42,6 +42,10 @@ export default function RAGPanel() {
     const [learningStats, setLearningStats] = useState(null)
     const [showSidebar, setShowSidebar] = useState(true)
     const [showHelp, setShowHelp] = useState(false)
+
+    // Smart Guidance Layer
+    const [suggestions, setSuggestions] = useState({ categories: [], top_queries: [] })
+    const [showAutocomplete, setShowAutocomplete] = useState(false)
 
     // Session state — Simon boot sequence
     const [sessionStarted, setSessionStarted] = useState(false)
@@ -134,6 +138,11 @@ export default function RAGPanel() {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
+
+    // Load suggestions for Smart Guidance Layer
+    useEffect(() => {
+        fetchSuggestions().then(data => setSuggestions(data)).catch(() => {})
+    }, [])
 
     // Load conversations
     async function loadConversations() {
@@ -821,6 +830,43 @@ export default function RAGPanel() {
                                     <span>Citación Obligatoria</span>
                                 </div>
                             </div>
+
+                            {/* Smart Guidance: Pre-chat suggestions */}
+                            {(suggestions.categories.length > 0 || suggestions.top_queries.length > 0) && (
+                                <div className="sg-prechat">
+                                    {suggestions.categories.length > 0 && (
+                                        <div className="sg-section">
+                                            <div className="sg-section-title"><Tag size={13} /> Temas disponibles</div>
+                                            <div className="sg-chips">
+                                                {suggestions.categories.slice(0, 8).map((cat, i) => (
+                                                    <button key={i} className="sg-chip category"
+                                                        onClick={() => { setInputValue(`¿Qué información hay sobre ${cat.name}?`); }}
+                                                    >
+                                                        <FolderOpen size={12} />
+                                                        {cat.name}
+                                                        {cat.count > 1 && <span className="sg-chip-count">{cat.count}</span>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {suggestions.top_queries.length > 0 && (
+                                        <div className="sg-section">
+                                            <div className="sg-section-title"><Sparkles size={13} /> Preguntas frecuentes</div>
+                                            <div className="sg-chips">
+                                                {suggestions.top_queries.slice(0, 6).map((q, i) => (
+                                                    <button key={i} className="sg-chip query"
+                                                        onClick={() => { setInputValue(q.text); }}
+                                                    >
+                                                        <MessageSquare size={12} />
+                                                        {q.text.length > 60 ? q.text.slice(0, 57) + '...' : q.text}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         messages.map((msg, i) => (
@@ -829,10 +875,42 @@ export default function RAGPanel() {
                                     {msg.role === 'user' ? '👤' : '🧠'}
                                 </div>
                                 <div className="rag-message-content">
-                                    <div
-                                        className="rag-message-text"
-                                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                                    />
+                                    {(() => {
+                                        // Parse related questions from Simon's response
+                                        const parts = (msg.content || '').split(/---\s*\n💡/);
+                                        const mainContent = parts[0];
+                                        let relatedQuestions = [];
+                                        if (msg.role === 'assistant' && parts.length > 1) {
+                                            const rqSection = parts[1];
+                                            const matches = rqSection.match(/- ¿([^?]+)\?/g) || [];
+                                            relatedQuestions = matches.map(m => m.replace(/^- /, '').trim());
+                                        }
+                                        return (
+                                            <>
+                                                <div
+                                                    className="rag-message-text"
+                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(mainContent) }}
+                                                />
+                                                {relatedQuestions.length > 0 && (
+                                                    <div className="sg-related">
+                                                        <div className="sg-related-title">
+                                                            <Lightbulb size={13} />
+                                                            También podrías preguntar:
+                                                        </div>
+                                                        <div className="sg-related-chips">
+                                                            {relatedQuestions.map((rq, ri) => (
+                                                                <button key={ri} className="sg-chip query small"
+                                                                    onClick={() => { setInputValue(rq); }}
+                                                                >
+                                                                    {rq}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                     {/* Clarification Suggestions */}
                                     {msg.type === 'clarification' && msg.suggestions && msg.suggestions.length > 0 && (
                                         <div className="rag-clarification">
@@ -939,14 +1017,22 @@ export default function RAGPanel() {
                     </div>
                 )}
 
-                {/* Input */}
+                {/* Input with Autocomplete */}
                 <div className="rag-input-area">
-                    <div className="rag-input-wrapper">
+                    <div className="rag-input-wrapper" style={{ position: 'relative' }}>
                         <textarea
                             className="rag-input"
                             value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleKeyPress}
+                            onChange={(e) => {
+                                setInputValue(e.target.value);
+                                setShowAutocomplete(e.target.value.trim().length >= 2);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') setShowAutocomplete(false);
+                                handleKeyPress(e);
+                            }}
+                            onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
+                            onFocus={() => { if (inputValue.trim().length >= 2) setShowAutocomplete(true); }}
                             placeholder="Escribí tu pregunta sobre los documentos..."
                             rows={1}
                             disabled={isLoading || !backendOnline}
@@ -958,6 +1044,31 @@ export default function RAGPanel() {
                         >
                             {isLoading ? <Loader2 size={18} className="rag-spin" /> : <Send size={18} />}
                         </button>
+
+                        {/* Autocomplete dropdown */}
+                        {showAutocomplete && inputValue.trim().length >= 2 && (() => {
+                            const query = inputValue.toLowerCase();
+                            const matches = (suggestions.top_queries || []).filter(q =>
+                                q.text.toLowerCase().includes(query)
+                            ).slice(0, 5);
+                            if (matches.length === 0) return null;
+                            return (
+                                <div className="sg-autocomplete">
+                                    {matches.map((m, i) => (
+                                        <button key={i} className="sg-autocomplete-item"
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setInputValue(m.text);
+                                                setShowAutocomplete(false);
+                                            }}
+                                        >
+                                            <Search size={13} />
+                                            <span>{m.text}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
                     </div>
                     <div className="rag-input-hint">
                         Respuestas basadas exclusivamente en documentos cargados · Enter para enviar

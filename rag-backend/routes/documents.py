@@ -479,3 +479,17 @@ async def get_analytics(days: int = Query(default=30, ge=1, le=365)):
         return get_full_analytics(days)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Suggestions — Smart Guidance Layer
+# ============================================================
+
+@router.get("/suggestions")
+async def get_suggestions():
+    """Get categories and top queries for guiding users."""
+    try:
+        from services.suggestions import get_suggestions
+        return get_suggestions()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

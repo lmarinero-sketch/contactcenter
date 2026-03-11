@@ -243,3 +243,15 @@ export async function checkRAGHealth() {
         return false;
     }
 }
+
+// === Suggestions (Smart Guidance Layer) ===
+
+export async function fetchSuggestions() {
+    try {
+        const response = await fetch(`${RAG_API_BASE}/suggestions`);
+        if (!response.ok) return { categories: [], top_queries: [] };
+        return await response.json();
+    } catch {
+        return { categories: [], top_queries: [] };
+    }
+}
