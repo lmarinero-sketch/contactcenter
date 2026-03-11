@@ -466,3 +466,16 @@ async def rules_count_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ============================================================
+# Analytics
+# ============================================================
+
+@router.get("/analytics")
+async def get_analytics(days: int = Query(default=30, ge=1, le=365)):
+    """Get comprehensive Simon IA analytics."""
+    try:
+        from services.analytics import get_full_analytics
+        return get_full_analytics(days)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

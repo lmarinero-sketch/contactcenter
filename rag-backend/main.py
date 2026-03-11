@@ -8,9 +8,9 @@ from routes.chat import router as chat_router
 from routes.documents import router as documents_router
 
 app = FastAPI(
-    title="RAG System - Sanatorio Argentino",
-    description="Asistente IA Documental para Contact Center",
-    version="2.0.0"
+    title="Simon IA - Sanatorio Argentino",
+    description="Asistente IA Documental con RAG Pipeline V3.1",
+    version="3.1.0"
 )
 
 # CORS — allow all origins (Vercel + local dev)

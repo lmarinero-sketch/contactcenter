@@ -16,6 +16,7 @@ import {
 } from '../api/ragClient'
 import RAGHelp from './RAGHelp'
 import RAGRules from './RAGRules'
+import SimonAnalytics from './SimonAnalytics'
 
 // Simple markdown-ish renderer (bold, lists, sources)
 function renderMarkdown(text) {
@@ -615,6 +616,13 @@ export default function RAGPanel() {
                             <Shield size={14} />
                             Reglas
                         </button>
+                        <button
+                            className={`rag-tab ${activeTab === 'analytics' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('analytics')}
+                        >
+                            <BarChart3 size={14} />
+                            Analytics
+                        </button>
                     </div>
 
                     {/* Conversation list */}
@@ -767,7 +775,15 @@ export default function RAGPanel() {
             {activeTab === 'rules' && (
                 <RAGRules />
             )}
-            {/* Right: Chat Area */}
+
+            {/* Analytics — full width, replaces chat */}
+            {activeTab === 'analytics' && (
+                <SimonAnalytics />
+            )}
+
+            {/* Right: Chat Area (only when not analytics) */}
+            {activeTab !== 'analytics' && (
+            <>
             <div className="rag-chat-area">
                 {/* Status bar */}
                 <div className="rag-status-bar">
@@ -1074,6 +1090,8 @@ export default function RAGPanel() {
                     </div>
                 )
             })()}
+            </>
+            )}
             {showHelp && <RAGHelp onClose={() => setShowHelp(false)} />}
         </div>
     )
