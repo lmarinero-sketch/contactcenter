@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import {
     LayoutDashboard, Users, Bot, MessageSquare,
-    TrendingUp, ChevronLeft, ChevronRight, Brain
+    TrendingUp, ChevronLeft, ChevronRight, Brain,
+    Shield, BarChart3
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -13,6 +14,8 @@ const NAV_ITEMS = [
 
 const TOOL_ITEMS = [
     { id: 'rag', label: 'Simon IA', icon: Brain },
+    { id: 'rag-rules', label: 'Reglas', icon: Shield, sub: true },
+    { id: 'rag-analytics', label: 'Analytics', icon: BarChart3, sub: true },
 ]
 
 export default function Sidebar({ activeView, onViewChange }) {
@@ -49,11 +52,11 @@ export default function Sidebar({ activeView, onViewChange }) {
                 {TOOL_ITEMS.map(item => (
                     <button
                         key={item.id}
-                        className={`nav-item ${activeView === item.id ? 'active' : ''}`}
+                        className={`nav-item ${item.sub ? 'nav-sub' : ''} ${activeView === item.id ? 'active' : ''}`}
                         onClick={() => onViewChange(item.id)}
                         title={collapsed ? item.label : undefined}
                     >
-                        <item.icon size={18} />
+                        <item.icon size={item.sub ? 15 : 18} />
                         {!collapsed && <span>{item.label}</span>}
                     </button>
                 ))}

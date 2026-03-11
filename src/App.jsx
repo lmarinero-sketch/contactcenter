@@ -6,6 +6,8 @@ import AgentsPanel from './components/AgentsPanel'
 import ChatbotPanel from './components/ChatbotPanel'
 import ConversationsPanel from './components/ConversationsPanel'
 import RAGPanel from './components/RAGPanel'
+import RAGRules from './components/RAGRules'
+import SimonAnalytics from './components/SimonAnalytics'
 
 const VIEW_TITLES = {
     overview: 'Overview',
@@ -13,6 +15,8 @@ const VIEW_TITLES = {
     chatbot: 'Chatbot Analytics',
     conversations: 'Conversaciones',
     rag: 'Simon IA',
+    'rag-rules': 'Reglas de Simon',
+    'rag-analytics': 'Analytics de Simon',
 }
 
 const VIEW_DESCRIPTIONS = {
@@ -21,6 +25,8 @@ const VIEW_DESCRIPTIONS = {
     chatbot: 'Árbol de decisiones y efectividad del bot',
     conversations: 'Explorar conversaciones individuales',
     rag: 'Consultá documentos internos con IA — respuestas precisas con citación de fuentes',
+    'rag-rules': 'Ingresá reglas e información que Simon debe recordar al responder',
+    'rag-analytics': 'Métricas de uso, rendimiento y calidad de Simon IA',
 }
 
 function App() {
@@ -42,6 +48,8 @@ function App() {
             case 'chatbot': return <ChatbotPanel key={refreshKey} />
             case 'conversations': return <ConversationsPanel key={refreshKey} initialTicketId={pendingTicketId} onTicketConsumed={() => setPendingTicketId(null)} />
             case 'rag': return <RAGPanel key={refreshKey} />
+            case 'rag-rules': return <RAGRules key={refreshKey} />
+            case 'rag-analytics': return <SimonAnalytics key={refreshKey} />
             default: return <OverviewPanel key={refreshKey} />
         }
     }
