@@ -46,32 +46,55 @@ export async function deleteRAGConversation(conversationId) {
 // === File Manager ===
 
 /**
- * Upload a single document to a folder
+ * Upload a single document to a folder — with timeout and abort support
  */
-export async function uploadRAGDocument(file, folder = '', tag = '') {
+export async function uploadRAGDocument(file, folder = '', tag = '', timeoutMs = 120000) {
     const formData = new FormData();
     formData.append('file', file);
     if (folder) formData.append('folder', folder);
     if (tag) formData.append('tag', tag);
 
-    const response = await fetch(`${RAG_API_BASE}/upload`, {
-        method: 'POST',
-        body: formData,
-    });
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Error al subir archivo' }));
-        throw new Error(error.detail || 'Error al subir documento');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(`${RAG_API_BASE}/upload`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Error al subir archivo' }));
+            throw new Error(error.detail || 'Error al subir documento');
+        }
+        return response.json();
+    } catch (e) {
+        clearTimeout(timer);
+        if (e.name === 'AbortError') {
+            throw new Error(`Timeout: "${file.name}" tardó más de ${timeoutMs / 1000}s`);
+        }
+        throw e;
     }
-    return response.json();
 }
 
 /**
- * Upload multiple files sequentially to a folder
+ * Upload multiple files sequentially to a folder.
+ * Features:
+ * - Per-file timeout (120s) to handle slow OCR/embedding
+ * - Automatic retry (1 attempt) on timeout or network error
+ * - Skips unsupported extensions
+ * - Continues on failure (doesn't abort the whole batch)
  */
 export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = null) {
     const results = [];
     let processed = 0, failed = 0, skipped = 0;
+    let total_chunks = 0;
     const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm'];
+
+    const TIMEOUT_MS = 120000; // 2 min per file
+    const MAX_RETRIES = 1;
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -83,21 +106,53 @@ export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = 
             continue;
         }
 
-        if (onProgress) onProgress({ current: i + 1, total: files.length, filename: file.name });
+        if (onProgress) onProgress({
+            current: i + 1 - skipped,
+            total: files.length - skipped,
+            filename: file.name,
+            processed,
+            failed,
+        });
 
-        try {
-            const result = await uploadRAGDocument(file, folder, tag);
-            processed++;
-            results.push({ filename: file.name, status: 'ok', ...result });
-        } catch (e) {
+        let success = false;
+        let lastError = null;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                if (attempt > 0) {
+                    // Wait before retry
+                    if (onProgress) onProgress({
+                        current: i + 1 - skipped,
+                        total: files.length - skipped,
+                        filename: file.name,
+                        processed,
+                        failed,
+                        retrying: true,
+                    });
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+
+                const result = await uploadRAGDocument(file, folder, tag, TIMEOUT_MS);
+                processed++;
+                total_chunks += (result.total_chunks || 0);
+                results.push({ filename: file.name, status: 'ok', ...result });
+                success = true;
+                break;
+            } catch (e) {
+                lastError = e;
+                console.warn(`Upload "${file.name}" attempt ${attempt + 1} failed:`, e.message);
+            }
+        }
+
+        if (!success) {
             failed++;
-            results.push({ filename: file.name, status: 'error', error: e.message });
+            results.push({ filename: file.name, status: 'error', error: lastError?.message || 'Error desconocido' });
         }
     }
 
     return {
         processed, failed, skipped,
-        total_chunks: results.reduce((sum, r) => sum + (r.total_chunks || 0), 0),
+        total_chunks,
         results,
     };
 }

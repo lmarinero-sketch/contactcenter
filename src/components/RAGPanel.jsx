@@ -5,7 +5,8 @@ import {
     AlertCircle, CheckCircle, File, X, Clock,
     Search, Sparkles, Layers, BarChart3, FolderOpen, Tag,
     Download, FolderPlus, ArrowLeft, Home, Folder,
-    Lightbulb, GraduationCap, HelpCircle
+    Lightbulb, GraduationCap, HelpCircle, Shield, FileWarning,
+    Info
 } from 'lucide-react'
 import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
@@ -47,6 +48,10 @@ export default function RAGPanel() {
     const [uploadTag, setUploadTag] = useState('')
     const [showNewFolder, setShowNewFolder] = useState(false)
     const [newFolderName, setNewFolderName] = useState('')
+
+    // Upload confirmation modal state
+    const [showUploadModal, setShowUploadModal] = useState(false)
+    const [pendingFiles, setPendingFiles] = useState([])
 
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
@@ -193,20 +198,73 @@ export default function RAGPanel() {
         }
     }
 
-    // Handle file upload (single or multiple)
-    async function handleFileUpload(event) {
+    // Supported extensions for filtering
+    const SUPPORTED_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm']
+
+    // Handle file selection — show confirmation modal
+    function handleFileSelect(event) {
         const files = Array.from(event.target.files || [])
+        if (!files.length) return
+        setPendingFiles(files)
+        setShowUploadModal(true)
+    }
+
+    // Get upload summary for the modal
+    function getUploadSummary(files) {
+        const supported = []
+        const unsupported = []
+        let totalSize = 0
+        const typeCounts = {}
+
+        for (const file of files) {
+            const ext = '.' + file.name.split('.').pop().toLowerCase()
+            totalSize += file.size
+            if (SUPPORTED_EXTS.includes(ext)) {
+                supported.push(file)
+                typeCounts[ext] = (typeCounts[ext] || 0) + 1
+            } else {
+                unsupported.push(file)
+            }
+        }
+
+        // Detect folder name from webkitRelativePath
+        let folderName = ''
+        if (files[0]?.webkitRelativePath) {
+            folderName = files[0].webkitRelativePath.split('/')[0]
+        }
+
+        return { supported, unsupported, totalSize, typeCounts, folderName }
+    }
+
+    // Confirm upload from modal
+    async function confirmUpload() {
+        setShowUploadModal(false)
+        const files = pendingFiles
+        setPendingFiles([])
+
         if (!files.length) return
 
         setIsUploading(true)
         setError(null)
 
-        if (files.length === 1) {
-            setUploadProgress(`Procesando "${files[0].name}"...`)
+        // Filter to supported files only
+        const supportedFiles = files.filter(f => {
+            const ext = '.' + f.name.split('.').pop().toLowerCase()
+            return SUPPORTED_EXTS.includes(ext)
+        })
+
+        if (supportedFiles.length === 0) {
+            setError('Ninguno de los archivos seleccionados tiene un formato soportado')
+            setIsUploading(false)
+            return
+        }
+
+        if (supportedFiles.length === 1) {
+            setUploadProgress(`Procesando "${supportedFiles[0].name}"...`)
             try {
-                const result = await uploadRAGDocument(files[0], currentFolder, uploadTag)
+                const result = await uploadRAGDocument(supportedFiles[0], currentFolder, uploadTag)
                 loadFiles()
-                setUploadProgress(`✅ "${files[0].name}" — ${result.total_chunks} chunks`)
+                setUploadProgress(`✅ "${supportedFiles[0].name}" — ${result.total_chunks} chunks`)
                 setTimeout(() => setUploadProgress(''), 4000)
             } catch (e) {
                 setError(e.message || 'Error al subir documento')
@@ -214,12 +272,19 @@ export default function RAGPanel() {
             }
         } else {
             try {
-                const result = await uploadRAGBatch(files, currentFolder, uploadTag, (p) => {
-                    setUploadProgress(`Subiendo ${p.current}/${p.total}: "${p.filename}"...`)
+                const result = await uploadRAGBatch(supportedFiles, currentFolder, uploadTag, (p) => {
+                    const retryLabel = p.retrying ? ' 🔄 Reintentando...' : ''
+                    const statusParts = [`Subiendo ${p.current}/${p.total}: "${p.filename}"${retryLabel}`]
+                    if (p.processed > 0) statusParts.push(`✅ ${p.processed}`)
+                    if (p.failed > 0) statusParts.push(`❌ ${p.failed}`)
+                    setUploadProgress(statusParts.join(' · '))
                 })
                 loadFiles()
-                setUploadProgress(`✅ ${result.processed} procesados, ${result.total_chunks} chunks - ${result.failed} fallidos, ${result.skipped} omitidos`)
-                setTimeout(() => setUploadProgress(''), 6000)
+                const parts = [`✅ ${result.processed} procesados`, `${result.total_chunks} chunks`]
+                if (result.failed > 0) parts.push(`❌ ${result.failed} fallidos`)
+                if (result.skipped > 0) parts.push(`⏭ ${result.skipped} omitidos`)
+                setUploadProgress(parts.join(' · '))
+                setTimeout(() => setUploadProgress(''), 8000)
             } catch (e) {
                 setError(e.message || 'Error al subir archivos')
                 setUploadProgress('')
@@ -228,6 +293,14 @@ export default function RAGPanel() {
 
         setIsUploading(false)
         setUploadTag('')
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        if (folderInputRef.current) folderInputRef.current.value = ''
+    }
+
+    // Cancel upload from modal
+    function cancelUpload() {
+        setShowUploadModal(false)
+        setPendingFiles([])
         if (fileInputRef.current) fileInputRef.current.value = ''
         if (folderInputRef.current) folderInputRef.current.value = ''
     }
@@ -436,10 +509,10 @@ export default function RAGPanel() {
                         <div className="rag-doc-list">
                             {/* Toolbar */}
                             <div className="rag-fm-toolbar">
-                                <input ref={fileInputRef} type="file" onChange={handleFileUpload}
+                                <input ref={fileInputRef} type="file" onChange={handleFileSelect}
                                     accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm"
                                     style={{ display: 'none' }} disabled={isUploading} multiple />
-                                <input ref={folderInputRef} type="file" onChange={handleFileUpload}
+                                <input ref={folderInputRef} type="file" onChange={handleFileSelect}
                                     style={{ display: 'none' }} disabled={isUploading}
                                     webkitdirectory="" directory="" multiple />
                                 <div className="rag-fm-actions">
@@ -734,6 +807,104 @@ export default function RAGPanel() {
                     </div>
                 </div>
             </div>
+
+            {/* Upload Confirmation Modal */}
+            {showUploadModal && (() => {
+                const summary = getUploadSummary(pendingFiles)
+                return (
+                    <div className="rag-modal-overlay" onClick={cancelUpload}>
+                        <div className="rag-modal" onClick={(e) => e.stopPropagation()}>
+                            <div className="rag-modal-header">
+                                <div className="rag-modal-icon">
+                                    <Upload size={24} />
+                                </div>
+                                <h3>Confirmar carga de archivos</h3>
+                                <button className="rag-modal-close" onClick={cancelUpload}>
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <div className="rag-modal-body">
+                                {/* Folder info */}
+                                {summary.folderName && (
+                                    <div className="rag-modal-folder">
+                                        <Folder size={16} />
+                                        <span>Carpeta: <strong>{summary.folderName}</strong></span>
+                                    </div>
+                                )}
+
+                                {/* Summary stats */}
+                                <div className="rag-modal-stats">
+                                    <div className="rag-modal-stat">
+                                        <FileText size={18} />
+                                        <div>
+                                            <span className="rag-modal-stat-value">{summary.supported.length}</span>
+                                            <span className="rag-modal-stat-label">archivos compatibles</span>
+                                        </div>
+                                    </div>
+                                    <div className="rag-modal-stat">
+                                        <BarChart3 size={18} />
+                                        <div>
+                                            <span className="rag-modal-stat-value">
+                                                {summary.totalSize < 1024 * 1024
+                                                    ? `${(summary.totalSize / 1024).toFixed(1)} KB`
+                                                    : `${(summary.totalSize / (1024 * 1024)).toFixed(1)} MB`}
+                                            </span>
+                                            <span className="rag-modal-stat-label">tamaño total</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* File types breakdown */}
+                                <div className="rag-modal-types">
+                                    <span className="rag-modal-types-label">Tipos de archivo:</span>
+                                    <div className="rag-modal-type-chips">
+                                        {Object.entries(summary.typeCounts).map(([ext, count]) => (
+                                            <span key={ext} className="rag-modal-type-chip">
+                                                {FILE_ICONS[ext] || '📄'} {ext} ({count})
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Unsupported files warning */}
+                                {summary.unsupported.length > 0 && (
+                                    <div className="rag-modal-warning">
+                                        <FileWarning size={14} />
+                                        <span>
+                                            <strong>{summary.unsupported.length}</strong> archivo(s) no soportado(s) serán omitidos
+                                            {summary.unsupported.length <= 5 && (
+                                                <span className="rag-modal-warning-files">
+                                                    : {summary.unsupported.map(f => f.name).join(', ')}
+                                                </span>
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Destination info */}
+                                <div className="rag-modal-destination">
+                                    <Info size={13} />
+                                    <span>
+                                        Destino: <strong>{currentFolder || 'Raíz'}</strong>
+                                        {uploadTag && <> · Tag: <strong>{uploadTag}</strong></>}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="rag-modal-footer">
+                                <button className="rag-modal-btn cancel" onClick={cancelUpload}>
+                                    Cancelar
+                                </button>
+                                <button className="rag-modal-btn confirm" onClick={confirmUpload}>
+                                    <Upload size={14} />
+                                    Cargar {summary.supported.length} archivo{summary.supported.length !== 1 ? 's' : ''}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }
