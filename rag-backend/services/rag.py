@@ -544,6 +544,8 @@ def _build_sources(documents: list[dict]) -> list[dict]:
                 "rerank_score": doc.get("rerank_score", 0),
                 "chunks_used": 0,
                 "source_type": source_type,
+                "storage_path": metadata.get("storage_path", ""),
+                "folder": metadata.get("folder", ""),
             }
         source_map[filename]["chunks_used"] += 1
         # Keep highest similarity

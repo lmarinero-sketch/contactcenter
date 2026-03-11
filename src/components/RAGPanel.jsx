@@ -731,6 +731,15 @@ export default function RAGPanel() {
                                                             <GraduationCap size={9} /> Aprendido
                                                         </span>
                                                     )}
+                                                    {src.source_type !== 'chat_history' && src.storage_path && (
+                                                        <button
+                                                            className="rag-source-download"
+                                                            onClick={() => downloadRAGFile(src.storage_path)}
+                                                            title={`Descargar ${src.filename}`}
+                                                        >
+                                                            <Download size={11} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>

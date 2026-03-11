@@ -159,6 +159,10 @@ async def list_files(folder: Optional[str] = Query(default="")):
             if not filename:
                 continue
 
+            # Skip internal chat learning chunks (not real files)
+            if filename == "__chat_learned__":
+                continue
+
             # If we're in a folder, only show items in this folder
             if folder:
                 if file_folder == folder:
@@ -347,6 +351,10 @@ async def list_documents(tag: Optional[str] = Query(default=None)):
             doc_tag = metadata.get("tag", "")
 
             if tag and doc_tag != tag:
+                continue
+
+            # Skip internal chat learning chunks
+            if filename == "__chat_learned__":
                 continue
 
             if filename not in doc_map:
