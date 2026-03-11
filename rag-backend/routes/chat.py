@@ -1,6 +1,6 @@
 """
 Chat Routes — RAG Question Answering + Conversation Management
-V2.1: Non-blocking pipeline execution with asyncio.to_thread + request timeout
+V3.0: Non-blocking pipeline execution + disambiguation + chat learning endpoints
 """
 import asyncio
 from fastapi import APIRouter, HTTPException
@@ -22,6 +22,8 @@ async def chat(request: ChatRequest):
     
     Uses asyncio.to_thread to run the synchronous RAG pipeline
     without blocking the event loop. Includes a timeout guard.
+    
+    V3.0: Now supports disambiguation responses (type: "clarification")
     """
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
@@ -86,3 +88,41 @@ async def delete_conversation(conversation_id: str):
         return {"message": "Conversación eliminada"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Chat Learning Endpoints
+# ============================================================
+
+@router.post("/learning/index-all")
+async def index_all_conversations():
+    """Index all conversations for chat learning (batch operation)."""
+    try:
+        from services.chat_learning import index_all_conversations as do_index
+        result = await asyncio.to_thread(do_index)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/learning/index/{conversation_id}")
+async def index_conversation(conversation_id: str):
+    """Index a specific conversation for chat learning."""
+    try:
+        from services.chat_learning import index_conversation as do_index
+        result = await asyncio.to_thread(do_index, conversation_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/learning/stats")
+async def learning_stats():
+    """Get statistics about chat learning."""
+    try:
+        from services.chat_learning import get_learning_stats
+        result = await asyncio.to_thread(get_learning_stats)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

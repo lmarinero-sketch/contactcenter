@@ -1,7 +1,10 @@
 """
-RAG Pipeline V2.1 — Maximum Precision + Performance
-6-stage pipeline: HyDE → Multi-Query → Hybrid Search → Dedup → Re-rank → Generate
-V2.1: Parallel re-ranking, timeouts on all OpenAI calls, thread-safe execution
+RAG Pipeline V3.0 — Maximum Precision + Performance + Learning + Disambiguation
+7-stage pipeline: Disambiguate → HyDE → Multi-Query → Hybrid Search → Dedup → Re-rank → Generate
+V3.0: 
+  - Step 0: Ambiguity detection — asks for clarification when question is unclear
+  - Chat Learning: Automatically indexes Q&A pairs for continuous improvement
+  - Enhanced context: Distinguishes between document sources and learned Q&A sources
 """
 import json
 import re
@@ -20,6 +23,101 @@ OPENAI_CALL_TIMEOUT = 30
 # Timeout for the entire pipeline (seconds)
 PIPELINE_TIMEOUT = 120
 
+
+# ============================================================
+# STEP 0: Ambiguity Detection & Disambiguation
+# ============================================================
+
+def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | None:
+    """
+    Step 0: Evaluate if the question is ambiguous and needs clarification.
+    
+    Returns None if the question is clear enough to proceed.
+    Returns a dict with clarification questions if ambiguous.
+    
+    Considers conversation history context — a vague follow-up like "y eso?"
+    is NOT ambiguous if there's recent context.
+    """
+    # Very short questions without conversation context are likely ambiguous
+    # But with context they might be valid follow-ups
+    has_context = len(conversation_history) >= 2
+    
+    # Skip disambiguation for very clear questions (optimization)
+    # Questions with specific keywords/entities are usually clear
+    if len(question.split()) >= 8:
+        return None
+    
+    try:
+        context_hint = ""
+        if has_context:
+            # Include last exchange for context
+            recent = conversation_history[-2:]
+            context_hint = "\n\nCONTEXTO DE CONVERSACIÓN RECIENTE:\n"
+            for msg in recent:
+                context_hint += f"- {msg['role']}: {msg['content'][:200]}\n"
+        
+        response = openai_client.chat.completions.create(
+            model=RERANK_MODEL,  # Use lighter model for speed
+            temperature=0,
+            max_tokens=400,
+            timeout=OPENAI_CALL_TIMEOUT,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Sos un clasificador de preguntas para un sistema de consulta documental de Sanatorio Argentino. "
+                        "Tu tarea es determinar si una pregunta del usuario es lo suficientemente clara para buscar en documentos, "
+                        "o si necesita clarificación.\n\n"
+                        "REGLAS:\n"
+                        "1. Si la pregunta es clara y específica → responde: {\"clear\": true}\n"
+                        "2. Si la pregunta es ambigua, muy vaga, o podría referirse a múltiples temas → responde con sugerencias\n"
+                        "3. Si hay CONTEXTO DE CONVERSACIÓN y la pregunta es una continuación lógica → {\"clear\": true}\n"
+                        "4. Preguntas de 1-2 palabras SIN contexto previo generalmente necesitan clarificación\n"
+                        "5. NO seas demasiado estricto — si la pregunta tiene al menos un tema identificable, es clara\n\n"
+                        "Formato de respuesta para preguntas ambiguas:\n"
+                        "{\n"
+                        "  \"clear\": false,\n"
+                        "  \"reason\": \"Explicación breve de por qué es ambigua\",\n"
+                        "  \"suggestions\": [\n"
+                        "    \"Pregunta sugerida más específica 1\",\n"
+                        "    \"Pregunta sugerida más específica 2\",\n"
+                        "    \"Pregunta sugerida más específica 3\"\n"
+                        "  ]\n"
+                        "}\n\n"
+                        "Respondé SOLO con JSON válido."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Pregunta del usuario: \"{question}\"{context_hint}"
+                }
+            ]
+        )
+        
+        text = response.choices[0].message.content.strip()
+        
+        # Clean markdown code fences if present
+        text = re.sub(r'^```json\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+        
+        result = json.loads(text)
+        
+        if result.get("clear", True):
+            return None
+        
+        return {
+            "reason": result.get("reason", "La pregunta podría ser más específica"),
+            "suggestions": result.get("suggestions", [])[:4],  # Max 4 suggestions
+        }
+    
+    except Exception as e:
+        print(f"Ambiguity check failed (proceeding anyway): {e}")
+        return None  # If check fails, proceed with the pipeline
+
+
+# ============================================================
+# STEP 1: HyDE (Hypothetical Document Embeddings)
+# ============================================================
 
 def _generate_hyde_response(question: str) -> str:
     """
@@ -50,6 +148,10 @@ def _generate_hyde_response(question: str) -> str:
         print(f"HyDE generation failed: {e}")
         return ""
 
+
+# ============================================================
+# STEP 2: Multi-Query
+# ============================================================
 
 def _generate_multi_queries(question: str) -> list[str]:
     """
@@ -82,9 +184,22 @@ def _generate_multi_queries(question: str) -> list[str]:
         return []
 
 
+# ============================================================
+# STEP 5: Re-ranking
+# ============================================================
+
 def _rerank_single_document(question: str, doc: dict) -> dict | None:
     """Re-rank a single document. Returns the doc with rerank_score or None if filtered out."""
     try:
+        # Identify if this is a learned Q&A chunk
+        source_type = doc.get("metadata", {}).get("source", "")
+        extra_hint = ""
+        if source_type == "chat_history":
+            extra_hint = (
+                " Este fragmento proviene de una conversación previa (Q&A aprendido). "
+                "Si la pregunta coincide temáticamente, es MUY relevante."
+            )
+        
         response = openai_client.chat.completions.create(
             model=RERANK_MODEL,
             temperature=0,
@@ -98,7 +213,8 @@ def _rerank_single_document(question: str, doc: dict) -> dict | None:
                         "responder la pregunta del usuario. "
                         "El fragmento puede ser texto narrativo O datos tabulares (filas con key:value, "
                         "columnas de Excel, listas de registros). Los datos tabulares que contienen "
-                        "términos relacionados a la pregunta son MUY relevantes aunque no 'respondan' directamente. "
+                        "términos relacionados a la pregunta son MUY relevantes aunque no 'respondan' directamente."
+                        f"{extra_hint} "
                         "Respondé SOLO con JSON: {\"score\": 0-10, \"reason\": \"explicación breve\"}"
                     )
                 },
@@ -163,23 +279,50 @@ def _rerank_documents(question: str, documents: list[dict]) -> list[dict]:
     return reranked[:RERANK_TOP_K]
 
 
+# ============================================================
+# STEP 6: Final Answer Generation
+# ============================================================
+
 def _generate_final_answer(question: str, documents: list[dict],
                            conversation_history: list[dict]) -> str:
     """
     Step 6: Final answer generation with strict source citation.
     Optimized for both narrative text and tabular/Excel data.
+    Now distinguishes between document sources and learned Q&A sources.
     """
-    # Build context from documents
+    # Build context from documents, separating doc vs learned
     context_parts = []
+    learned_parts = []
+    
     for i, doc in enumerate(documents, 1):
-        filename = doc.get("metadata", {}).get("filename", "desconocido")
+        metadata = doc.get("metadata", {})
+        filename = metadata.get("filename", "desconocido")
         score = doc.get("rerank_score", "N/A")
-        context_parts.append(
-            f"--- Documento {i} (Fuente: {filename}, Relevancia: {score}/10) ---\n"
-            f"{doc['content']}"
-        )
+        source_type = metadata.get("source", "")
+        
+        if source_type == "chat_history":
+            learned_parts.append(
+                f"--- Respuesta Previa (Conversación: {metadata.get('conversation_title', 'anterior')}, "
+                f"Relevancia: {score}/10) ---\n{doc['content']}"
+            )
+        else:
+            context_parts.append(
+                f"--- Documento {i} (Fuente: {filename}, Relevancia: {score}/10) ---\n"
+                f"{doc['content']}"
+            )
 
     context = "\n\n".join(context_parts)
+    learned_context = "\n\n".join(learned_parts)
+
+    # Build system prompt with both contexts
+    learned_section = ""
+    if learned_context:
+        learned_section = (
+            f"\n\n[RESPUESTAS PREVIAS APRENDIDAS]\n"
+            f"Las siguientes son respuestas que ya se dieron en conversaciones anteriores sobre temas similares. "
+            f"Usalas como referencia pero verificá con los documentos del [CONTEXTO] si están disponibles.\n"
+            f"{learned_context}"
+        )
 
     system_prompt = f"""Sos un asistente preciso de consulta documental para Sanatorio Argentino.
 Tu función es responder preguntas usando la información del [CONTEXTO] proporcionado.
@@ -193,9 +336,10 @@ REGLAS:
 6. Si la información está repartida en varios fragmentos, sintetizá coherentemente.
 7. Respondé en español, de forma clara y profesional.
 8. Usá formato markdown para estructurar la respuesta (listas, tablas, negritas, etc.)
+9. Si hay respuestas previas aprendidas, podés usarlas como base pero siempre priorizá los documentos actuales.
 
 [CONTEXTO]
-{context}"""
+{context}{learned_section}"""
 
     # Build messages with conversation history
     messages = [{"role": "system", "content": system_prompt}]
@@ -220,6 +364,10 @@ REGLAS:
     return response.choices[0].message.content
 
 
+# ============================================================
+# Hybrid Search Executor
+# ============================================================
+
 def _execute_search(query: str) -> list[dict]:
     """Execute a single hybrid search for a query. Used for parallel search."""
     try:
@@ -235,13 +383,16 @@ def _execute_search(query: str) -> list[dict]:
         return []
 
 
+# ============================================================
+# MAIN PIPELINE
+# ============================================================
+
 def process_question(question: str, conversation_id: str | None = None) -> dict:
     """
-    Main RAG pipeline — Process a user question through 6 stages.
+    Main RAG pipeline — Process a user question through 7 stages.
     Returns the answer, sources, and pipeline metadata.
     
-    V2.1: HyDE + Multi-Query run in parallel, searches run in parallel,
-    re-ranking runs in parallel. Much faster than sequential V2.
+    V3.0: Disambiguate → HyDE + Multi-Query → Hybrid Search → Dedup → Re-rank → Generate → Learn
     """
     pipeline_info = {
         "hyde_generated": False,
@@ -249,7 +400,36 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
         "total_searched": 0,
         "unique_results": 0,
         "reranked_kept": 0,
+        "disambiguation_triggered": False,
+        "chat_learning": False,
     }
+
+    # Load conversation history early (needed for disambiguation)
+    conversation_history = []
+    if conversation_id:
+        try:
+            history_result = supabase.table("rag_messages") \
+                .select("role, content") \
+                .eq("conversation_id", conversation_id) \
+                .order("created_at") \
+                .execute()
+            conversation_history = history_result.data or []
+        except Exception as e:
+            print(f"Failed to load conversation history: {e}")
+
+    # === STEP 0: Ambiguity Check ===
+    ambiguity = _check_ambiguity(question, conversation_history)
+    
+    if ambiguity is not None:
+        pipeline_info["disambiguation_triggered"] = True
+        # Return clarification request instead of searching
+        return _build_clarification_response(
+            question=question,
+            reason=ambiguity["reason"],
+            suggestions=ambiguity["suggestions"],
+            conversation_id=conversation_id,
+            pipeline_info=pipeline_info,
+        )
 
     # === STEPS 1 & 2: HyDE + Multi-Query IN PARALLEL ===
     hyde_future = _executor.submit(_generate_hyde_response, question)
@@ -326,26 +506,27 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
         pipeline_info["rerank_fallback"] = True
 
     # === STEP 6: Generate Final Answer ===
-    # Load conversation history if we have a conversation_id
-    conversation_history = []
-    if conversation_id:
-        try:
-            history_result = supabase.table("rag_messages") \
-                .select("role, content") \
-                .eq("conversation_id", conversation_id) \
-                .order("created_at") \
-                .execute()
-            conversation_history = history_result.data or []
-        except Exception as e:
-            print(f"Failed to load conversation history: {e}")
-
     answer = _generate_final_answer(question, reranked, conversation_history)
 
     # Build sources summary
     sources = _build_sources(reranked)
 
-    return _build_response(answer, sources, pipeline_info, question, conversation_id)
+    response = _build_response(answer, sources, pipeline_info, question, conversation_id)
 
+    # === STEP 7: Learn from this conversation (async, non-blocking) ===
+    if response.get("conversation_id"):
+        try:
+            _executor.submit(_learn_from_conversation, response["conversation_id"])
+            pipeline_info["chat_learning"] = True
+        except Exception as e:
+            print(f"Failed to submit learning task: {e}")
+
+    return response
+
+
+# ============================================================
+# Response Builders
+# ============================================================
 
 def _build_sources(documents: list[dict]) -> list[dict]:
     """Build a deduplicated sources summary grouped by filename."""
@@ -353,6 +534,8 @@ def _build_sources(documents: list[dict]) -> list[dict]:
     for doc in documents:
         metadata = doc.get("metadata", {})
         filename = metadata.get("filename", "desconocido")
+        source_type = metadata.get("source", "document")
+        
         if filename not in source_map:
             source_map[filename] = {
                 "filename": filename,
@@ -360,6 +543,7 @@ def _build_sources(documents: list[dict]) -> list[dict]:
                 "similarity": doc.get("similarity", 0),
                 "rerank_score": doc.get("rerank_score", 0),
                 "chunks_used": 0,
+                "source_type": source_type,
             }
         source_map[filename]["chunks_used"] += 1
         # Keep highest similarity
@@ -403,4 +587,66 @@ def _build_response(answer: str, sources: list[dict], pipeline_info: dict,
         "model": CHAT_MODEL,
         "conversation_id": conversation_id,
         "pipeline": pipeline_info,
+        "type": "answer",
     }
+
+
+def _build_clarification_response(question: str, reason: str, 
+                                   suggestions: list[str],
+                                   conversation_id: str | None,
+                                   pipeline_info: dict) -> dict:
+    """Build a clarification response when the question is ambiguous."""
+    # Create conversation if needed (to maintain flow)
+    if not conversation_id:
+        title = question[:80]
+        conv_result = supabase.table("rag_conversations") \
+            .insert({"title": title}) \
+            .execute()
+        conversation_id = conv_result.data[0]["id"]
+    
+    # Save user message
+    supabase.table("rag_messages").insert({
+        "conversation_id": conversation_id,
+        "role": "user",
+        "content": question,
+    }).execute()
+
+    # Build clarification message
+    clarification_text = f"🤔 {reason}\n\n¿Podrías ser más específico? Te sugiero algunas opciones:"
+    for i, suggestion in enumerate(suggestions, 1):
+        clarification_text += f"\n{i}. {suggestion}"
+
+    # Save assistant clarification message
+    supabase.table("rag_messages").insert({
+        "conversation_id": conversation_id,
+        "role": "assistant",
+        "content": clarification_text,
+        "pipeline_info": pipeline_info,
+    }).execute()
+
+    return {
+        "type": "clarification",
+        "answer": clarification_text,
+        "reason": reason,
+        "suggestions": suggestions,
+        "conversation_id": conversation_id,
+        "pipeline": pipeline_info,
+        "sources": [],
+        "documents_found": 0,
+        "model": CHAT_MODEL,
+    }
+
+
+# ============================================================
+# Chat Learning (async)
+# ============================================================
+
+def _learn_from_conversation(conversation_id: str):
+    """Background task: Index the latest Q&A from a conversation."""
+    try:
+        from services.chat_learning import index_conversation
+        result = index_conversation(conversation_id)
+        if result.get("indexed", 0) > 0:
+            print(f"📚 Learned {result['indexed']} Q&A pairs from conversation {conversation_id}")
+    except Exception as e:
+        print(f"Chat learning error: {e}")
