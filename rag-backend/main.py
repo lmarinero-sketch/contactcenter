@@ -13,13 +13,14 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS — allow frontend dev server
+# CORS — allow all origins (Vercel + local dev)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Routes
