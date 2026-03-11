@@ -159,8 +159,8 @@ async def list_files(folder: Optional[str] = Query(default="")):
             if not filename:
                 continue
 
-            # Skip internal chat learning chunks (not real files)
-            if filename == "__chat_learned__":
+            # Skip internal chunks (not real files)
+            if filename in ("__chat_learned__", "__rules__"):
                 continue
 
             # If we're in a folder, only show items in this folder
@@ -353,8 +353,8 @@ async def list_documents(tag: Optional[str] = Query(default=None)):
             if tag and doc_tag != tag:
                 continue
 
-            # Skip internal chat learning chunks
-            if filename == "__chat_learned__":
+            # Skip internal chunks
+            if filename in ("__chat_learned__", "__rules__"):
                 continue
 
             if filename not in doc_map:
@@ -405,3 +405,64 @@ async def delete_document(filename: str = Query(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# Rules — Manual Knowledge Input
+# ============================================================
+
+from pydantic import BaseModel
+
+class RuleInput(BaseModel):
+    text: str
+    created_by: str = "admin"
+
+@router.post("/rules")
+async def create_rule_endpoint(payload: RuleInput):
+    """Create a new rule from text input (processes dates, categorizes, embeds)."""
+    if not payload.text or len(payload.text.strip()) < 5:
+        raise HTTPException(status_code=400, detail="El texto de la regla es muy corto")
+    
+    try:
+        from services.rules import create_rule
+        result = create_rule(payload.text.strip(), payload.created_by)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rules")
+async def list_rules_endpoint():
+    """List all stored rules."""
+    try:
+        from services.rules import list_rules
+        rules = list_rules()
+        return {"rules": rules, "total": len(rules)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/rules/{rule_id}")
+async def delete_rule_endpoint(rule_id: int):
+    """Delete a specific rule."""
+    try:
+        from services.rules import delete_rule
+        success = delete_rule(rule_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Regla no encontrada")
+        return {"message": "Regla eliminada"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rules/count")
+async def rules_count_endpoint():
+    """Get total count of rules."""
+    try:
+        from services.rules import get_rules_count
+        return {"count": get_rules_count()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -15,6 +15,7 @@ import {
     deleteRAGFolder, checkRAGHealth
 } from '../api/ragClient'
 import RAGHelp from './RAGHelp'
+import RAGRules from './RAGRules'
 
 // Simple markdown-ish renderer (bold, lists, sources)
 function renderMarkdown(text) {
@@ -607,6 +608,13 @@ export default function RAGPanel() {
                             <FileText size={14} />
                             Archivos ({totalFiles})
                         </button>
+                        <button
+                            className={`rag-tab ${activeTab === 'rules' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('rules')}
+                        >
+                            <Shield size={14} />
+                            Reglas
+                        </button>
                     </div>
 
                     {/* Conversation list */}
@@ -755,6 +763,10 @@ export default function RAGPanel() {
                 </div>
             )}
 
+            {/* Rules tab */}
+            {activeTab === 'rules' && (
+                <RAGRules />
+            )}
             {/* Right: Chat Area */}
             <div className="rag-chat-area">
                 {/* Status bar */}

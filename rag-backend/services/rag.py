@@ -290,9 +290,10 @@ def _generate_final_answer(question: str, documents: list[dict],
     Optimized for both narrative text and tabular/Excel data.
     Now distinguishes between document sources and learned Q&A sources.
     """
-    # Build context from documents, separating doc vs learned
+    # Build context from documents, separating doc vs learned vs rules
     context_parts = []
     learned_parts = []
+    rules_parts = []
     
     for i, doc in enumerate(documents, 1):
         metadata = doc.get("metadata", {})
@@ -305,6 +306,12 @@ def _generate_final_answer(question: str, documents: list[dict],
                 f"--- Respuesta Previa (Conversación: {metadata.get('conversation_title', 'anterior')}, "
                 f"Relevancia: {score}/10) ---\n{doc['content']}"
             )
+        elif source_type == "rule":
+            rules_parts.append(
+                f"--- Regla: {metadata.get('title', 'S/T')} (Categoría: {metadata.get('category', 'general')}, "
+                f"Fecha regla: {metadata.get('rule_date', 'N/D')}, Relevancia: {score}/10) ---\n"
+                f"{metadata.get('processed_text', doc['content'])}"
+            )
         else:
             context_parts.append(
                 f"--- Documento {i} (Fuente: {filename}, Relevancia: {score}/10) ---\n"
@@ -313,8 +320,9 @@ def _generate_final_answer(question: str, documents: list[dict],
 
     context = "\n\n".join(context_parts)
     learned_context = "\n\n".join(learned_parts)
+    rules_context = "\n\n".join(rules_parts)
 
-    # Build system prompt with both contexts
+    # Build system prompt with all context types
     learned_section = ""
     if learned_context:
         learned_section = (
@@ -324,22 +332,31 @@ def _generate_final_answer(question: str, documents: list[dict],
             f"{learned_context}"
         )
 
-    system_prompt = f"""Sos un asistente preciso de consulta documental para Sanatorio Argentino.
-Tu función es responder preguntas usando la información del [CONTEXTO] proporcionado.
+    rules_section = ""
+    if rules_context:
+        rules_section = (
+            f"\n\n[REGLAS Y DIRECTIVAS]\n"
+            f"Las siguientes son reglas/información ingresada manualmente por administradores del sistema. "
+            f"TIENEN PRIORIDAD sobre los documentos cuando hay conflicto. Respetá estas instrucciones.\n"
+            f"{rules_context}"
+        )
+
+    system_prompt = f"""Sos Simon, el asistente IA documental del Sanatorio Argentino.
+Tu función es responder preguntas usando la información proporcionada.
 
 REGLAS:
-1. Usá SOLO información del [CONTEXTO]. NO uses conocimiento externo.
-2. El contexto puede incluir datos tabulares (Excel con pares clave:valor) — interpretá estos datos como registros estructurados.
-3. Si encontrás datos relacionados, aunque sean parciales, presentalos organizados. NO digas "no tengo información" si hay datos relevantes.
-4. SOLO respondé "No tengo suficiente información" si el contexto realmente NO contiene NADA relacionado a la pregunta.
-5. SIEMPRE citá la fuente: **(Fuente: nombre_archivo)**
-6. Si la información está repartida en varios fragmentos, sintetizá coherentemente.
-7. Respondé en español, de forma clara y profesional.
-8. Usá formato markdown para estructurar la respuesta (listas, tablas, negritas, etc.)
-9. Si hay respuestas previas aprendidas, podés usarlas como base pero siempre priorizá los documentos actuales.
+1. Usá SOLO información del [CONTEXTO], [REGLAS Y DIRECTIVAS] y [RESPUESTAS PREVIAS]. NO uses conocimiento externo.
+2. Si hay [REGLAS Y DIRECTIVAS], estas tienen MÁXIMA PRIORIDAD — son instrucciones directas del personal.
+3. El contexto puede incluir datos tabulares (Excel con pares clave:valor) — interpretá estos datos como registros estructurados.
+4. Si encontrás datos relacionados, aunque sean parciales, presentalos organizados. NO digas "no tengo información" si hay datos relevantes.
+5. SOLO respondé "No tengo suficiente información" si el contexto realmente NO contiene NADA relacionado a la pregunta.
+6. SIEMPRE citá la fuente: **(Fuente: nombre_archivo)** o **(Regla: título_regla)**
+7. Si la información está repartida en varios fragmentos, sintetizá coherentemente.
+8. Respondé en español, de forma clara y profesional.
+9. Usá formato markdown para estructurar la respuesta (listas, tablas, negritas, etc.)
 
 [CONTEXTO]
-{context}{learned_section}"""
+{context}{rules_section}{learned_section}"""
 
     # Build messages with conversation history
     messages = [{"role": "system", "content": system_prompt}]
