@@ -14,6 +14,7 @@ import {
     listRAGFiles, downloadRAGFile, createRAGFolder, deleteRAGFile,
     deleteRAGFolder, checkRAGHealth
 } from '../api/ragClient'
+import RAGHelp from './RAGHelp'
 
 // Simple markdown-ish renderer (bold, lists, sources)
 function renderMarkdown(text) {
@@ -40,6 +41,7 @@ export default function RAGPanel() {
     const [backendOnline, setBackendOnline] = useState(null)
     const [learningStats, setLearningStats] = useState(null)
     const [showSidebar, setShowSidebar] = useState(true)
+    const [showHelp, setShowHelp] = useState(false)
 
     // File manager state
     const [fileItems, setFileItems] = useState([])
@@ -643,6 +645,13 @@ export default function RAGPanel() {
                                 {learningStats.learned_chunks} aprendidos
                             </span>
                         )}
+                        <button
+                            className="rag-help-trigger"
+                            onClick={() => setShowHelp(true)}
+                            title="¿Cómo funciona?"
+                        >
+                            <HelpCircle size={15} />
+                        </button>
                     </div>
                 </div>
 
@@ -914,6 +923,7 @@ export default function RAGPanel() {
                     </div>
                 )
             })()}
+            {showHelp && <RAGHelp onClose={() => setShowHelp(false)} />}
         </div>
     )
 }
