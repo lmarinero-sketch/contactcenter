@@ -4,7 +4,8 @@ import {
     Plus, Loader2, ChevronRight, Brain, BookOpen,
     AlertCircle, CheckCircle, File, X, Clock,
     Search, Sparkles, Layers, BarChart3, FolderOpen, Tag,
-    Download, FolderPlus, ArrowLeft, Home, Folder
+    Download, FolderPlus, ArrowLeft, Home, Folder,
+    Lightbulb, GraduationCap, HelpCircle
 } from 'lucide-react'
 import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
@@ -36,6 +37,7 @@ export default function RAGPanel() {
     const [uploadProgress, setUploadProgress] = useState('')
     const [error, setError] = useState(null)
     const [backendOnline, setBackendOnline] = useState(null)
+    const [learningStats, setLearningStats] = useState(null)
     const [showSidebar, setShowSidebar] = useState(true)
 
     // File manager state
@@ -55,7 +57,22 @@ export default function RAGPanel() {
         checkRAGHealth().then(setBackendOnline)
         loadConversations()
         loadFiles()
+        loadLearningStats()
     }, [])
+
+    // Load learning stats
+    async function loadLearningStats() {
+        try {
+            const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api'
+            const resp = await fetch(`${RAG_API_BASE}/learning/stats`)
+            if (resp.ok) {
+                const data = await resp.json()
+                setLearningStats(data)
+            }
+        } catch (e) {
+            console.error('Error loading learning stats:', e)
+        }
+    }
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -145,15 +162,30 @@ export default function RAGPanel() {
                 loadConversations()
             }
 
-            // Add assistant message
-            const assistantMsg = {
-                role: 'assistant',
-                content: result.answer,
-                sources: result.sources,
-                pipeline_info: result.pipeline,
-                created_at: new Date().toISOString(),
+            // Handle disambiguation/clarification response
+            if (result.type === 'clarification') {
+                const clarificationMsg = {
+                    role: 'assistant',
+                    content: result.answer,
+                    type: 'clarification',
+                    suggestions: result.suggestions || [],
+                    pipeline_info: result.pipeline,
+                    created_at: new Date().toISOString(),
+                }
+                setMessages(prev => [...prev, clarificationMsg])
+            } else {
+                // Normal answer
+                const assistantMsg = {
+                    role: 'assistant',
+                    content: result.answer,
+                    sources: result.sources,
+                    pipeline_info: result.pipeline,
+                    created_at: new Date().toISOString(),
+                }
+                setMessages(prev => [...prev, assistantMsg])
+                // Refresh learning stats after successful answer
+                loadLearningStats()
             }
-            setMessages(prev => [...prev, assistantMsg])
         } catch (e) {
             setError(e.message || 'Error al procesar la pregunta')
         } finally {
@@ -259,6 +291,44 @@ export default function RAGPanel() {
         } catch (e) {
             setError(e.message)
         }
+    }
+
+    // Handle clicking a disambiguation suggestion
+    function handleSuggestionClick(suggestion) {
+        setInputValue(suggestion)
+        // Auto-send the suggestion
+        setTimeout(() => {
+            const fakeEvent = { key: 'Enter', shiftKey: false, preventDefault: () => {} }
+            // Directly call handleSend with the suggestion
+            setInputValue('')
+            setError(null)
+            const userMsg = { role: 'user', content: suggestion, created_at: new Date().toISOString() }
+            setMessages(prev => [...prev, userMsg])
+            setIsLoading(true)
+            sendRAGMessage(suggestion, activeConversation)
+                .then(result => {
+                    if (!activeConversation && result.conversation_id) {
+                        setActiveConversation(result.conversation_id)
+                        loadConversations()
+                    }
+                    if (result.type === 'clarification') {
+                        setMessages(prev => [...prev, {
+                            role: 'assistant', content: result.answer,
+                            type: 'clarification', suggestions: result.suggestions || [],
+                            pipeline_info: result.pipeline, created_at: new Date().toISOString(),
+                        }])
+                    } else {
+                        setMessages(prev => [...prev, {
+                            role: 'assistant', content: result.answer,
+                            sources: result.sources, pipeline_info: result.pipeline,
+                            created_at: new Date().toISOString(),
+                        }])
+                        loadLearningStats()
+                    }
+                })
+                .catch(e => setError(e.message))
+                .finally(() => setIsLoading(false))
+        }, 50)
     }
 
     // Key press handler
@@ -494,6 +564,12 @@ export default function RAGPanel() {
                         <span className="badge info" style={{ marginLeft: 8 }}>
                             {totalFiles} docs
                         </span>
+                        {learningStats && learningStats.learned_chunks > 0 && (
+                            <span className="badge positive" style={{ marginLeft: 4 }} title="Q&A aprendidos del historial">
+                                <GraduationCap size={10} style={{ marginRight: 3 }} />
+                                {learningStats.learned_chunks} aprendidos
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -536,6 +612,28 @@ export default function RAGPanel() {
                                         className="rag-message-text"
                                         dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                                     />
+                                    {/* Clarification Suggestions */}
+                                    {msg.type === 'clarification' && msg.suggestions && msg.suggestions.length > 0 && (
+                                        <div className="rag-clarification">
+                                            <div className="rag-clarification-header">
+                                                <Lightbulb size={14} />
+                                                Sugerencias
+                                            </div>
+                                            <div className="rag-suggestion-chips">
+                                                {msg.suggestions.map((suggestion, j) => (
+                                                    <button
+                                                        key={j}
+                                                        className="rag-suggestion-chip"
+                                                        onClick={() => handleSuggestionClick(suggestion)}
+                                                        disabled={isLoading}
+                                                    >
+                                                        <HelpCircle size={12} />
+                                                        {suggestion}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     {/* Sources */}
                                     {msg.sources && msg.sources.length > 0 && (
                                         <div className="rag-sources">
@@ -545,11 +643,20 @@ export default function RAGPanel() {
                                             </div>
                                             {msg.sources.map((src, j) => (
                                                 <div key={j} className="rag-source-item">
-                                                    <span className="rag-source-icon">{FILE_ICONS[src.file_type] || '📄'}</span>
-                                                    <span className="rag-source-name">{src.filename}</span>
+                                                    <span className="rag-source-icon">
+                                                        {src.source_type === 'chat_history' ? '🧠' : (FILE_ICONS[src.file_type] || '📄')}
+                                                    </span>
+                                                    <span className="rag-source-name">
+                                                        {src.source_type === 'chat_history' ? 'Aprendido de chat previo' : src.filename}
+                                                    </span>
                                                     <span className="badge info">{src.chunks_used} chunks</span>
                                                     {src.rerank_score > 0 && (
                                                         <span className="badge positive">{src.rerank_score}/10</span>
+                                                    )}
+                                                    {src.source_type === 'chat_history' && (
+                                                        <span className="badge" style={{ background: '#7c3aed22', color: '#7c3aed', fontSize: '10px' }}>
+                                                            <GraduationCap size={9} /> Aprendido
+                                                        </span>
                                                     )}
                                                 </div>
                                             ))}
@@ -559,11 +666,17 @@ export default function RAGPanel() {
                                     {msg.pipeline_info && (
                                         <div className="rag-pipeline-info">
                                             <BarChart3 size={11} />
+                                            {msg.pipeline_info.disambiguation_triggered && (
+                                                <span style={{ color: '#f59e0b' }}>🤔 Desambiguación</span>
+                                            )}
                                             <span>HyDE: {msg.pipeline_info.hyde_generated ? '✓' : '✗'}</span>
                                             <span>Queries: {(msg.pipeline_info.multi_queries || 0) + 1}</span>
                                             <span>Buscados: {msg.pipeline_info.total_searched}</span>
                                             <span>Únicos: {msg.pipeline_info.unique_results}</span>
                                             <span>Usados: {msg.pipeline_info.reranked_kept}</span>
+                                            {msg.pipeline_info.chat_learning && (
+                                                <span style={{ color: '#7c3aed' }}>📚 Aprendido</span>
+                                            )}
                                         </div>
                                     )}
                                 </div>
