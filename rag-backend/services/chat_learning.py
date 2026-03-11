@@ -172,20 +172,20 @@ def index_all_conversations() -> dict:
 def get_learning_stats() -> dict:
     """Get statistics about chat learning."""
     try:
-        # Count chat-learned chunks
+        # Count chat-learned chunks by selecting rows with the learned filename
         result = supabase.table("rag_documents") \
-            .select("id", count="exact") \
-            .eq("metadata->>source", CHAT_LEARNING_TAG) \
+            .select("id") \
+            .eq("metadata->>filename", CHAT_LEARNING_FILENAME) \
             .execute()
         
-        learned_chunks = result.count or 0
+        learned_chunks = len(result.data) if result.data else 0
         
         # Count total conversations
         conv_result = supabase.table("rag_conversations") \
-            .select("id", count="exact") \
+            .select("id") \
             .execute()
         
-        total_conversations = conv_result.count or 0
+        total_conversations = len(conv_result.data) if conv_result.data else 0
         
         return {
             "learned_chunks": learned_chunks,
@@ -194,3 +194,4 @@ def get_learning_stats() -> dict:
     
     except Exception as e:
         return {"error": str(e)}
+
