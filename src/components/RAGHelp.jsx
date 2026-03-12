@@ -236,9 +236,9 @@ export default function RAGHelp({ onClose }) {
                     {/* === PIPELINE === */}
                     {activeSection === 'pipeline' && (
                         <div className="rag-help-section">
-                            <h3>Pipeline de 7 Etapas</h3>
+                            <h3>Pipeline de 8 Etapas</h3>
                             <p className="rag-help-desc">
-                                Cada pregunta pasa por <strong>7 etapas inteligentes</strong> para garantizar
+                                Cada pregunta pasa por <strong>8 etapas inteligentes</strong> para garantizar
                                 la máxima precisión en la respuesta.
                             </p>
 
@@ -273,7 +273,7 @@ export default function RAGHelp({ onClose }) {
                                         <div className="rag-help-pipe-title">
                                             <Layers size={14} /> Multi-Query
                                         </div>
-                                        <p>Tu pregunta se reformula en <strong>3 versiones diferentes</strong> para cubrir más ángulos de búsqueda.</p>
+                                        <p>Tu pregunta se reformula en <strong>3 versiones diferentes</strong> que mantienen las entidades clave para cubrir más ángulos sin perder el foco.</p>
                                     </div>
                                 </div>
 
@@ -304,12 +304,24 @@ export default function RAGHelp({ onClose }) {
                                 <div className="rag-help-pipe-connector" />
 
                                 <div className="rag-help-pipe-step highlight">
+                                    <div className="rag-help-pipe-num">4.5</div>
+                                    <div className="rag-help-pipe-content">
+                                        <div className="rag-help-pipe-title">
+                                            <Target size={14} /> Filtro por Entidad
+                                        </div>
+                                        <p>Si preguntás por una entidad específica (ej: <strong>"OSDE"</strong>), filtra los resultados para <strong>excluir documentos de otras entidades</strong> y enfocarse solo en la que mencionaste.</p>
+                                    </div>
+                                </div>
+
+                                <div className="rag-help-pipe-connector" />
+
+                                <div className="rag-help-pipe-step highlight">
                                     <div className="rag-help-pipe-num">5</div>
                                     <div className="rag-help-pipe-content">
                                         <div className="rag-help-pipe-title">
                                             <BarChart3 size={14} /> Re-ranking IA
                                         </div>
-                                        <p>Un segundo modelo de IA <strong>evalúa cada fragmento del 1 al 10</strong> según su relevancia real para tu pregunta. Solo los mejores pasan.</p>
+                                        <p>Un segundo modelo de IA <strong>evalúa cada fragmento del 1 al 10</strong> según su relevancia. Penaliza fragmentos que hablan de entidades diferentes a la que preguntaste.</p>
                                     </div>
                                 </div>
 
@@ -461,8 +473,8 @@ export default function RAGHelp({ onClose }) {
 
                 {/* Footer */}
                 <div className="rag-help-footer">
-                    <span>Sanatorio Argentino · Sistema RAG V3.0</span>
-                    <span>Powered by OpenAI GPT-4o + Embeddings</span>
+                    <span>Sanatorio Argentino · Sistema RAG V3.2</span>
+                    <span>Powered by OpenAI GPT-4o + Entity-Aware Pipeline</span>
                 </div>
             </div>
         </div>

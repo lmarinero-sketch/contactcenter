@@ -1,8 +1,10 @@
 """
-RAG Pipeline V3.0 — Maximum Precision + Performance + Learning + Disambiguation
-7-stage pipeline: Disambiguate → HyDE → Multi-Query → Hybrid Search → Dedup → Re-rank → Generate
-V3.0: 
+RAG Pipeline V3.2 — Maximum Precision + Entity-Aware Topic Filtering
+8-stage pipeline: Disambiguate → HyDE → Multi-Query → Hybrid Search → Dedup → Entity Filter → Re-rank → Generate
+V3.2:
   - Step 0: Ambiguity detection — asks for clarification when question is unclear
+  - Step 4.5: Entity-Aware Topic Filtering — extracts key entities from the question
+    and filters retrieved chunks to stay on-topic (e.g., only OSDE docs when asking about OSDE)
   - Chat Learning: Automatically indexes Q&A pairs for continuous improvement
   - Enhanced context: Distinguishes between document sources and learned Q&A sources
 """
@@ -116,6 +118,143 @@ def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | 
 
 
 # ============================================================
+# STEP 4.5: Entity Extraction & Topic Filtering
+# ============================================================
+
+def _extract_topic_entities(question: str) -> dict:
+    """
+    Extract key entities and topics from the question.
+    Returns a dict with:
+      - entities: list of proper nouns/brands (e.g., "OSDE", "Swiss Medical", "PAMI")
+      - topic: the main topic keyword (e.g., "autorizaciones", "turnos")
+      - strict: whether to enforce strict entity filtering
+    """
+    try:
+        response = openai_client.chat.completions.create(
+            model=RERANK_MODEL,  # gpt-4o-mini for speed
+            temperature=0,
+            max_tokens=200,
+            timeout=OPENAI_CALL_TIMEOUT,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Extraé las entidades clave de la pregunta del usuario. "
+                        "Entidades son: nombres propios, marcas, instituciones, obras sociales, "
+                        "departamentos, servicios específicos, etc.\n\n"
+                        "Reglas:\n"
+                        "1. Si la pregunta menciona una obra social específica (OSDE, Swiss Medical, PAMI, "
+                        "Galeno, Medifé, IOMA, Provincia, etc.), esa es la entidad PRINCIPAL.\n"
+                        "2. Si la pregunta menciona un sector/servicio (UTI, laboratorio, quirófano, "
+                        "farmacia, etc.), ese es la entidad.\n"
+                        "3. Si la pregunta es genérica (sin entidad específica), devolvé entities vacío.\n"
+                        "4. 'strict' = true si la pregunta claramente se refiere a UNA entidad específica "
+                        "y mezclar con otras sería incorrecto.\n\n"
+                        "Respondé SOLO JSON: {\"entities\": [\"nombre1\"], \"topic\": \"tema\", \"strict\": true/false}"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Pregunta: \"{question}\""
+                }
+            ]
+        )
+        
+        text = response.choices[0].message.content.strip()
+        text = re.sub(r'^```json\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+        result = json.loads(text)
+        
+        entities = result.get("entities", [])
+        topic = result.get("topic", "")
+        strict = result.get("strict", False)
+        
+        if entities:
+            print(f"🎯 Entities extracted: {entities} (strict={strict}, topic={topic})")
+        
+        return {"entities": entities, "topic": topic, "strict": strict}
+    
+    except Exception as e:
+        print(f"Entity extraction failed (proceeding without filter): {e}")
+        return {"entities": [], "topic": "", "strict": False}
+
+
+def _filter_by_entity(documents: list[dict], entity_info: dict, 
+                      min_results: int = 3) -> tuple[list[dict], dict]:
+    """
+    Filter documents to keep only those relevant to the extracted entities.
+    Uses a soft-filter approach: if too few results remain, relaxes the filter.
+    
+    Returns:
+        - filtered documents list
+        - filter stats dict
+    """
+    entities = entity_info.get("entities", [])
+    strict = entity_info.get("strict", False)
+    
+    if not entities:
+        return documents, {"entity_filter": "none", "entities": []}
+    
+    # Normalize entities for case-insensitive matching
+    normalized_entities = [e.lower().strip() for e in entities]
+    
+    # Score each document based on entity mention
+    scored_docs = []
+    for doc in documents:
+        content_lower = doc.get("content", "").lower()
+        metadata = doc.get("metadata", {})
+        
+        # Check content + metadata for entity mentions
+        filename_lower = metadata.get("filename", "").lower()
+        doc_summary_lower = metadata.get("doc_summary", "").lower()
+        
+        full_text = f"{content_lower} {filename_lower} {doc_summary_lower}"
+        
+        # Count entity matches
+        entity_hits = sum(1 for ent in normalized_entities if ent in full_text)
+        
+        # Special handling for chat_history / rules — always keep these
+        source_type = metadata.get("source", "")
+        is_special = source_type in ("chat_history", "rule")
+        
+        scored_docs.append({
+            "doc": doc,
+            "entity_hits": entity_hits,
+            "has_entity": entity_hits > 0,
+            "is_special": is_special,
+        })
+    
+    # Separate: docs with entity match vs without
+    with_entity = [s["doc"] for s in scored_docs if s["has_entity"] or s["is_special"]]
+    without_entity = [s["doc"] for s in scored_docs if not s["has_entity"] and not s["is_special"]]
+    
+    stats = {
+        "entity_filter": "strict" if strict else "soft",
+        "entities": entities,
+        "with_entity": len(with_entity),
+        "without_entity": len(without_entity),
+    }
+    
+    # Strict mode: only keep entity-matching docs (if enough remain)
+    if strict and len(with_entity) >= min_results:
+        print(f"🎯 Strict entity filter: kept {len(with_entity)}/{len(documents)} docs for {entities}")
+        stats["filtered_out"] = len(without_entity)
+        return with_entity, stats
+    
+    # Soft mode: prioritize entity-matching docs, then fill with others
+    if with_entity:
+        result = with_entity + without_entity
+        print(f"🎯 Soft entity filter: prioritized {len(with_entity)} entity docs + {len(without_entity)} others for {entities}")
+        stats["reordered"] = True
+        return result, stats
+    
+    # No matches at all — return original order
+    print(f"🎯 Entity filter: no docs matched {entities}, keeping all")
+    stats["entity_filter"] = "no_match"
+    return documents, stats
+
+
+# ============================================================
 # STEP 1: HyDE (Hypothetical Document Embeddings)
 # ============================================================
 
@@ -150,13 +289,14 @@ def _generate_hyde_response(question: str) -> str:
 
 
 # ============================================================
-# STEP 2: Multi-Query
+# STEP 2: Multi-Query (Entity-Aware)
 # ============================================================
 
 def _generate_multi_queries(question: str) -> list[str]:
     """
-    Step 2: Multi-Query
+    Step 2: Multi-Query (Entity-Aware)
     Generate 3 reformulations of the question from different angles.
+    Preserves key entities in all reformulations to prevent topic drift.
     """
     try:
         response = openai_client.chat.completions.create(
@@ -170,6 +310,10 @@ def _generate_multi_queries(question: str) -> list[str]:
                     "content": (
                         "Generá exactamente 3 reformulaciones diferentes de la siguiente pregunta. "
                         "Cada reformulación debe abordar la pregunta desde un ángulo diferente. "
+                        "IMPORTANTE: Si la pregunta menciona una entidad específica (obra social, "
+                        "servicio, departamento, institución), TODAS las reformulaciones deben "
+                        "mantener esa entidad. No generalices ni la reemplaces por sinónimos.\n"
+                        "Ejemplo: si pregunta por 'OSDE', las 3 reformulaciones deben mencionar 'OSDE'.\n"
                         "Respondé SOLO con las 3 preguntas, una por línea, sin numeración ni explicación."
                     )
                 },
@@ -188,8 +332,10 @@ def _generate_multi_queries(question: str) -> list[str]:
 # STEP 5: Re-ranking
 # ============================================================
 
-def _rerank_single_document(question: str, doc: dict) -> dict | None:
-    """Re-rank a single document. Returns the doc with rerank_score or None if filtered out."""
+def _rerank_single_document(question: str, doc: dict, 
+                            entity_info: dict | None = None) -> dict | None:
+    """Re-rank a single document with entity awareness.
+    Returns the doc with rerank_score or None if filtered out."""
     try:
         # Identify if this is a learned Q&A chunk
         source_type = doc.get("metadata", {}).get("source", "")
@@ -198,6 +344,18 @@ def _rerank_single_document(question: str, doc: dict) -> dict | None:
             extra_hint = (
                 " Este fragmento proviene de una conversación previa (Q&A aprendido). "
                 "Si la pregunta coincide temáticamente, es MUY relevante."
+            )
+        
+        # Entity-awareness hint for re-ranking
+        entity_hint = ""
+        if entity_info and entity_info.get("entities"):
+            entities_str = ", ".join(entity_info["entities"])
+            entity_hint = (
+                f" ATENCIÓN: La pregunta se refiere específicamente a: {entities_str}. "
+                f"Si el fragmento habla de {entities_str}, aumentá el score. "
+                f"Si el fragmento habla de OTRA entidad diferente (ej: otra obra social, "
+                f"otro servicio), reducí el score significativamente (máximo 2/10) "
+                f"a menos que contenga información comparativa relevante."
             )
         
         response = openai_client.chat.completions.create(
@@ -214,7 +372,8 @@ def _rerank_single_document(question: str, doc: dict) -> dict | None:
                         "El fragmento puede ser texto narrativo O datos tabulares (filas con key:value, "
                         "columnas de Excel, listas de registros). Los datos tabulares que contienen "
                         "términos relacionados a la pregunta son MUY relevantes aunque no 'respondan' directamente."
-                        f"{extra_hint} "
+                        f"{extra_hint}"
+                        f"{entity_hint} "
                         "Respondé SOLO con JSON: {\"score\": 0-10, \"reason\": \"explicación breve\"}"
                     )
                 },
@@ -249,18 +408,20 @@ def _rerank_single_document(question: str, doc: dict) -> dict | None:
     return None
 
 
-def _rerank_documents(question: str, documents: list[dict]) -> list[dict]:
+def _rerank_documents(question: str, documents: list[dict],
+                      entity_info: dict | None = None) -> list[dict]:
     """
-    Step 5: Re-ranking with LLM (PARALLELIZED)
+    Step 5: Re-ranking with LLM (PARALLELIZED + ENTITY-AWARE)
     Score each document's relevance to the question (0-10).
     Uses ThreadPoolExecutor for concurrent API calls.
+    Entity info is passed to each re-ranker for topic-aware scoring.
     """
     candidates = documents[:12]  # Only re-rank top 12 candidates
     reranked = []
 
-    # Submit all re-ranking calls in parallel
+    # Submit all re-ranking calls in parallel (with entity info)
     futures = {
-        _executor.submit(_rerank_single_document, question, doc): doc
+        _executor.submit(_rerank_single_document, question, doc, entity_info): doc
         for doc in candidates
     }
 
@@ -362,6 +523,11 @@ REGLAS:
 - ¿Pregunta relacionada 2?
 - ¿Pregunta relacionada 3?
 
+11. ENFOQUE TEMÁTICO OBLIGATORIO: Si la pregunta menciona una entidad específica (obra social, servicio, departamento), 
+respondé EXCLUSIVAMENTE con información de esa entidad. NO mezcles datos de otras entidades similares.
+Por ejemplo, si preguntan por OSDE, NO incluyas información de Swiss Medical, PAMI u otras obras sociales,
+a menos que el usuario pida explícitamente una comparación.
+
 [CONTEXTO]
 {context}{rules_section}{learned_section}"""
 
@@ -413,16 +579,18 @@ def _execute_search(query: str) -> list[dict]:
 
 def process_question(question: str, conversation_id: str | None = None) -> dict:
     """
-    Main RAG pipeline — Process a user question through 7 stages.
+    Main RAG pipeline — Process a user question through 8 stages.
     Returns the answer, sources, and pipeline metadata.
     
-    V3.0: Disambiguate → HyDE + Multi-Query → Hybrid Search → Dedup → Re-rank → Generate → Learn
+    V3.2: Disambiguate → HyDE + Multi-Query → Hybrid Search → Dedup → Entity Filter → Re-rank → Generate → Learn
     """
     pipeline_info = {
         "hyde_generated": False,
         "multi_queries": 0,
         "total_searched": 0,
         "unique_results": 0,
+        "entity_filter": "none",
+        "entity_detected": [],
         "reranked_kept": 0,
         "disambiguation_triggered": False,
         "chat_learning": False,
@@ -455,9 +623,10 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
             pipeline_info=pipeline_info,
         )
 
-    # === STEPS 1 & 2: HyDE + Multi-Query IN PARALLEL ===
+    # === STEPS 1, 2 & 4.5 prep: HyDE + Multi-Query + Entity Extraction IN PARALLEL ===
     hyde_future = _executor.submit(_generate_hyde_response, question)
     multi_future = _executor.submit(_generate_multi_queries, question)
+    entity_future = _executor.submit(_extract_topic_entities, question)
 
     try:
         hyde_response = hyde_future.result(timeout=OPENAI_CALL_TIMEOUT + 5)
@@ -471,8 +640,15 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
         print(f"Multi-query future failed: {e}")
         multi_queries = []
 
+    try:
+        entity_info = entity_future.result(timeout=OPENAI_CALL_TIMEOUT + 5)
+    except Exception as e:
+        print(f"Entity extraction future failed: {e}")
+        entity_info = {"entities": [], "topic": "", "strict": False}
+
     pipeline_info["hyde_generated"] = bool(hyde_response)
     pipeline_info["multi_queries"] = len(multi_queries)
+    pipeline_info["entity_detected"] = entity_info.get("entities", [])
 
     # === STEP 3: Hybrid Search × N (PARALLEL) ===
     search_queries = [question]
@@ -515,8 +691,14 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
         answer = "No encontré documentos relevantes para responder tu pregunta. Asegurate de que los documentos necesarios estén cargados en el sistema."
         return _build_response(answer, [], pipeline_info, question, conversation_id)
 
-    # === STEP 5: Re-ranking (PARALLEL) ===
-    reranked = _rerank_documents(question, unique_docs)
+    # === STEP 4.5: Entity-Aware Topic Filtering ===
+    if entity_info.get("entities"):
+        unique_docs, filter_stats = _filter_by_entity(unique_docs, entity_info)
+        pipeline_info["entity_filter"] = filter_stats.get("entity_filter", "none")
+        pipeline_info["entity_filter_stats"] = filter_stats
+    
+    # === STEP 5: Re-ranking (PARALLEL + ENTITY-AWARE) ===
+    reranked = _rerank_documents(question, unique_docs, entity_info)
     pipeline_info["reranked_kept"] = len(reranked)
 
     # FALLBACK: If re-ranking filtered everything, use top docs by vector similarity

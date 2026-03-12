@@ -582,7 +582,7 @@ export default function RAGPanel() {
                 </div>
 
                 <div className="simon-welcome-footer">
-                    Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.0
+                    Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.2
                 </div>
             </div>
         )
@@ -981,6 +981,12 @@ export default function RAGPanel() {
                                             <span>Queries: {(msg.pipeline_info.multi_queries || 0) + 1}</span>
                                             <span>Buscados: {msg.pipeline_info.total_searched}</span>
                                             <span>Únicos: {msg.pipeline_info.unique_results}</span>
+                                            {msg.pipeline_info.entity_detected && msg.pipeline_info.entity_detected.length > 0 && (
+                                                <span style={{ color: '#3b82f6' }}>
+                                                    🎯 {msg.pipeline_info.entity_detected.join(', ')}
+                                                    {msg.pipeline_info.entity_filter === 'strict' ? ' (estricto)' : ''}
+                                                </span>
+                                            )}
                                             <span>Usados: {msg.pipeline_info.reranked_kept}</span>
                                             {msg.pipeline_info.chat_learning && (
                                                 <span style={{ color: '#7c3aed' }}>📚 Aprendido</span>
