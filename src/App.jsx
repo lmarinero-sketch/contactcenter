@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { RefreshCw, Calendar } from 'lucide-react'
+import { RefreshCw, Loader2 } from 'lucide-react'
+import { useAuth } from './contexts/AuthContext'
+import LoginPage from './components/LoginPage'
 import Sidebar from './components/Sidebar'
 import OverviewPanel from './components/OverviewPanel'
 import AgentsPanel from './components/AgentsPanel'
@@ -8,6 +10,8 @@ import ConversationsPanel from './components/ConversationsPanel'
 import RAGPanel from './components/RAGPanel'
 import RAGRules from './components/RAGRules'
 import SimonAnalytics from './components/SimonAnalytics'
+import ShiftCalendar from './components/ShiftCalendar'
+import BitacoraPanel from './components/BitacoraPanel'
 
 const VIEW_TITLES = {
     overview: 'Overview',
@@ -17,6 +21,8 @@ const VIEW_TITLES = {
     rag: 'Simon IA',
     'rag-rules': 'Reglas de Simon',
     'rag-analytics': 'Analytics de Simon',
+    shifts: 'Diagrama de Turnos',
+    logbook: 'Bitácora',
 }
 
 const VIEW_DESCRIPTIONS = {
@@ -27,12 +33,30 @@ const VIEW_DESCRIPTIONS = {
     rag: 'Consultá documentos internos con IA — respuestas precisas con citación de fuentes',
     'rag-rules': 'Ingresá reglas e información que Simon debe recordar al responder',
     'rag-analytics': 'Métricas de uso, rendimiento y calidad de Simon IA',
+    shifts: 'Calendario mensual de turnos del equipo',
+    logbook: 'Registro de novedades, sugerencias, problemas y cambios',
 }
 
 function App() {
+    const { user, profile, loading } = useAuth()
     const [activeView, setActiveView] = useState('overview')
     const [refreshKey, setRefreshKey] = useState(0)
     const [pendingTicketId, setPendingTicketId] = useState(null)
+
+    // Loading state
+    if (loading) {
+        return (
+            <div className="app-loading">
+                <Loader2 size={32} className="spin" />
+                <span>Cargando...</span>
+            </div>
+        )
+    }
+
+    // Not authenticated → show login
+    if (!user) {
+        return <LoginPage />
+    }
 
     const handleRefresh = () => setRefreshKey(prev => prev + 1)
 
@@ -50,6 +74,8 @@ function App() {
             case 'rag': return <RAGPanel key={refreshKey} />
             case 'rag-rules': return <RAGRules key={refreshKey} />
             case 'rag-analytics': return <SimonAnalytics key={refreshKey} />
+            case 'shifts': return <ShiftCalendar key={refreshKey} />
+            case 'logbook': return <BitacoraPanel key={refreshKey} />
             default: return <OverviewPanel key={refreshKey} />
         }
     }
