@@ -6339,3 +6339,95 @@ body {
   box-shadow: 0 0 0 3px rgba(26, 107, 181, 0.1);
 }
 .shift-bulk-hint { font-size: 11px; color: var(--gray-400); font-weight: 500; }
+
+/* ====== MINI CALENDAR ====== */
+.bulk-mini-cal {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+
+.bulk-mini-cal-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.bulk-mini-cal-day-name {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-400);
+  padding: 4px 0;
+}
+
+.bulk-mini-cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.bulk-mini-cal-empty {
+  aspect-ratio: 1;
+}
+
+.bulk-mini-cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: inherit;
+  padding: 0;
+}
+
+.bulk-mini-cal-day:hover:not(:disabled) {
+  border-color: var(--blue-300);
+  background: var(--blue-50);
+  transform: scale(1.05);
+}
+
+.bulk-mini-cal-day.selected {
+  background: var(--blue-600);
+  color: white;
+  border-color: var(--blue-600);
+  box-shadow: 0 2px 6px rgba(26, 107, 181, 0.3);
+  transform: scale(1.05);
+}
+
+.bulk-mini-cal-day.selected:hover {
+  background: var(--blue-700);
+  border-color: var(--blue-700);
+}
+
+.bulk-mini-cal-day.nonwork {
+  background: var(--gray-100);
+  color: var(--gray-400);
+  cursor: not-allowed;
+  font-size: 11px;
+}
+
+.bulk-mini-cal-day.nonwork:disabled {
+  opacity: 0.7;
+}
+
+.bulk-mini-cal-day.sunday {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.bulk-mini-cal-day.holiday {
+  background: #fef2f2;
+  font-size: 12px;
+}

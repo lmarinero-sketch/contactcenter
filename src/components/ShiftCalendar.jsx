@@ -191,8 +191,7 @@ export default function ShiftCalendar() {
 
     // Bulk fill state
     const [bulkAgent, setBulkAgent] = useState(AGENTS[0])
-    const [bulkFrom, setBulkFrom] = useState(1)
-    const [bulkTo, setBulkTo] = useState(5)
+    const [bulkSelectedDays, setBulkSelectedDays] = useState(new Set())
     const [bulkType, setBulkType] = useState('M')
 
     const daysInMonth = getDaysInMonth(year, month)
@@ -270,13 +269,40 @@ export default function ShiftCalendar() {
     }
 
     // ====== BULK FILL ======
+    const toggleBulkDay = (day) => {
+        setBulkSelectedDays(prev => {
+            const next = new Set(prev)
+            if (next.has(day)) next.delete(day)
+            else next.add(day)
+            return next
+        })
+    }
+
+    const toggleAllLaborables = () => {
+        const laborables = []
+        for (let d = 1; d <= daysInMonth; d++) {
+            if (!isNonWorking(year, month, d)) laborables.push(d)
+        }
+        const allSelected = laborables.every(d => bulkSelectedDays.has(d))
+        if (allSelected) {
+            setBulkSelectedDays(new Set())
+        } else {
+            setBulkSelectedDays(new Set(laborables))
+        }
+    }
+
+    const openBulkModal = () => {
+        setBulkSelectedDays(new Set())
+        setBulkModal(true)
+    }
+
     const handleBulkFill = async () => {
+        if (bulkSelectedDays.size === 0) return
         setSaving(true)
         const userId = (await supabase.auth.getUser()).data.user?.id
         const inserts = []
 
-        for (let d = bulkFrom; d <= Math.min(bulkTo, daysInMonth); d++) {
-            if (isNonWorking(year, month, d)) continue
+        for (const d of bulkSelectedDays) {
             inserts.push({
                 agent_name: bulkAgent,
                 shift_date: dateKey(year, month, d),
@@ -297,6 +323,22 @@ export default function ShiftCalendar() {
         setBulkModal(false)
         fetchShifts()
     }
+
+    // Build calendar grid for mini-calendar (7 columns, weeks aligned)
+    const bulkCalendarGrid = useMemo(() => {
+        const firstDayOfWeek = getDayOfWeek(year, month, 1) // 0=Sun
+        const rows = []
+        let row = Array(firstDayOfWeek).fill(null)
+        for (let d = 1; d <= daysInMonth; d++) {
+            row.push(d)
+            if (row.length === 7) { rows.push(row); row = [] }
+        }
+        if (row.length > 0) {
+            while (row.length < 7) row.push(null)
+            rows.push(row)
+        }
+        return rows
+    }, [year, month, daysInMonth])
 
     // ====== AI PROCESS ======
     const handleAIProcess = () => {
@@ -360,7 +402,7 @@ export default function ShiftCalendar() {
                                 <Sparkles size={14} />
                                 IA
                             </button>
-                            <button className="btn btn-secondary btn-sm" onClick={() => setBulkModal(true)}>
+                            <button className="btn btn-secondary btn-sm" onClick={openBulkModal}>
                                 <CalendarRange size={14} />
                                 Carga Rápida
                             </button>
@@ -621,14 +663,14 @@ export default function ShiftCalendar() {
             {/* ====== BULK FILL MODAL ====== */}
             {bulkModal && (
                 <div className="shift-modal-overlay" onClick={() => setBulkModal(false)}>
-                    <div className="shift-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+                    <div className="shift-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
                         <div className="shift-modal-header">
-                            <h4><CalendarRange size={18} style={{ marginRight: 8 }} /> Carga Rápida</h4>
+                            <h4><CalendarRange size={18} style={{ marginRight: 8 }} /> Carga Rápida — {MONTHS[month]} {year}</h4>
                             <button className="shift-modal-close" onClick={() => setBulkModal(false)}><X size={18} /></button>
                         </div>
                         <div className="shift-modal-body">
                             <p style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
-                                Asigná un turno a un rango de días. Los domingos y feriados se excluyen automáticamente.
+                                Seleccioná los días tocándolos. Domingos y feriados están bloqueados.
                             </p>
 
                             <div className="shift-modal-field">
@@ -645,25 +687,44 @@ export default function ShiftCalendar() {
                             </div>
 
                             <div className="shift-modal-field">
-                                <label>Rango de días</label>
-                                <div className="shift-bulk-range">
-                                    <span>Del día</span>
-                                    <input type="number" min={1} max={daysInMonth} value={bulkFrom}
-                                        onChange={e => setBulkFrom(Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="shift-bulk-input" />
-                                    <span>al día</span>
-                                    <input type="number" min={1} max={daysInMonth} value={bulkTo}
-                                        onChange={e => setBulkTo(Math.min(daysInMonth, parseInt(e.target.value) || daysInMonth))}
-                                        className="shift-bulk-input" />
-                                    <span className="shift-bulk-hint">
-                                        ({(() => {
-                                            let count = 0
-                                            for (let d = bulkFrom; d <= Math.min(bulkTo, daysInMonth); d++) {
-                                                if (!isNonWorking(year, month, d)) count++
-                                            }
-                                            return count
-                                        })()} días laborables)
-                                    </span>
+                                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span>Seleccionar días ({bulkSelectedDays.size} seleccionados)</span>
+                                    <button className="btn-ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={toggleAllLaborables}>
+                                        {(() => {
+                                            const laborables = []
+                                            for (let d = 1; d <= daysInMonth; d++) { if (!isNonWorking(year, month, d)) laborables.push(d) }
+                                            return laborables.every(d => bulkSelectedDays.has(d)) ? 'Deseleccionar todos' : 'Seleccionar todos'
+                                        })()}
+                                    </button>
+                                </label>
+                                <div className="bulk-mini-cal">
+                                    <div className="bulk-mini-cal-header">
+                                        {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+                                            <span key={d} className="bulk-mini-cal-day-name">{d}</span>
+                                        ))}
+                                    </div>
+                                    {bulkCalendarGrid.map((row, ri) => (
+                                        <div key={ri} className="bulk-mini-cal-row">
+                                            {row.map((day, ci) => {
+                                                if (!day) return <span key={ci} className="bulk-mini-cal-empty" />
+                                                const nonWork = isNonWorking(year, month, day)
+                                                const holiday = getHoliday(year, month, day)
+                                                const sunday = isSunday(year, month, day)
+                                                const selected = bulkSelectedDays.has(day)
+                                                return (
+                                                    <button
+                                                        key={ci}
+                                                        className={`bulk-mini-cal-day ${selected ? 'selected' : ''} ${nonWork ? 'nonwork' : ''} ${holiday ? 'holiday' : ''} ${sunday ? 'sunday' : ''}`}
+                                                        disabled={nonWork}
+                                                        onClick={() => toggleBulkDay(day)}
+                                                        title={holiday || (sunday ? 'Domingo' : `Día ${day}`)}
+                                                    >
+                                                        {nonWork ? (holiday ? '🏛' : 'D') : day}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -686,11 +747,13 @@ export default function ShiftCalendar() {
                             </div>
                         </div>
                         <div className="shift-modal-footer">
-                            <div style={{ flex: 1 }} />
+                            <span style={{ fontSize: 11, color: '#64748b', flex: 1 }}>
+                                {bulkSelectedDays.size} día{bulkSelectedDays.size !== 1 ? 's' : ''} → {bulkAgent} → {SHIFT_TYPES[bulkType].label}
+                            </span>
                             <button className="btn btn-secondary btn-sm" onClick={() => setBulkModal(false)}>Cancelar</button>
-                            <button className="btn btn-primary btn-sm" onClick={handleBulkFill} disabled={saving}>
+                            <button className="btn btn-primary btn-sm" onClick={handleBulkFill} disabled={saving || bulkSelectedDays.size === 0}>
                                 {saving ? <Loader2 size={14} className="spin" /> : <Zap size={14} />}
-                                Aplicar
+                                Aplicar ({bulkSelectedDays.size})
                             </button>
                         </div>
                     </div>
