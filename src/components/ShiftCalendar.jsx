@@ -395,11 +395,54 @@ export default function ShiftCalendar() {
         if (!gridRef.current) return
         setExporting(true)
         try {
-            const canvas = await html2canvas(gridRef.current, {
+            // Clone the grid into an off-screen container at fixed desktop width
+            // This ensures consistent PDF output regardless of device
+            const clone = gridRef.current.cloneNode(true)
+            const offscreen = document.createElement('div')
+            offscreen.style.cssText = `
+                position: fixed; left: -9999px; top: 0;
+                width: 1200px; min-width: 1200px;
+                background: #ffffff; padding: 16px;
+                font-family: Inter, system-ui, sans-serif;
+                overflow: visible;
+            `
+            // Force desktop styles on the clone
+            clone.style.width = '100%'
+            clone.style.overflow = 'visible'
+            // Remove mobile scroll constraints from grid wrapper
+            const wrapper = clone.querySelector('.shift-grid-wrapper')
+            if (wrapper) {
+                wrapper.style.overflow = 'visible'
+                wrapper.style.margin = '0'
+                wrapper.style.padding = '0'
+            }
+            const grid = clone.querySelector('.shift-grid')
+            if (grid) {
+                grid.style.minWidth = 'unset'
+                grid.style.width = '100%'
+            }
+            // Force sticky columns to static for capture
+            clone.querySelectorAll('.shift-grid-corner, .shift-grid-agent').forEach(el => {
+                el.style.position = 'static'
+            })
+
+            offscreen.appendChild(clone)
+            document.body.appendChild(offscreen)
+
+            // Wait for render
+            await new Promise(r => setTimeout(r, 100))
+
+            const canvas = await html2canvas(offscreen, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
+                width: 1200,
+                windowWidth: 1200,
             })
+
+            // Cleanup
+            document.body.removeChild(offscreen)
+
             const imgData = canvas.toDataURL('image/png')
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
             const pageW = pdf.internal.pageSize.getWidth()
@@ -415,7 +458,7 @@ export default function ShiftCalendar() {
             pdf.text(`Sanatorio Argentino — Contact Center | Generado: ${new Date().toLocaleDateString('es-AR')}`, 14, 20)
             pdf.setTextColor(0)
 
-            // Image
+            // Image — fit to page
             const marginTop = 25
             const availW = pageW - 20
             const availH = pageH - marginTop - 10
