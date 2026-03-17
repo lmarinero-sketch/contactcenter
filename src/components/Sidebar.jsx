@@ -134,7 +134,7 @@ export default function Sidebar({ activeView, onViewChange, mobileOpen }) {
                 </div>
             )}
 
-            {collapsed && profile && (
+            {collapsed && (
                 <div className="sidebar-user-collapsed">
                     <button className="sidebar-logout-btn" onClick={handleLogout} title="Cerrar sesión">
                         <LogOut size={16} />

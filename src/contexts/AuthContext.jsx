@@ -35,10 +35,21 @@ export function AuthProvider({ children }) {
                     setLoading(false)
                     return
                 }
-                setUser(session?.user ?? null)
                 if (session?.user) {
                     const prof = await fetchProfile(session.user.id)
-                    if (mounted) setProfile(prof)
+                    if (!mounted) return
+                    if (prof) {
+                        setUser(session.user)
+                        setProfile(prof)
+                    } else {
+                        // User exists but no profile — force sign out
+                        console.warn('No profile found for user, signing out')
+                        await supabase.auth.signOut()
+                        setUser(null)
+                        setProfile(null)
+                    }
+                } else {
+                    setUser(null)
                 }
             } catch (err) {
                 console.error('Auth init error:', err)
