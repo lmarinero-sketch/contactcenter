@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2, Menu } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './components/LoginPage'
 import Sidebar from './components/Sidebar'
@@ -42,6 +42,7 @@ function App() {
     const [activeView, setActiveView] = useState('overview')
     const [refreshKey, setRefreshKey] = useState(0)
     const [pendingTicketId, setPendingTicketId] = useState(null)
+    const [mobileOpen, setMobileOpen] = useState(false)
 
     // Loading state
     if (loading) {
@@ -65,6 +66,11 @@ function App() {
         setActiveView('conversations')
     }
 
+    const handleViewChange = (view) => {
+        setActiveView(view)
+        setMobileOpen(false) // Close sidebar on mobile after selecting
+    }
+
     const renderView = () => {
         switch (activeView) {
             case 'overview': return <OverviewPanel key={refreshKey} onNavigateToChat={navigateToConversation} />
@@ -82,20 +88,26 @@ function App() {
 
     return (
         <div className="app-layout">
-            <Sidebar activeView={activeView} onViewChange={setActiveView} />
+            {/* Mobile overlay */}
+            {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />}
+
+            <Sidebar activeView={activeView} onViewChange={handleViewChange} mobileOpen={mobileOpen} />
 
             <main className="main-content">
                 <header className="main-header">
                     <div className="header-left">
+                        <button className="btn-mobile-menu" onClick={() => setMobileOpen(!mobileOpen)}>
+                            <Menu size={20} />
+                        </button>
                         <div>
                             <h2>{VIEW_TITLES[activeView]}</h2>
-                            <span className="breadcrumb">{VIEW_DESCRIPTIONS[activeView]}</span>
+                            <span className="breadcrumb hide-mobile">{VIEW_DESCRIPTIONS[activeView]}</span>
                         </div>
                     </div>
                     <div className="header-right">
                         <button className="btn btn-secondary" onClick={handleRefresh}>
                             <RefreshCw size={14} />
-                            Actualizar
+                            <span className="hide-mobile">Actualizar</span>
                         </button>
                     </div>
                 </header>
@@ -109,3 +121,4 @@ function App() {
 }
 
 export default App
+

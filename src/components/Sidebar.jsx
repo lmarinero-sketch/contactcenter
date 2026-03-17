@@ -37,7 +37,7 @@ const ROLE_COLORS = {
     refuerzo: '#f59e0b',
 }
 
-export default function Sidebar({ activeView, onViewChange }) {
+export default function Sidebar({ activeView, onViewChange, mobileOpen }) {
     const [collapsed, setCollapsed] = useState(false)
     const { profile, signOut } = useAuth()
 
@@ -50,7 +50,7 @@ export default function Sidebar({ activeView, onViewChange }) {
     }
 
     return (
-        <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
                 <div className="sidebar-logo">
                     <img src="/logosanatorio.png" alt="Sanatorio Argentino" />

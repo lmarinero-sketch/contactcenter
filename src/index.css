@@ -6431,3 +6431,334 @@ body {
   background: #fef2f2;
   font-size: 12px;
 }
+
+/* ===================== RESPONSIVE ===================== */
+
+/* Hamburger menu button — hidden on desktop */
+.btn-mobile-menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--gray-700);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Mobile overlay */
+.sidebar-overlay {
+  display: none;
+}
+
+/* Hide on mobile utility */
+.hide-mobile { }
+
+/* ===== TABLET & MOBILE (< 768px) ===== */
+@media (max-width: 768px) {
+  .btn-mobile-menu {
+    display: flex;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+    animation: fadeIn 0.2s ease;
+  }
+
+  /* Sidebar: hidden by default, slide in on mobile-open */
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    z-index: 999;
+    width: 260px !important;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+
+  .sidebar.mobile-open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .sidebar.collapsed {
+    width: 260px !important;
+  }
+
+  .sidebar-toggle {
+    display: none !important;
+  }
+
+  /* Main content: full width */
+  .app-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+  }
+
+  .main-header {
+    padding: 12px 16px !important;
+    gap: 8px;
+  }
+
+  .main-header h2 {
+    font-size: 16px !important;
+  }
+
+  .page-content {
+    padding: 12px !important;
+  }
+
+  /* Shift Calendar - Responsive */
+  .shift-calendar {
+    gap: 8px !important;
+  }
+
+  .shift-calendar-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 8px;
+  }
+
+  .shift-calendar-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .shift-calendar-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .shift-calendar-title {
+    font-size: 16px !important;
+  }
+
+  .shift-calendar-legend {
+    gap: 6px !important;
+  }
+
+  .shift-legend-label {
+    font-size: 10px !important;
+  }
+
+  .shift-legend-dot {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 9px !important;
+  }
+
+  /* Grid: horizontal scroll with sticky agent column */
+  .shift-grid-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+
+  .shift-grid {
+    min-width: 800px !important;
+  }
+
+  .shift-grid-corner,
+  .shift-grid-agent {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: white;
+    min-width: 100px !important;
+    width: 100px !important;
+  }
+
+  .shift-grid-day-header {
+    min-width: 32px !important;
+  }
+
+  .shift-day-name {
+    font-size: 8px !important;
+  }
+
+  .shift-day-num {
+    font-size: 11px !important;
+  }
+
+  .shift-grid-cell {
+    min-width: 32px !important;
+    min-height: 32px !important;
+  }
+
+  .shift-cell-badge {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 10px !important;
+  }
+
+  .shift-cell-nonwork {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 9px !important;
+  }
+
+  .shift-agent-name {
+    font-size: 11px !important;
+  }
+
+  .shift-agent-info {
+    font-size: 8px !important;
+  }
+
+  /* Stats: stack vertically */
+  .shift-stats {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+
+  .shift-stat-card {
+    padding: 8px 12px !important;
+  }
+
+  /* Modals: full-width on mobile */
+  .shift-modal {
+    width: 95vw !important;
+    max-width: none !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .shift-modal-body {
+    padding: 12px !important;
+  }
+
+  .shift-type-selector {
+    gap: 4px !important;
+  }
+
+  .shift-type-option {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* AI Bar responsive */
+  .shift-ai-bar {
+    margin: 0 -12px;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  .shift-ai-body {
+    flex-direction: column !important;
+  }
+
+  .shift-ai-preview-grid {
+    max-height: 120px;
+  }
+
+  /* Bitácora responsive */
+  .bitacora-toolbar {
+    flex-direction: column !important;
+    gap: 8px;
+  }
+
+  .bitacora-filters {
+    flex-wrap: wrap !important;
+    gap: 4px;
+  }
+
+  .bitacora-filter-btn {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .bitacora-entry-card {
+    padding: 12px !important;
+  }
+
+  /* Login page responsive */
+  .login-container {
+    padding: 16px !important;
+  }
+
+  .login-card {
+    padding: 24px !important;
+    max-width: 100% !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .login-card h2 {
+    font-size: 20px !important;
+  }
+}
+
+/* ===== SMALL MOBILE (< 480px) ===== */
+@media (max-width: 480px) {
+  .main-header h2 {
+    font-size: 14px !important;
+  }
+
+  .page-content {
+    padding: 8px !important;
+  }
+
+  .shift-calendar-actions .btn {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .shift-grid {
+    min-width: 650px !important;
+  }
+
+  .shift-grid-corner,
+  .shift-grid-agent {
+    min-width: 80px !important;
+    width: 80px !important;
+  }
+
+  .shift-cell-badge,
+  .shift-cell-nonwork {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 8px !important;
+    border-radius: 4px !important;
+  }
+
+  .shift-grid-cell {
+    min-width: 26px !important;
+    min-height: 26px !important;
+  }
+
+  /* Bulk modal mini-cal */
+  .bulk-mini-cal-day {
+    font-size: 11px !important;
+  }
+
+  .shift-modal-footer {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .shift-modal-footer span {
+    width: 100%;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
