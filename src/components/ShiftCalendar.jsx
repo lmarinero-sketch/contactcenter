@@ -5,8 +5,10 @@ import {
     ChevronLeft, ChevronRight, Plus, X, Save,
     Trash2, Loader2, Sun, Moon, Clock,
     Palmtree, Coffee, Zap, Sparkles, Send,
-    CalendarRange, Flag
+    CalendarRange, Flag, FileDown
 } from 'lucide-react'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 const AGENTS = ['Daniela', 'Sofia', 'Antonella', 'Refuerzo']
 
@@ -385,6 +387,51 @@ export default function ShiftCalendar() {
     const isToday = (day) => year === now.getFullYear() && month === now.getMonth() && day === now.getDate()
     const isWeekend = (day) => { const dow = getDayOfWeek(year, month, day); return dow === 0 || dow === 6 }
 
+    // ====== PDF EXPORT ======
+    const gridRef = useRef(null)
+    const [exporting, setExporting] = useState(false)
+
+    const handleExportPDF = async () => {
+        if (!gridRef.current) return
+        setExporting(true)
+        try {
+            const canvas = await html2canvas(gridRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+            })
+            const imgData = canvas.toDataURL('image/png')
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+            const pageW = pdf.internal.pageSize.getWidth()
+            const pageH = pdf.internal.pageSize.getHeight()
+
+            // Title
+            pdf.setFontSize(16)
+            pdf.setFont(undefined, 'bold')
+            pdf.text(`Diagrama de Turnos — ${MONTHS[month]} ${year}`, 14, 14)
+            pdf.setFontSize(9)
+            pdf.setFont(undefined, 'normal')
+            pdf.setTextColor(120)
+            pdf.text(`Sanatorio Argentino — Contact Center | Generado: ${new Date().toLocaleDateString('es-AR')}`, 14, 20)
+            pdf.setTextColor(0)
+
+            // Image
+            const marginTop = 25
+            const availW = pageW - 20
+            const availH = pageH - marginTop - 10
+            const imgRatio = canvas.width / canvas.height
+            let w = availW
+            let h = w / imgRatio
+            if (h > availH) { h = availH; w = h * imgRatio }
+            pdf.addImage(imgData, 'PNG', 10, marginTop, w, h)
+
+            pdf.save(`turnos_${MONTHS[month].toLowerCase()}_${year}.pdf`)
+        } catch (err) {
+            console.error('PDF export error:', err)
+        }
+        setExporting(false)
+    }
+
     return (
         <div className="shift-calendar">
             {/* Header */}
@@ -408,6 +455,10 @@ export default function ShiftCalendar() {
                             </button>
                         </>
                     )}
+                    <button className="btn btn-secondary btn-sm" onClick={handleExportPDF} disabled={loading || exporting}>
+                        {exporting ? <Loader2 size={14} className="spin" /> : <FileDown size={14} />}
+                        PDF
+                    </button>
                 </div>
             </div>
 
@@ -506,6 +557,8 @@ export default function ShiftCalendar() {
                 </div>
             )}
 
+            {/* Printable area */}
+            <div ref={gridRef}>
             {/* Grid */}
             {loading ? (
                 <div className="shift-loading">
@@ -513,6 +566,7 @@ export default function ShiftCalendar() {
                     <span>Cargando turnos...</span>
                 </div>
             ) : (
+                <>
                 <div className="shift-grid-wrapper">
                     <div className="shift-grid" style={{ gridTemplateColumns: `140px repeat(${daysInMonth}, 1fr)` }}>
                         {/* Header row */}
@@ -580,11 +634,9 @@ export default function ShiftCalendar() {
                         ))}
                     </div>
                 </div>
-            )}
 
-            {/* Stats */}
-            {!loading && (
-                <div className="shift-stats">
+                {/* Stats */}
+                <div className="shift-stats" style={{ marginTop: 16 }}>
                     {AGENTS.map(agent => {
                         const agentShifts = shifts.filter(s => s.agent_name === agent)
                         const counts = {}
@@ -606,7 +658,9 @@ export default function ShiftCalendar() {
                         )
                     })}
                 </div>
+                </>
             )}
+            </div>
 
             {/* ====== CELL EDIT MODAL ====== */}
             {modal && (
