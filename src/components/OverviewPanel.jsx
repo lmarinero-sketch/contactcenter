@@ -36,6 +36,7 @@ export default function OverviewPanel({ onNavigateToChat }) {
     // Raw data — loaded ONCE
     const [rawData, setRawData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState(null)
 
     // Filter state — changes trigger instant recalc, no fetch
     const [dateFrom, setDateFrom] = useState(null)
@@ -43,18 +44,43 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
     // Load raw data once on mount
     useEffect(() => {
+        let mounted = true
+        let timeoutId = null
+
         async function load() {
             try {
                 setLoading(true)
+                setLoadError(null)
+
+                // Safety timeout — 25s max for data loading
+                timeoutId = setTimeout(() => {
+                    if (mounted && loading) {
+                        setLoadError('La carga de datos tardó demasiado. Intentá nuevamente.')
+                        setLoading(false)
+                    }
+                }, 25000)
+
                 const data = await fetchOverviewRawData()
-                setRawData(data)
+                if (mounted) {
+                    setRawData(data)
+                    setLoadError(null)
+                }
             } catch (err) {
                 console.error('Error loading overview:', err)
+                if (mounted) {
+                    setLoadError(err.message || 'Error al cargar los datos')
+                }
             } finally {
-                setLoading(false)
+                if (mounted) setLoading(false)
+                if (timeoutId) clearTimeout(timeoutId)
             }
         }
         load()
+
+        return () => {
+            mounted = false
+            if (timeoutId) clearTimeout(timeoutId)
+        }
     }, [])
 
     // Compute stats instantly when filters change — no spinner, no refetch
@@ -73,6 +99,20 @@ export default function OverviewPanel({ onNavigateToChat }) {
     if (loading) {
         return (
             <div className="loading-spinner"><div className="spinner"></div></div>
+        )
+    }
+
+    if (loadError) {
+        return (
+            <div className="empty-state">
+                <AlertTriangle color="#ef4444" />
+                <h3>Error al cargar datos</h3>
+                <p>{loadError}</p>
+                <button className="btn btn-primary" style={{ marginTop: '12px' }}
+                    onClick={() => window.location.reload()}>
+                    Reintentar
+                </button>
+            </div>
         )
     }
 

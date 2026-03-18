@@ -7,8 +7,17 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
     let allData = []
     let offset = 0
     let hasMore = true
+    const maxRows = 10000 // Safety cap to prevent infinite loops
+    const startTime = Date.now()
+    const TIMEOUT_MS = 15000 // 15s max for any fetchAllRows call
 
-    while (hasMore) {
+    while (hasMore && allData.length < maxRows) {
+        // Timeout guard
+        if (Date.now() - startTime > TIMEOUT_MS) {
+            console.warn(`fetchAllRows(${tableName}): timeout after ${allData.length} rows`)
+            break
+        }
+
         let query = supabase
             .from(tableName)
             .select(selectColumns)
@@ -99,10 +108,17 @@ export async function fetchTicketDetail(ticketId) {
 
 // 1️⃣  Fetch raw data ONCE — no date filters, fetch ALL rows (no 1000-row cap)
 export async function fetchOverviewRawData() {
-    const [allTickets, allAnalyses] = await Promise.all([
+    // Race loading against a 20s timeout to prevent infinite loading
+    const dataPromise = Promise.all([
         fetchAllRows('cc_tickets', 'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name, customer_phone'),
         fetchAllRows('cc_analysis', 'ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds'),
     ])
+
+    const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Data loading timeout (20s)')), 20000)
+    )
+
+    const [allTickets, allAnalyses] = await Promise.race([dataPromise, timeoutPromise])
 
     return {
         allTickets,
@@ -434,7 +450,7 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     }
 
     const todayConflicts = analyses.filter(a => {
-        const ticket = tickets.find(t => t.ticket_id === a.ticket_id)
+        const ticket = allTicketsMap.get(a.ticket_id)
         if (!ticket?.chat_started_at) return false
         return new Date(ticket.chat_started_at) >= todayStart &&
             (a.sentiment_score !== null && a.sentiment_score < -0.3 || a.overall_sentiment === 'frustrated')
@@ -452,12 +468,15 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     const botTotal = analyses.length
     const botResolutionRate = botTotal > 0 ? parseFloat(((botResolved / botTotal) * 100).toFixed(1)) : 0
 
+    // Build a Map for O(1) ticket lookups (fixes O(n²) bottleneck)
+    const ticketsMap = new Map(tickets.map(t => [t.ticket_id, t]))
+
     const pathTransferRate = {}
     analyses.forEach(a => {
         const path = a.bot_first_choice || 'No detectado'
         if (!pathTransferRate[path]) pathTransferRate[path] = { total: 0, transferred: 0 }
         pathTransferRate[path].total++
-        const ticket = tickets.find(t => t.ticket_id === a.ticket_id)
+        const ticket = ticketsMap.get(a.ticket_id)
         if (ticket?.transferred_to_agent) pathTransferRate[path].transferred++
     })
     const botPathTransferRates = Object.entries(pathTransferRate)
@@ -472,7 +491,7 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     // ─── PROBLEMATIC CHATS (computed from filtered data) ───
     const problematicChats = []
     analyses.forEach(a => {
-        const ticket = tickets.find(t => t.ticket_id === a.ticket_id)
+        const ticket = ticketsMap.get(a.ticket_id)
         if (!ticket) return
         const reasons = []
         if (a.overall_sentiment === 'negative' || a.overall_sentiment === 'frustrated') reasons.push(`Sentimiento: ${a.overall_sentiment}`)
