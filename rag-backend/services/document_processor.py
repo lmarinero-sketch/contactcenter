@@ -229,17 +229,32 @@ def _extract_excel(file_path: str) -> str:
     Extract text from Excel files with semantic context.
     Each row includes column headers as key-value pairs so the LLM
     understands what each cell means (critical for RAG retrieval).
+    Supports both .xlsx (openpyxl) and .xls (xlrd) formats.
     """
-    from openpyxl import load_workbook
+    ext = os.path.splitext(file_path)[1].lower()
 
-    wb = load_workbook(file_path, data_only=True)
+    # Try openpyxl first (for .xlsx), then xlrd (for .xls and fallback)
+    rows_by_sheet = {}
+
+    if ext == '.xlsx':
+        try:
+            rows_by_sheet = _read_excel_openpyxl(file_path)
+        except Exception as e:
+            print(f"Excel: openpyxl failed ({e}), falling back to xlrd...")
+            rows_by_sheet = _read_excel_xlrd(file_path)
+    else:
+        # .xls — use xlrd directly
+        try:
+            rows_by_sheet = _read_excel_xlrd(file_path)
+        except Exception as e:
+            print(f"Excel: xlrd failed ({e}), trying openpyxl as fallback...")
+            rows_by_sheet = _read_excel_openpyxl(file_path)
+
+    # Format rows into semantic text
     parts = []
-
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
+    for sheet_name, rows in rows_by_sheet.items():
         parts.append(f"\n=== Hoja: {sheet_name} ===\n")
 
-        rows = list(ws.iter_rows(values_only=True))
         if not rows:
             continue
 
@@ -285,6 +300,55 @@ def _extract_excel(file_path: str) -> str:
                     parts.append(" | ".join(cells))
 
     return "\n".join(parts)
+
+
+def _read_excel_openpyxl(file_path: str) -> dict:
+    """Read Excel file using openpyxl (.xlsx format)."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(file_path, data_only=True)
+    result = {}
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        result[sheet_name] = list(ws.iter_rows(values_only=True))
+    wb.close()
+    return result
+
+
+def _read_excel_xlrd(file_path: str) -> dict:
+    """Read Excel file using xlrd (.xls legacy format)."""
+    import xlrd
+
+    wb = xlrd.open_workbook(file_path)
+    result = {}
+    for sheet_name in wb.sheet_names():
+        ws = wb.sheet_by_name(sheet_name)
+        rows = []
+        for row_idx in range(ws.nrows):
+            row_values = []
+            for col_idx in range(ws.ncols):
+                cell = ws.cell(row_idx, col_idx)
+                # Handle xlrd date cells
+                if cell.ctype == xlrd.XL_CELL_DATE:
+                    try:
+                        date_tuple = xlrd.xldate_as_tuple(cell.value, wb.datemode)
+                        # Format as readable date
+                        from datetime import datetime
+                        dt = datetime(*date_tuple)
+                        row_values.append(dt.strftime("%d/%m/%Y %H:%M") if date_tuple[3] or date_tuple[4] else dt.strftime("%d/%m/%Y"))
+                    except Exception:
+                        row_values.append(str(cell.value))
+                elif cell.ctype == xlrd.XL_CELL_NUMBER:
+                    # Format integers without .0
+                    if cell.value == int(cell.value):
+                        row_values.append(str(int(cell.value)))
+                    else:
+                        row_values.append(str(cell.value))
+                else:
+                    row_values.append(cell.value)
+            rows.append(tuple(row_values))
+        result[sheet_name] = rows
+    return result
 
 
 def _extract_csv(file_path: str) -> str:
