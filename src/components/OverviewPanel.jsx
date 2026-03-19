@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
     MessageSquare, Smile, Clock,
     TrendingUp, TrendingDown, AlertTriangle, Download, Zap, ChevronRight, Timer,
-    CalendarDays, Bot, Activity, Search, Users, BarChart3
+    CalendarDays, Bot, Activity, Search, Users, BarChart3, UserCheck
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -443,21 +443,29 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
                 <div className="card">
                     <div className="card-header">
-                        <h3>Distribución de Sentimiento</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <UserCheck size={16} color="#1a6bb5" />
+                            <h3 style={{ margin: 0 }}>Top Agentes</h3>
+                        </div>
                     </div>
                     <div className="card-body">
                         <div className="chart-container">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={sentimentData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value"
-                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} animationDuration={600}>
-                                        {sentimentData.map((entry, i) => (
-                                            <Cell key={i} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip />
-                                </PieChart>
-                            </ResponsiveContainer>
+                            {stats.agentDist && stats.agentDist.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={stats.agentDist} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                        <XAxis type="number" tick={{ fontSize: 11 }} />
+                                        <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                                            formatter={(value) => [`${value} chats`, 'Cantidad']}
+                                        />
+                                        <Bar dataKey="chats" fill="#1a6bb5" radius={[0, 6, 6, 0]} animationDuration={600} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Sin datos de agentes</div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -519,35 +527,30 @@ export default function OverviewPanel({ onNavigateToChat }) {
                 <div className="card">
                     <div className="card-header">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Bot size={16} color="#8b5cf6" />
-                            <h3 style={{ margin: 0 }}>Eficiencia del Bot — Derivaciones por Camino</h3>
+                            <BarChart3 size={16} color="#8b5cf6" />
+                            <h3 style={{ margin: 0 }}>Volumen Diario</h3>
                         </div>
                     </div>
                     <div className="card-body">
-                        {stats.botPathTransferRates && stats.botPathTransferRates.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {stats.botPathTransferRates.map((p, i) => (
-                                    <div key={i} className="bot-path-row">
-                                        <div className="bot-path-label">{p.path}</div>
-                                        <div className="bot-path-bar-container">
-                                            <div className="bot-path-bar"
-                                                style={{
-                                                    width: `${Math.min(p.rate, 100)}%`,
-                                                    background: p.rate > 80 ? '#ef4444' : p.rate > 50 ? '#f59e0b' : '#10b981',
-                                                    transition: 'width 0.6s ease, background 0.4s ease',
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="bot-path-stats">
-                                            <span style={{ fontWeight: 700, color: p.rate > 80 ? '#ef4444' : '#1e293b', transition: 'color 0.3s' }}>{p.rate}%</span>
-                                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>({p.transferred}/{p.total})</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Sin datos suficientes</div>
-                        )}
+                        <div className="chart-container">
+                            {stats.dailyVolume && stats.dailyVolume.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={stats.dailyVolume}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={Math.max(0, Math.floor(stats.dailyVolume.length / 8))} />
+                                        <YAxis tick={{ fontSize: 11 }} />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                                            formatter={(value) => [`${value} chats`, 'Cantidad']}
+                                        />
+                                        <Area type="monotone" dataKey="chats" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.15} strokeWidth={2}
+                                            dot={{ r: 3, fill: '#8b5cf6' }} animationDuration={600} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Sin datos de volumen</div>
+                            )}
+                        </div>
                     </div>
                 </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Bot, ArrowRight, CheckCircle, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fetchBotTreeStats } from '../services/dataService'
+import DateFilter from './DateFilter'
 
 const LEVEL_COLORS = {
     1: ['#1a6bb5', '#10b981', '#8b5cf6'],
@@ -83,15 +84,17 @@ function TreeNode({ option, count, total, color, level, children, defaultOpen = 
 export default function ChatbotPanel() {
     const [stats, setStats] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [dateFrom, setDateFrom] = useState(null)
+    const [dateTo, setDateTo] = useState(null)
 
     useEffect(() => {
         loadStats()
-    }, [])
+    }, [dateFrom, dateTo])
 
     async function loadStats() {
         try {
             setLoading(true)
-            const data = await fetchBotTreeStats()
+            const data = await fetchBotTreeStats(dateFrom, dateTo)
             setStats(data)
         } catch (err) {
             console.error('Error loading bot tree stats:', err)
@@ -100,16 +103,24 @@ export default function ChatbotPanel() {
         }
     }
 
+    const handleDateChange = (from, to) => {
+        setDateFrom(from)
+        setDateTo(to)
+    }
+
     if (loading) {
         return <div className="loading-spinner"><div className="spinner"></div></div>
     }
 
     if (!stats || stats.totalAnalyzed === 0) {
         return (
-            <div className="empty-state">
-                <Bot />
-                <h3>Sin datos del chatbot</h3>
-                <p>Los datos del árbol del chatbot se completarán cuando las conversaciones sean analizadas por OpenAI.</p>
+            <div className="fade-in">
+                <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={handleDateChange} />
+                <div className="empty-state">
+                    <Bot />
+                    <h3>Sin datos del chatbot</h3>
+                    <p>Los datos del árbol del chatbot se completarán cuando las conversaciones sean analizadas por OpenAI.</p>
+                </div>
             </div>
         )
     }
@@ -128,7 +139,8 @@ export default function ChatbotPanel() {
 
     return (
         <div className="fade-in">
-            {/* KPIs Row */}
+            {/* Date Filter */}
+            <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={handleDateChange} />
             <div className="kpi-grid stagger">
                 <div className="kpi-card">
                     <div className="kpi-icon blue">

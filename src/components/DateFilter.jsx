@@ -2,6 +2,7 @@ import { Calendar } from 'lucide-react'
 
 const PRESETS = [
     { label: 'Hoy', value: 'today' },
+    { label: 'Ayer', value: 'yesterday' },
     { label: '7 días', value: '7d' },
     { label: '30 días', value: '30d' },
     { label: 'Todo', value: 'all' },
@@ -14,6 +15,13 @@ function getPresetDates(preset) {
     switch (preset) {
         case 'today':
             return { from: todayStart.toISOString(), to: now.toISOString() }
+        case 'yesterday': {
+            const yStart = new Date(todayStart)
+            yStart.setDate(yStart.getDate() - 1)
+            const yEnd = new Date(todayStart)
+            yEnd.setMilliseconds(yEnd.getMilliseconds() - 1)
+            return { from: yStart.toISOString(), to: yEnd.toISOString() }
+        }
         case '7d': {
             const d = new Date(todayStart)
             d.setDate(d.getDate() - 7)

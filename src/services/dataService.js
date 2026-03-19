@@ -45,7 +45,7 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
 }
 
 // ===================== TICKETS =====================
-export async function fetchTickets({ limit = 50, offset = 0, agent = null, dateFrom = null, dateTo = null } = {}) {
+export async function fetchTickets({ limit = 50, offset = 0, agent = null, dateFrom = null, dateTo = null, ticketIds = null } = {}) {
     let query = supabase
         .from('cc_tickets')
         .select(`
@@ -72,6 +72,7 @@ export async function fetchTickets({ limit = 50, offset = 0, agent = null, dateF
     if (agent) query = query.eq('agent_name', agent)
     if (dateFrom) query = query.gte('received_at', dateFrom)
     if (dateTo) query = query.lte('received_at', dateTo)
+    if (ticketIds && ticketIds.length > 0) query = query.in('ticket_id', ticketIds)
 
     const { data, error, count } = await query
     if (error) throw error
@@ -259,11 +260,20 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         hours.map(total => dayOccurrences[dayIdx] > 0 ? Math.round(total / dayOccurrences[dayIdx]) : 0)
     )
 
-    // ─── WEEKLY TREND (using ALL tickets, last 8 weeks) ───
+    // ─── WEEKLY TREND (respects date filters) ───
     // Count unique phones per week (1 phone = 1 chat regardless of ticket count)
     const now = new Date()
+
+    // Determine how many weeks to show based on filter range
+    let trendWeeks = 8 // default
+    if (dateFrom) {
+        const fromDate = new Date(dateFrom)
+        const diffDays = Math.ceil((now - fromDate) / (1000 * 60 * 60 * 24))
+        trendWeeks = Math.max(1, Math.ceil(diffDays / 7))
+    }
+
     const weeklyTrend = []
-    for (let w = 7; w >= 0; w--) {
+    for (let w = trendWeeks - 1; w >= 0; w--) {
         const weekStart = new Date(now)
         weekStart.setDate(now.getDate() - (w * 7) - now.getDay() + 1)
         weekStart.setHours(0, 0, 0, 0)
@@ -271,7 +281,8 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         weekEnd.setDate(weekStart.getDate() + 6)
         weekEnd.setHours(23, 59, 59, 999)
 
-        const weekTickets = allTickets.filter(t => {
+        // Use filtered tickets instead of allTickets
+        const weekTickets = tickets.filter(t => {
             if (!t.chat_started_at) return false
             const d = new Date(t.chat_started_at)
             return d >= weekStart && d <= weekEnd
@@ -288,10 +299,11 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         ? parseFloat((((currentWeekChats - prevWeekChats) / prevWeekChats) * 100).toFixed(1))
         : 0
 
-    // ─── SENTIMENT WEEKLY TREND ───
+    // ─── SENTIMENT WEEKLY TREND (respects date filters) ───
     const sentimentTrend = []
     const allTicketsMap = new Map(allTickets.map(t => [t.ticket_id, t]))
-    for (let w = 7; w >= 0; w--) {
+    const filteredTicketsMap = new Map(tickets.map(t => [t.ticket_id, t]))
+    for (let w = trendWeeks - 1; w >= 0; w--) {
         const weekStart = new Date(now)
         weekStart.setDate(now.getDate() - (w * 7) - now.getDay() + 1)
         weekStart.setHours(0, 0, 0, 0)
@@ -299,8 +311,9 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         weekEnd.setDate(weekStart.getDate() + 6)
         weekEnd.setHours(23, 59, 59, 999)
 
-        const weekAnalyses = allAnalyses.filter(a => {
-            const ticket = allTicketsMap.get(a.ticket_id)
+        // Use filteredTicketsMap to respect date filter
+        const weekAnalyses = analyses.filter(a => {
+            const ticket = filteredTicketsMap.get(a.ticket_id)
             if (!ticket?.chat_started_at) return false
             const d = new Date(ticket.chat_started_at)
             return d >= weekStart && d <= weekEnd
@@ -510,6 +523,38 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     })
     problematicChats.sort((a, b) => (a.analysis?.sentiment_score || 0) - (b.analysis?.sentiment_score || 0))
 
+    // ─── AGENT DISTRIBUTION (Top agents by chat count) ───
+    const agentCounts = {}
+    tickets.forEach(t => {
+        const name = t.agent_name || 'Bot (sin agente)'
+        agentCounts[name] = (agentCounts[name] || 0) + 1
+    })
+    const agentDist = Object.entries(agentCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([name, count]) => ({ name, chats: count }))
+
+    // ─── DAILY VOLUME (chats per calendar day) ───
+    const dailyVolumeBuckets = {}
+    tickets.forEach(t => {
+        if (t.chat_started_at) {
+            const dateKey = new Date(t.chat_started_at).toISOString().slice(0, 10)
+            if (!dailyVolumeBuckets[dateKey]) dailyVolumeBuckets[dateKey] = new Set()
+            if (t.customer_phone) {
+                dailyVolumeBuckets[dateKey].add(t.customer_phone)
+            } else {
+                dailyVolumeBuckets[dateKey].add(t.ticket_id)
+            }
+        }
+    })
+    const dailyVolume = Object.entries(dailyVolumeBuckets)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-30) // last 30 days max
+        .map(([date, phoneSet]) => ({
+            date: `${parseInt(date.slice(8))}/${parseInt(date.slice(5, 7))}`,
+            chats: phoneSet.size,
+        }))
+
     return {
         totalChats,
         totalTickets,
@@ -535,6 +580,8 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         agentLoadToday,
         totalToday,
         problematicChats,
+        agentDist,
+        dailyVolume,
     }
 }
 

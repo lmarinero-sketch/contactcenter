@@ -84,26 +84,29 @@ export default function ConversationsPanel({ initialTicketId, onTicketConsumed }
         finally { setLoading(false) }
     }
 
-    // When risk filter is toggled ON, fetch ALL tickets and filter client-side
+    // When risk filter is toggled ON, fetch only at-risk tickets using their IDs
     async function loadRiskTickets() {
         try {
             setLoading(true)
-            // Paginate to fetch ALL tickets (bypass Supabase 1000-row default)
-            let allData = []
-            let offset = 0
-            const BATCH = 1000
-            let hasMore = true
-            while (hasMore) {
-                const { tickets: batch } = await fetchTickets({
-                    limit: BATCH, offset,
-                    agent: filterAgent || null,
-                })
-                allData = allData.concat(batch)
-                hasMore = batch.length === BATCH
-                offset += BATCH
+            if (riskIds.size === 0) {
+                setRiskTicketsCache([])
+                return
             }
-            const riskOnly = allData.filter(t => riskIds.has(t.ticket_id))
-            setRiskTicketsCache(riskOnly)
+            // Fetch ticket details for all risk IDs directly
+            const riskIdArray = [...riskIds]
+            let allRiskTickets = []
+            // Batch in groups of 50 to avoid query size limits
+            const BATCH = 50
+            for (let i = 0; i < riskIdArray.length; i += BATCH) {
+                const batch = riskIdArray.slice(i, i + BATCH)
+                const { tickets: batchTickets } = await fetchTickets({
+                    limit: BATCH, offset: 0,
+                    agent: filterAgent || null,
+                    ticketIds: batch,
+                })
+                allRiskTickets = allRiskTickets.concat(batchTickets)
+            }
+            setRiskTicketsCache(allRiskTickets)
         } catch (err) { console.error('Error loading risk tickets:', err) }
         finally { setLoading(false) }
     }
