@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { trackLogin, trackLogout } from '../lib/hubTracker'
 
 const AuthContext = createContext(null)
 
@@ -130,12 +131,16 @@ export function AuthProvider({ children }) {
             password,
         })
         if (error) throw error
+        // Track in Hub Monitor (non-blocking)
+        trackLogin(supabase, data.user.id)
         return data
     }
 
     const signOut = async () => {
+        const userId = user?.id
         const { error } = await supabase.auth.signOut()
         if (error) throw error
+        if (userId) trackLogout(supabase, userId)
         setUser(null)
         setProfile(null)
     }
