@@ -42,6 +42,9 @@ export default function OverviewPanel({ onNavigateToChat }) {
     const [dateFrom, setDateFrom] = useState(null)
     const [dateTo, setDateTo] = useState(null)
 
+    // Heatmap view mode: 'total' or 'avg'
+    const [heatmapMode, setHeatmapMode] = useState('total')
+
     // Load raw data once on mount
     useEffect(() => {
         let mounted = true
@@ -160,7 +163,8 @@ export default function OverviewPanel({ onNavigateToChat }) {
     }))
 
     const forecastData = stats.forecast || []
-    const heatmapMax = Math.max(...(stats.heatmapData || []).flat().filter(Boolean), 1)
+    const activeHeatmap = heatmapMode === 'avg' ? (stats.heatmapAvgData || stats.heatmapData) : stats.heatmapData
+    const heatmapMax = Math.max(...(activeHeatmap || []).flat().filter(Boolean), 1)
 
     const formatSeconds = (seconds) => {
         if (!seconds) return '—'
@@ -344,6 +348,32 @@ export default function OverviewPanel({ onNavigateToChat }) {
                             <CalendarDays size={16} color="#0d9488" />
                             <h3 style={{ margin: 0 }}>Mapa de Calor — Demanda</h3>
                         </div>
+                        <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
+                            <button
+                                onClick={() => setHeatmapMode('total')}
+                                style={{
+                                    padding: '4px 12px', fontSize: '11px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    background: heatmapMode === 'total' ? '#fff' : 'transparent',
+                                    color: heatmapMode === 'total' ? '#0d9488' : '#94a3b8',
+                                    boxShadow: heatmapMode === 'total' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                }}
+                            >
+                                Total
+                            </button>
+                            <button
+                                onClick={() => setHeatmapMode('avg')}
+                                style={{
+                                    padding: '4px 12px', fontSize: '11px', fontWeight: 600, border: 'none', borderRadius: '6px', cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    background: heatmapMode === 'avg' ? '#fff' : 'transparent',
+                                    color: heatmapMode === 'avg' ? '#0d9488' : '#94a3b8',
+                                    boxShadow: heatmapMode === 'avg' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                }}
+                            >
+                                Promedio/día
+                            </button>
+                        </div>
                     </div>
                     <div className="card-body">
                         <div className="heatmap-container">
@@ -356,13 +386,13 @@ export default function OverviewPanel({ onNavigateToChat }) {
                                     <>
                                         <div key={`label-${dayIdx}`} className="heatmap-day-label">{DAY_LABELS[dayIdx]}</div>
                                         {HEATMAP_HOURS.map(h => {
-                                            const val = stats.heatmapData?.[dayIdx]?.[h] || 0
+                                            const val = activeHeatmap?.[dayIdx]?.[h] || 0
                                             return (
                                                 <div
                                                     key={`${dayIdx}-${h}`}
                                                     className="heatmap-cell"
                                                     style={{ background: getHeatmapColor(val, heatmapMax), transition: 'background 0.4s ease' }}
-                                                    title={`${DAY_LABELS[dayIdx]} ${h}:00 — ${val} chats`}
+                                                    title={`${DAY_LABELS[dayIdx]} ${h}:00 — ${val} ${heatmapMode === 'avg' ? 'prom.' : ''} chats`}
                                                 >
                                                     {val > 0 && <span className="heatmap-cell-value">{val}</span>}
                                                 </div>

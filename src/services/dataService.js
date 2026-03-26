@@ -240,14 +240,25 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         }
     })
 
-    // ─── HEATMAP: HOUR × DAY MATRIX (raw totals, not averages) ───
+    // ─── HEATMAP: HOUR × DAY MATRIX (totals + averages per day-of-week) ───
     const heatmapData = Array.from({ length: 7 }, () => Array(24).fill(0))
+    const heatmapDayOccurrences = Array(7).fill(0)
+    const heatmapSeenDates = new Set()
     tickets.forEach(t => {
         if (t.chat_started_at) {
             const d = new Date(t.chat_started_at)
             heatmapData[d.getDay()][d.getHours()]++
+            const dayDateKey = `${d.getDay()}-${d.toISOString().slice(0, 10)}`
+            if (!heatmapSeenDates.has(dayDateKey)) {
+                heatmapSeenDates.add(dayDateKey)
+                heatmapDayOccurrences[d.getDay()]++
+            }
         }
     })
+    // Average per day-of-week: total / number of occurrences of that day
+    const heatmapAvgData = heatmapData.map((hours, dayIdx) =>
+        hours.map(total => heatmapDayOccurrences[dayIdx] > 0 ? Math.round(total / heatmapDayOccurrences[dayIdx]) : 0)
+    )
 
     // ─── WEEKLY TREND (respects date filters) ───
     // Count unique phones per week (1 phone = 1 chat regardless of ticket count)
@@ -557,6 +568,7 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         hourlyDist,
         dailyDist,
         heatmapData,
+        heatmapAvgData,
         weeklyTrend,
         weeklyVariation,
         currentWeekChats,
