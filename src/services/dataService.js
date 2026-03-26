@@ -7,9 +7,9 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
     let allData = []
     let offset = 0
     let hasMore = true
-    const maxRows = 10000 // Safety cap to prevent infinite loops
+    const maxRows = 50000 // Safety cap — cc_tickets already has 10k+ rows
     const startTime = Date.now()
-    const TIMEOUT_MS = 15000 // 15s max for any fetchAllRows call
+    const TIMEOUT_MS = 30000 // 30s max for any fetchAllRows call
 
     while (hasMore && allData.length < maxRows) {
         // Timeout guard
