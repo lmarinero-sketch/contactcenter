@@ -47,7 +47,8 @@ export default function DateFilter({ dateFrom, dateTo, onChange }) {
 
     const handleCustomDate = (type, value) => {
         if (type === 'from') {
-            onChange(value ? new Date(value).toISOString() : null, dateTo)
+            // Use T00:00:00 to parse as LOCAL midnight (not UTC)
+            onChange(value ? new Date(value + 'T00:00:00').toISOString() : null, dateTo)
         } else {
             onChange(dateFrom, value ? new Date(value + 'T23:59:59').toISOString() : null)
         }
