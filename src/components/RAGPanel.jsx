@@ -631,7 +631,7 @@ export default function RAGPanel() {
                             className={`rag-tab ${activeTab === 'documents' ? 'active' : ''}`}
                             onClick={() => setActiveTab('documents')}
                         >
-                            <FileText size={14} />
+                            {isUploading ? <Loader2 size={14} className="rag-spin" style={{ color: '#3b82f6' }} /> : <FileText size={14} />}
                             Archivos ({totalFiles})
                         </button>
                     </div>
@@ -715,7 +715,12 @@ export default function RAGPanel() {
                                 </div>
                             )}
 
-                            {uploadProgress && <div className="rag-upload-status">{uploadProgress}</div>}
+                            {(isUploading || uploadProgress) && (
+                                <div className="rag-upload-status" style={{ padding: '8px 12px', background: '#eff6ff', color: '#1e40af', borderRadius: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', border: '1px solid #bfdbfe' }}>
+                                    <Loader2 size={14} className="rag-spin" />
+                                    <span>{uploadProgress || 'Preparando y subiendo en segundo plano...'}</span>
+                                </div>
+                            )}
 
                             {/* Breadcrumbs */}
                             <div className="rag-fm-breadcrumbs">
