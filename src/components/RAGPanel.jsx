@@ -522,7 +522,7 @@ export default function RAGPanel() {
             <div className="simon-welcome">
                 <div className="simon-welcome-card">
                     <div className="simon-avatar-container">
-                        <img src="/simon.webp" alt="Simon" className="simon-avatar" />
+                        <img src="/simonminutes.png" alt="Simon" className="simon-avatar" />
                         <div className="simon-avatar-glow" />
                     </div>
                     <h1 className="simon-name">Simon</h1>
@@ -798,7 +798,7 @@ export default function RAGPanel() {
                         <ChevronRight size={16} style={{ transform: showSidebar ? 'rotate(180deg)' : 'none' }} />
                     </button>
                     <div className="rag-status-info">
-                        <img src="/simon.webp" alt="Simon" className="rag-simon-mini" />
+                        <img src="/simonminutes.png" alt="Simon" className="rag-simon-mini" />
                         <span className="rag-status-title">Simon</span>
                     </div>
                     <div className="rag-status-indicators">
@@ -830,7 +830,7 @@ export default function RAGPanel() {
                     {messages.length === 0 && !isLoading ? (
                         <div className="rag-welcome">
                             <div className="rag-welcome-icon">
-                                <img src="/simon.webp" alt="Simon" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
+                                <img src="/simonminutes.png" alt="Simon" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
                             </div>
                             <h3>Simon</h3>
                             <p>Preguntá lo que necesites sobre los documentos cargados. Las respuestas incluyen citación de fuentes.</p>
