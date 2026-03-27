@@ -82,6 +82,22 @@ def _process_single_file(file_path: str, filename: str, folder: str = "", tag: s
     }
 
 
+def _fetch_all_rag_chunks(select_clause: str) -> list:
+    """Fetch all rows bypassing Supabase 1000 limit via pagination."""
+    all_data = []
+    page_size = 1000
+    for i in range(100):  # max 100,000 chunks safeguard
+        start = i * page_size
+        end = start + page_size - 1
+        res = supabase.table("rag_documents").select(select_clause).range(start, end).execute()
+        if not res.data:
+            break
+        all_data.extend(res.data)
+        if len(res.data) < page_size:
+            break
+    return all_data
+
+
 # === File Upload ===
 
 @router.post("/upload")
@@ -143,15 +159,12 @@ async def list_files(folder: Optional[str] = Query(default="")):
         folder = (folder or "").strip("/")
 
         # Get all documents from vector DB
-        result = supabase.table("rag_documents") \
-            .select("metadata, created_at") \
-            .execute()
+        all_chunks = _fetch_all_rag_chunks("metadata, created_at")
 
-        # Build file and folder structure
         file_map = {}
         folder_set = set()
 
-        for row in (result.data or []):
+        for row in all_chunks:
             metadata = row.get("metadata", {})
             file_folder = metadata.get("folder", "")
             filename = metadata.get("filename", "")
@@ -295,13 +308,11 @@ async def delete_folder(path: str = Query(...)):
         deleted_total = 0
 
         # Get all docs in this folder (and subfolders)
-        result = supabase.table("rag_documents") \
-            .select("id, metadata") \
-            .execute()
+        all_chunks = _fetch_all_rag_chunks("id, metadata")
 
         ids_to_delete = []
         storage_paths = set()
-        for row in (result.data or []):
+        for row in all_chunks:
             doc_folder = row.get("metadata", {}).get("folder", "")
             if doc_folder == path or doc_folder.startswith(path + "/"):
                 ids_to_delete.append(row["id"])
@@ -340,12 +351,10 @@ async def delete_folder(path: str = Query(...)):
 async def list_documents(tag: Optional[str] = Query(default=None)):
     """List all unique documents, optionally filtered by tag."""
     try:
-        result = supabase.table("rag_documents") \
-            .select("metadata, created_at") \
-            .execute()
+        all_chunks = _fetch_all_rag_chunks("metadata, created_at")
 
         doc_map = {}
-        for row in (result.data or []):
+        for row in all_chunks:
             metadata = row.get("metadata", {})
             filename = metadata.get("filename", "desconocido")
             doc_tag = metadata.get("tag", "")
@@ -371,7 +380,7 @@ async def list_documents(tag: Optional[str] = Query(default=None)):
         documents = sorted(doc_map.values(), key=lambda x: x.get("created_at", ""), reverse=True)
         all_tags = list(set(
             row.get("metadata", {}).get("tag", "")
-            for row in (result.data or [])
+            for row in all_chunks
             if row.get("metadata", {}).get("tag")
         ))
 

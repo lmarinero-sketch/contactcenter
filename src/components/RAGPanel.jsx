@@ -63,6 +63,9 @@ export default function RAGPanel() {
     // Upload confirmation modal state
     const [showUploadModal, setShowUploadModal] = useState(false)
     const [pendingFiles, setPendingFiles] = useState([])
+    
+    // Custom confirm modal state
+    const [confirmAction, setConfirmAction] = useState(null)
 
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
@@ -279,7 +282,7 @@ export default function RAGPanel() {
         for (const file of files) {
             const ext = '.' + file.name.split('.').pop().toLowerCase()
             totalSize += file.size
-            if (SUPPORTED_EXTS.includes(ext)) {
+            if (SUPPORTED_EXTS.includes(ext) && !file.name.startsWith('~$') && !file.name.startsWith('.')) {
                 supported.push(file)
                 typeCounts[ext] = (typeCounts[ext] || 0) + 1
             } else {
@@ -367,25 +370,35 @@ export default function RAGPanel() {
 
     // Delete file
     async function handleDeleteFile(item) {
-        const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
-        if (!confirm(`¿Eliminar "${item.name}"?`)) return
-        try {
-            await deleteRAGFile(path)
-            loadFiles()
-        } catch (e) {
-            setError(e.message)
-        }
+        setConfirmAction({
+            title: 'Eliminar Archivo',
+            message: `¿Estás seguro de que deseás eliminar "${item.name}"?`,
+            onConfirm: async () => {
+                const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
+                try {
+                    await deleteRAGFile(path)
+                    loadFiles()
+                } catch (e) {
+                    setError(e.message)
+                }
+            }
+        });
     }
 
     // Delete folder
     async function handleDeleteFolder(item) {
-        if (!confirm(`¿Eliminar carpeta "${item.name}" y todo su contenido?`)) return
-        try {
-            await deleteRAGFolder(item.path)
-            loadFiles()
-        } catch (e) {
-            setError(e.message)
-        }
+        setConfirmAction({
+            title: 'Eliminar Carpeta',
+            message: `¿Eliminar la carpeta "${item.name}" y todo su contenido? Esta acción no se puede deshacer.`,
+            onConfirm: async () => {
+                try {
+                    await deleteRAGFolder(item.path)
+                    loadFiles()
+                } catch (e) {
+                    setError(e.message)
+                }
+            }
+        });
     }
 
     // Create folder
@@ -414,16 +427,21 @@ export default function RAGPanel() {
     // Delete conversation
     async function handleDeleteConversation(convId, e) {
         e.stopPropagation()
-        if (!confirm('¿Eliminar esta conversación?')) return
-        try {
-            await deleteRAGConversation(convId)
-            if (activeConversation === convId) {
-                startNewConversation()
+        setConfirmAction({
+            title: 'Eliminar Conversación',
+            message: '¿Estás seguro de que querés eliminar esta conversación del historial?',
+            onConfirm: async () => {
+                try {
+                    await deleteRAGConversation(convId)
+                    if (activeConversation === convId) {
+                        startNewConversation()
+                    }
+                    loadConversations()
+                } catch (err) {
+                    setError(err.message)
+                }
             }
-            loadConversations()
-        } catch (e) {
-            setError(e.message)
-        }
+        });
     }
 
     // Handle clicking a disambiguation suggestion
@@ -661,17 +679,16 @@ export default function RAGPanel() {
                             <div className="rag-fm-toolbar">
                                 <input ref={fileInputRef} type="file" onChange={handleFileSelect}
                                     accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm"
-                                    style={{ display: 'none' }} disabled={isUploading} multiple />
+                                    style={{ display: 'none' }} multiple />
                                 <input ref={folderInputRef} type="file" onChange={handleFileSelect}
-                                    style={{ display: 'none' }} disabled={isUploading}
-                                    webkitdirectory="" directory="" multiple />
+                                    style={{ display: 'none' }} webkitdirectory="" directory="" multiple />
                                 <div className="rag-fm-actions">
                                     <button className="rag-fm-btn" onClick={() => fileInputRef.current?.click()}
-                                        disabled={isUploading} title="Subir archivos">
-                                        {isUploading ? <Loader2 size={13} className="rag-spin" /> : <Upload size={13} />}
+                                        title="Subir archivos">
+                                        <Upload size={13} />
                                     </button>
                                     <button className="rag-fm-btn" onClick={() => folderInputRef.current?.click()}
-                                        disabled={isUploading} title="Subir carpeta">
+                                        title="Subir carpeta">
                                         <FolderOpen size={13} />
                                     </button>
                                     <button className="rag-fm-btn" onClick={() => setShowNewFolder(!showNewFolder)} title="Nueva carpeta">
@@ -682,7 +699,7 @@ export default function RAGPanel() {
                                     <Tag size={11} />
                                     <input type="text" placeholder="Tag" value={uploadTag}
                                         onChange={(e) => setUploadTag(e.target.value)}
-                                        disabled={isUploading} className="rag-tag-field" />
+                                        className="rag-tag-field" />
                                 </div>
                             </div>
 
@@ -1179,6 +1196,39 @@ export default function RAGPanel() {
                     </div>
                 )
             })()}
+            {/* Custom Confirm Modal */}
+            {confirmAction && (
+                <div className="rag-modal-overlay" onClick={() => setConfirmAction(null)}>
+                    <div className="rag-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="rag-modal-header">
+                            <div className="rag-modal-icon" style={{ background: '#fef2f2', color: '#ef4444' }}>
+                                <AlertCircle size={24} />
+                            </div>
+                            <h3>{confirmAction.title}</h3>
+                            <button className="rag-modal-close" onClick={() => setConfirmAction(null)}>
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="rag-modal-body">
+                            <div className="rag-modal-destination" style={{ border: 'none', background: 'transparent', padding: '16px 0', fontSize: '14px', color: '#475569' }}>
+                                {confirmAction.message}
+                            </div>
+                        </div>
+                        <div className="rag-modal-footer">
+                            <button className="rag-modal-btn cancel" onClick={() => setConfirmAction(null)}>
+                                Cancelar
+                            </button>
+                            <button className="rag-modal-btn confirm" style={{ background: '#ef4444', color: 'white' }} onClick={() => {
+                                confirmAction.onConfirm();
+                                setConfirmAction(null);
+                            }}>
+                                <Trash2 size={14} /> Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             {showHelp && <RAGHelp onClose={() => setShowHelp(false)} />}
         </div>
     )

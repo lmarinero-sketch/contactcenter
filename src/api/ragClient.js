@@ -100,7 +100,7 @@ export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = 
         const file = files[i];
         const ext = '.' + file.name.split('.').pop().toLowerCase();
 
-        if (!supportedExts.includes(ext)) {
+        if (!supportedExts.includes(ext) || file.name.startsWith('~$') || file.name.startsWith('.')) {
             skipped++;
             results.push({ filename: file.name, status: 'skipped' });
             continue;
