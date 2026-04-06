@@ -376,9 +376,6 @@ export default function AgentReportModal({ isOpen, onClose, stats, rawData, sele
                                 </div>
                                 <div className="report-kpi-value">{stats.avgSentiment}</div>
                                 <div className="report-kpi-label">Sentimiento Prom.</div>
-                                <div className="report-kpi-sub">
-                                    {stats.avgSentiment >= 0.3 ? '🟢 Positivo' : stats.avgSentiment >= 0 ? '🟡 Neutro' : '🔴 Negativo'}
-                                </div>
                             </div>
                             <div className="report-kpi-card">
                                 <div className="report-kpi-icon" style={{ background: '#faf5ff' }}>
