@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
-    MessageSquare, Smile, Clock,
+    MessageSquare, Smile, Clock, FileText,
     TrendingUp, TrendingDown, AlertTriangle, Download, Zap, ChevronRight, Timer,
     CalendarDays, Bot, Activity, Search, Users, BarChart3, UserCheck
 } from 'lucide-react'
@@ -9,9 +9,10 @@ import {
     PieChart, Pie, Cell, AreaChart, Area, Legend, LineChart, Line, ComposedChart,
     ReferenceLine
 } from 'recharts'
-import { fetchOverviewRawData, computeOverviewStats, exportToCSV } from '../services/dataService'
+import { fetchOverviewRawData, computeOverviewStats, exportToCSV, extractAgentList } from '../services/dataService'
 import { format } from 'date-fns'
 import DateFilter from './DateFilter'
+import AgentReportModal from './AgentReportModal'
 
 const SENTIMENT_COLORS = {
     positive: '#10b981',
@@ -41,6 +42,10 @@ export default function OverviewPanel({ onNavigateToChat }) {
     // Filter state — changes trigger instant recalc, no fetch
     const [dateFrom, setDateFrom] = useState(null)
     const [dateTo, setDateTo] = useState(null)
+    const [selectedAgent, setSelectedAgent] = useState(null)
+
+    // Report modal
+    const [showReport, setShowReport] = useState(false)
 
     // Heatmap view mode: 'total' or 'avg'
     const [heatmapMode, setHeatmapMode] = useState('total')
@@ -86,11 +91,17 @@ export default function OverviewPanel({ onNavigateToChat }) {
         }
     }, [])
 
+    // Agent list from raw data (for filter dropdown)
+    const agentList = useMemo(() => {
+        if (!rawData) return []
+        return extractAgentList(rawData.allTickets)
+    }, [rawData])
+
     // Compute stats instantly when filters change — no spinner, no refetch
     const stats = useMemo(() => {
         if (!rawData) return null
-        return computeOverviewStats(rawData.allTickets, rawData.allAnalyses, dateFrom, dateTo)
-    }, [rawData, dateFrom, dateTo])
+        return computeOverviewStats(rawData.allTickets, rawData.allAnalyses, dateFrom, dateTo, selectedAgent)
+    }, [rawData, dateFrom, dateTo, selectedAgent])
 
     const problems = stats?.problematicChats || []
 
@@ -199,8 +210,34 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
     return (
         <div className="fade-in">
-            {/* Date Filter */}
-            <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={handleDateChange} />
+            {/* Date + Agent Filter Bar */}
+            <div className="overview-filters-bar">
+                <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={handleDateChange} />
+                <div className="overview-filters-right">
+                    <div className="agent-filter-wrapper">
+                        <Users size={14} color="#94a3b8" />
+                        <select
+                            id="agent-filter-select"
+                            className="agent-filter-select"
+                            value={selectedAgent || ''}
+                            onChange={(e) => setSelectedAgent(e.target.value || null)}
+                        >
+                            <option value="">Todos los agentes</option>
+                            {agentList.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button
+                        className="btn btn-report"
+                        onClick={() => setShowReport(true)}
+                        title="Generar informe PDF con análisis de IA"
+                    >
+                        <FileText size={14} />
+                        <span className="hide-mobile">Generar Informe</span>
+                    </button>
+                </div>
+            </div>
 
             {/* ═══ EXECUTIVE SUMMARY ═══ */}
             <div className="exec-card" style={{ marginBottom: '20px' }}>
@@ -668,6 +705,17 @@ export default function OverviewPanel({ onNavigateToChat }) {
                     </div>
                 </div>
             )}
+
+            {/* Agent Report Modal */}
+            <AgentReportModal
+                isOpen={showReport}
+                onClose={() => setShowReport(false)}
+                stats={stats}
+                rawData={rawData}
+                selectedAgent={selectedAgent}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+            />
         </div>
     )
 }

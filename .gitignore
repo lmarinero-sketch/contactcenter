@@ -33,6 +33,9 @@ _debug*.mjs
 _fix_agents_v*.mjs
 _fix_betina_web.mjs
 _deploy*.bat
+_test_*.mjs
+bulk-upload*.mjs
+bulk-upload-progress.json
 
 # Antigravity skills (external)
 antigravity-awesome-skills/

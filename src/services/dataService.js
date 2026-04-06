@@ -127,10 +127,19 @@ export async function fetchOverviewRawData() {
     }
 }
 
+// Helper: extract unique agent names from raw tickets (for filter dropdown)
+export function extractAgentList(allTickets) {
+    const names = new Set()
+    allTickets.forEach(t => {
+        if (t.agent_name) names.add(t.agent_name)
+    })
+    return [...names].sort()
+}
+
 // 2️⃣  Pure computation — runs client-side, instant on filter changes
-export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, dateTo = null) {
+export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, dateTo = null, selectedAgent = null) {
     // Apply date filter to get current-view tickets
-    const tickets = allTickets.filter(t => {
+    let tickets = allTickets.filter(t => {
         if (!dateFrom && !dateTo) return true
         const d = t.received_at ? new Date(t.received_at) : null
         if (!d) return false
@@ -138,6 +147,11 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         if (dateTo && d > new Date(dateTo)) return false
         return true
     })
+
+    // Apply agent filter
+    if (selectedAgent) {
+        tickets = tickets.filter(t => t.agent_name === selectedAgent)
+    }
 
     const ticketIds = new Set(tickets.map(t => t.ticket_id))
     const analyses = allAnalyses.filter(a => ticketIds.has(a.ticket_id))
