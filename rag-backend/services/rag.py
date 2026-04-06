@@ -1,15 +1,18 @@
 """
-RAG Pipeline V3.2 — Maximum Precision + Entity-Aware Topic Filtering
+RAG Pipeline V3.3 — Maximum Precision + Entity-Aware + Recency Bias
 8-stage pipeline: Disambiguate → HyDE → Multi-Query → Hybrid Search → Dedup → Entity Filter → Re-rank → Generate
-V3.2:
+V3.3:
   - Step 0: Ambiguity detection — asks for clarification when question is unclear
+  - Step 4: Recency-boosted deduplication — newer documents get priority in ranking
   - Step 4.5: Entity-Aware Topic Filtering — extracts key entities from the question
     and filters retrieved chunks to stay on-topic (e.g., only OSDE docs when asking about OSDE)
+  - Step 5: Recency-aware re-ranking — LLM scorer favors recent documents
+  - Step 6: Recency-aware answer gen — prefers most recent info when data conflicts
   - Chat Learning: Automatically indexes Q&A pairs for continuous improvement
-  - Enhanced context: Distinguishes between document sources and learned Q&A sources
 """
 import json
 import re
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from config import (
     openai_client, supabase,
@@ -371,7 +374,10 @@ def _rerank_single_document(question: str, doc: dict,
                         "responder la pregunta del usuario. "
                         "El fragmento puede ser texto narrativo O datos tabulares (filas con key:value, "
                         "columnas de Excel, listas de registros). Los datos tabulares que contienen "
-                        "términos relacionados a la pregunta son MUY relevantes aunque no 'respondan' directamente."
+                        "términos relacionados a la pregunta son MUY relevantes aunque no 'respondan' directamente. "
+                        "PRIORIDAD TEMPORAL: Si el fragmento contiene fechas o períodos, "
+                        "los documentos más recientes (cercanos a hoy) son MÁS relevantes. "
+                        "Si dos fragmentos contienen info similar, el más reciente debería tener mayor score."
                         f"{extra_hint}"
                         f"{entity_hint} "
                         "Respondé SOLO con JSON: {\"score\": 0-10, \"reason\": \"explicación breve\"}"
@@ -502,8 +508,10 @@ def _generate_final_answer(question: str, documents: list[dict],
             f"{rules_context}"
         )
 
+    today_str = datetime.now().strftime("%d/%m/%Y")
     system_prompt = f"""Sos Simon, el asistente IA documental del Sanatorio Argentino.
 Tu función es responder preguntas usando la información proporcionada.
+Fecha de hoy: {today_str}
 
 REGLAS:
 1. Usá SOLO información del [CONTEXTO], [REGLAS Y DIRECTIVAS] y [RESPUESTAS PREVIAS]. NO uses conocimiento externo.
@@ -523,10 +531,15 @@ REGLAS:
 - ¿Pregunta relacionada 2?
 - ¿Pregunta relacionada 3?
 
-11. ENFOQUE TEMÁTICO OBLIGATORIO: Si la pregunta menciona una entidad específica (obra social, servicio, departamento), 
+11. ENFOQUE TEMÁTICO OBLIGATORIO: Si la pregunta menciona una entidad específica (obra social, servicio, departamento),
 respondé EXCLUSIVAMENTE con información de esa entidad. NO mezcles datos de otras entidades similares.
 Por ejemplo, si preguntan por OSDE, NO incluyas información de Swiss Medical, PAMI u otras obras sociales,
 a menos que el usuario pida explícitamente una comparación.
+
+12. PRIORIDAD TEMPORAL: Cuando existan múltiples documentos con información similar (ej: convenios de distintos años),
+PRIORIZÁ SIEMPRE la información más reciente (fecha más cercana a hoy: {today_str}).
+Si hay datos que se contradicen entre documentos viejos y nuevos, usá los datos del documento más reciente.
+Menciona la fecha/período del documento cuando sea relevante para el usuario.
 
 [CONTEXTO]
 {context}{rules_section}{learned_section}"""
@@ -672,12 +685,33 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
 
     pipeline_info["total_searched"] = len(all_results)
 
-    # === STEP 4: De-duplication ===
+    # === STEP 4: De-duplication + Recency Boost ===
     seen = {}
     for doc in all_results:
         doc_id = doc.get("id")
         if doc_id not in seen or doc.get("rank_score", 0) > seen[doc_id].get("rank_score", 0):
             seen[doc_id] = doc
+
+    # Apply recency boost: newer documents get a small score bonus
+    now = datetime.now(timezone.utc)
+    for doc in seen.values():
+        created_at = doc.get("created_at") or doc.get("metadata", {}).get("created_at", "")
+        if created_at:
+            try:
+                if isinstance(created_at, str):
+                    created_at = created_at.replace("Z", "+00:00")
+                    doc_date = datetime.fromisoformat(created_at)
+                else:
+                    doc_date = created_at
+                days_old = (now - doc_date).days
+                # Recency boost: 0.15 for today, decays over 180 days
+                recency_boost = max(0, 0.15 * (1 - days_old / 180))
+                doc["recency_boost"] = round(recency_boost, 4)
+                doc["rank_score"] = doc.get("rank_score", 0) + recency_boost
+            except Exception:
+                doc["recency_boost"] = 0
+        else:
+            doc["recency_boost"] = 0
 
     unique_docs = sorted(
         seen.values(),
