@@ -9,7 +9,7 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
     let hasMore = true
     const maxRows = 50000 // Safety cap — cc_tickets already has 10k+ rows
     const startTime = Date.now()
-    const TIMEOUT_MS = 30000 // 30s max for any fetchAllRows call
+    const TIMEOUT_MS = 60000 // 60s max for any fetchAllRows call (dataset is 10k+ rows)
 
     while (hasMore && allData.length < maxRows) {
         // Timeout guard
@@ -107,24 +107,46 @@ export async function fetchTicketDetail(ticketId) {
 
 // ===================== OVERVIEW STATS =====================
 
-// 1️⃣  Fetch raw data ONCE — no date filters, fetch ALL rows (no 1000-row cap)
-export async function fetchOverviewRawData() {
-    // Race loading against a 20s timeout to prevent infinite loading
+// In-memory cache to avoid redundant full re-fetches (invalidated on force refresh)
+let _overviewCache = null
+let _overviewCacheTime = 0
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 min cache unless force-refreshed
+
+// 1️⃣  Fetch raw data — uses cache unless forceRefresh=true or cache is stale
+export async function fetchOverviewRawData(forceRefresh = false) {
+    const now = Date.now()
+    if (!forceRefresh && _overviewCache && (now - _overviewCacheTime) < CACHE_TTL_MS) {
+        console.log('[dataService] Returning cached overview data (age:', Math.round((now - _overviewCacheTime) / 1000), 's)')
+        return _overviewCache
+    }
+
+    console.log('[dataService] Fetching fresh overview data...' + (forceRefresh ? ' (FORCE REFRESH)' : ''))
+
+    // Race loading against a 45s timeout to prevent infinite loading
     const dataPromise = Promise.all([
         fetchAllRows('cc_tickets', 'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name, customer_phone'),
         fetchAllRows('cc_analysis', 'ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds'),
     ])
 
     const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Data loading timeout (20s)')), 20000)
+        setTimeout(() => reject(new Error('Data loading timeout (45s) — intentá nuevamente')), 45000)
     )
 
     const [allTickets, allAnalyses] = await Promise.race([dataPromise, timeoutPromise])
 
-    return {
-        allTickets,
-        allAnalyses,
-    }
+    const result = { allTickets, allAnalyses }
+    _overviewCache = result
+    _overviewCacheTime = Date.now()
+    console.log(`[dataService] Loaded ${allTickets.length} tickets, ${allAnalyses.length} analyses`)
+
+    return result
+}
+
+// Force-invalidate cache (called when user presses Refresh)
+export function invalidateOverviewCache() {
+    _overviewCache = null
+    _overviewCacheTime = 0
+    console.log('[dataService] Overview cache invalidated')
 }
 
 // Helper: extract unique agent names from raw tickets (for filter dropdown)

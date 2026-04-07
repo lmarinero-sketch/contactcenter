@@ -886,6 +886,42 @@ body {
   }
 }
 
+/* Spin class for Lucide icons */
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ===================== REFRESH BANNER ===================== */
+.refresh-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e40af;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.btn-refreshing {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1e40af !important;
+  cursor: wait !important;
+}
+
+.btn-refresh-done {
+  background: #f0fdf4 !important;
+  border-color: #86efac !important;
+  color: #166534 !important;
+  transition: all 0.3s ease;
+}
+
 /* ===================== BUTTONS ===================== */
 .btn {
   display: inline-flex;

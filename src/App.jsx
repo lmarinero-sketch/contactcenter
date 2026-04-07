@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, Loader2, Menu } from 'lucide-react'
+import { RefreshCw, Loader2, Menu, Check } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './components/LoginPage'
 import Sidebar from './components/Sidebar'
@@ -59,7 +59,22 @@ function App() {
         return <LoginPage />
     }
 
-    const handleRefresh = () => setRefreshKey(prev => prev + 1)
+    const [forceRefreshCount, setForceRefreshCount] = useState(0)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [showRefreshDone, setShowRefreshDone] = useState(false)
+
+    const handleRefresh = () => {
+        setIsRefreshing(true)
+        setShowRefreshDone(false)
+        setForceRefreshCount(prev => prev + 1)
+        setRefreshKey(prev => prev + 1)
+        // Reset visual state after a reasonable time
+        setTimeout(() => {
+            setIsRefreshing(false)
+            setShowRefreshDone(true)
+            setTimeout(() => setShowRefreshDone(false), 2000)
+        }, 3000)
+    }
 
     const navigateToConversation = (ticketId) => {
         setPendingTicketId(ticketId)
@@ -73,7 +88,7 @@ function App() {
 
     const renderView = () => {
         switch (activeView) {
-            case 'overview': return <OverviewPanel key={refreshKey} onNavigateToChat={navigateToConversation} />
+            case 'overview': return <OverviewPanel key={refreshKey} onNavigateToChat={navigateToConversation} forceRefresh={forceRefreshCount} />
             case 'agents': return <AgentsPanel key={refreshKey} />
             case 'chatbot': return <ChatbotPanel key={refreshKey} />
             case 'conversations': return <ConversationsPanel key={refreshKey} initialTicketId={pendingTicketId} onTicketConsumed={() => setPendingTicketId(null)} />
@@ -105,9 +120,18 @@ function App() {
                         </div>
                     </div>
                     <div className="header-right">
-                        <button className="btn btn-secondary" onClick={handleRefresh}>
-                            <RefreshCw size={14} />
-                            <span className="hide-mobile">Actualizar</span>
+                        <button 
+                            className={`btn btn-secondary ${isRefreshing ? 'btn-refreshing' : ''} ${showRefreshDone ? 'btn-refresh-done' : ''}`}
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                        >
+                            {isRefreshing ? (
+                                <><Loader2 size={14} className="spin" /><span className="hide-mobile">Actualizando...</span></>
+                            ) : showRefreshDone ? (
+                                <><Check size={14} /><span className="hide-mobile">Actualizado ✓</span></>
+                            ) : (
+                                <><RefreshCw size={14} /><span className="hide-mobile">Actualizar</span></>
+                            )}
                         </button>
                     </div>
                 </header>

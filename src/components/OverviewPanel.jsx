@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo } from 'react'
 import {
     MessageSquare, Smile, Clock, FileText,
     TrendingUp, TrendingDown, AlertTriangle, Download, Zap, ChevronRight, Timer,
-    CalendarDays, Bot, Activity, Search, Users, BarChart3, UserCheck
+    CalendarDays, Bot, Activity, Search, Users, BarChart3, UserCheck, Loader2
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area, Legend, LineChart, Line, ComposedChart,
     ReferenceLine
 } from 'recharts'
-import { fetchOverviewRawData, computeOverviewStats, exportToCSV, extractAgentList } from '../services/dataService'
+import { fetchOverviewRawData, computeOverviewStats, exportToCSV, extractAgentList, invalidateOverviewCache } from '../services/dataService'
 import { format } from 'date-fns'
 import DateFilter from './DateFilter'
 import AgentReportModal from './AgentReportModal'
@@ -33,7 +33,7 @@ function getHeatmapColor(value, max) {
     return '#1d4ed8'
 }
 
-export default function OverviewPanel({ onNavigateToChat }) {
+export default function OverviewPanel({ onNavigateToChat, forceRefresh = false }) {
     // Raw data — loaded ONCE
     const [rawData, setRawData] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -50,28 +50,47 @@ export default function OverviewPanel({ onNavigateToChat }) {
     // Heatmap view mode: 'total' or 'avg'
     const [heatmapMode, setHeatmapMode] = useState('total')
 
-    // Load raw data once on mount
+    // Refresh counter for force-refreshing
+    const [refreshCount, setRefreshCount] = useState(0)
+    // Refreshing state (not initial loading)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    // Last data update timestamp
+    const [lastUpdated, setLastUpdated] = useState(null)
+
+    // Load data - runs on mount and when forceRefresh/refreshCount changes
     useEffect(() => {
         let mounted = true
         let timeoutId = null
 
         async function load() {
             try {
-                setLoading(true)
+                const isForced = forceRefresh || refreshCount > 0
+                if (rawData && isForced) {
+                    setIsRefreshing(true)
+                } else {
+                    setLoading(true)
+                }
                 setLoadError(null)
 
-                // Safety timeout — 25s max for data loading
+                // Safety timeout — 50s max for data loading
                 timeoutId = setTimeout(() => {
-                    if (mounted && loading) {
+                    if (mounted) {
                         setLoadError('La carga de datos tardó demasiado. Intentá nuevamente.')
                         setLoading(false)
+                        setIsRefreshing(false)
                     }
-                }, 25000)
+                }, 50000)
 
-                const data = await fetchOverviewRawData()
+                // Force refresh invalidates the cache first
+                if (isForced) {
+                    invalidateOverviewCache()
+                }
+
+                const data = await fetchOverviewRawData(isForced)
                 if (mounted) {
                     setRawData(data)
                     setLoadError(null)
+                    setLastUpdated(new Date())
                 }
             } catch (err) {
                 console.error('Error loading overview:', err)
@@ -79,7 +98,10 @@ export default function OverviewPanel({ onNavigateToChat }) {
                     setLoadError(err.message || 'Error al cargar los datos')
                 }
             } finally {
-                if (mounted) setLoading(false)
+                if (mounted) {
+                    setLoading(false)
+                    setIsRefreshing(false)
+                }
                 if (timeoutId) clearTimeout(timeoutId)
             }
         }
@@ -89,6 +111,15 @@ export default function OverviewPanel({ onNavigateToChat }) {
             mounted = false
             if (timeoutId) clearTimeout(timeoutId)
         }
+    }, [forceRefresh, refreshCount])
+
+    // Auto-refresh every 5 min
+    useEffect(() => {
+        const interval = setInterval(() => {
+            console.log('[OverviewPanel] Auto-refreshing data...')
+            setRefreshCount(prev => prev + 1)
+        }, 5 * 60 * 1000)
+        return () => clearInterval(interval)
     }, [])
 
     // Agent list from raw data (for filter dropdown)
@@ -210,6 +241,14 @@ export default function OverviewPanel({ onNavigateToChat }) {
 
     return (
         <div className="fade-in">
+            {/* Refreshing indicator */}
+            {isRefreshing && (
+                <div className="refresh-banner">
+                    <Loader2 size={14} className="spin" />
+                    <span>Actualizando datos en tiempo real...</span>
+                </div>
+            )}
+
             {/* Date + Agent Filter Bar */}
             <div className="overview-filters-bar">
                 <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={handleDateChange} />
@@ -245,6 +284,11 @@ export default function OverviewPanel({ onNavigateToChat }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Zap size={16} color="#1a6bb5" />
                         <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>Resumen Ejecutivo</h3>
+                        {lastUpdated && (
+                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 400, marginLeft: '4px' }}>
+                                · Actualizado {format(lastUpdated, 'HH:mm:ss')}
+                            </span>
+                        )}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {stats.weeklyVariation !== 0 && (
