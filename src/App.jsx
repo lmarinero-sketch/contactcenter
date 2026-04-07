@@ -44,6 +44,10 @@ function App() {
     const [pendingTicketId, setPendingTicketId] = useState(null)
     const [mobileOpen, setMobileOpen] = useState(false)
 
+    const [forceRefreshCount, setForceRefreshCount] = useState(0)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [showRefreshDone, setShowRefreshDone] = useState(false)
+
     // Loading state
     if (loading) {
         return (
@@ -58,10 +62,6 @@ function App() {
     if (!user) {
         return <LoginPage />
     }
-
-    const [forceRefreshCount, setForceRefreshCount] = useState(0)
-    const [isRefreshing, setIsRefreshing] = useState(false)
-    const [showRefreshDone, setShowRefreshDone] = useState(false)
 
     const handleRefresh = () => {
         setIsRefreshing(true)
