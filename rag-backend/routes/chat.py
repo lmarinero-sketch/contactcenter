@@ -91,6 +91,42 @@ async def delete_conversation(conversation_id: str):
 
 
 # ============================================================
+# Feedback Endpoint
+# ============================================================
+
+class FeedbackRequest(BaseModel):
+    conversation_id: str
+    message_index: int
+    is_correct: bool
+
+
+@router.post("/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """
+    Record user feedback (correct/incorrect) for a specific assistant message.
+    
+    Effects:
+    - Stores feedback in rag_feedback table (for analytics)
+    - Updates the message's feedback column in rag_messages
+    - If INCORRECT: de-indexes the corresponding Q&A pair from the vector store
+      so Simon stops using that wrong answer as learned knowledge
+    - If CORRECT: marks the Q&A pair as verified (boosted in future searches)
+    """
+    try:
+        from services.chat_learning import handle_feedback
+        result = await asyncio.to_thread(
+            handle_feedback,
+            request.conversation_id,
+            request.message_index,
+            request.is_correct,
+        )
+        return result
+    except Exception as e:
+        print(f"Feedback error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
 # Chat Learning Endpoints
 # ============================================================
 
@@ -118,7 +154,7 @@ async def index_conversation(conversation_id: str):
 
 @router.get("/learning/stats")
 async def learning_stats():
-    """Get statistics about chat learning."""
+    """Get statistics about chat learning, including feedback metrics."""
     try:
         from services.chat_learning import get_learning_stats
         result = await asyncio.to_thread(get_learning_stats)

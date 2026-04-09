@@ -340,14 +340,22 @@ def _rerank_single_document(question: str, doc: dict,
     """Re-rank a single document with entity awareness.
     Returns the doc with rerank_score or None if filtered out."""
     try:
-        # Identify if this is a learned Q&A chunk
+        # Identify if this is a learned Q&A chunk (and if verified by user feedback)
         source_type = doc.get("metadata", {}).get("source", "")
+        is_verified = doc.get("metadata", {}).get("verified", False)
         extra_hint = ""
         if source_type == "chat_history":
-            extra_hint = (
-                " Este fragmento proviene de una conversación previa (Q&A aprendido). "
-                "Si la pregunta coincide temáticamente, es MUY relevante."
-            )
+            if is_verified:
+                extra_hint = (
+                    " Este fragmento proviene de una conversación previa VERIFICADA por un usuario "
+                    "(marcada como correcta). Si la pregunta coincide temáticamente, es EXTREMADAMENTE relevante "
+                    "y debería tener score alto (8-10)."
+                )
+            else:
+                extra_hint = (
+                    " Este fragmento proviene de una conversación previa (Q&A aprendido). "
+                    "Si la pregunta coincide temáticamente, es MUY relevante."
+                )
         
         # Entity-awareness hint for re-ranking
         entity_hint = ""
