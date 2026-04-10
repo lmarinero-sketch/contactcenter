@@ -842,45 +842,73 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
 
 // ===================== AGENT ACTIVITY CONTROL =====================
 // AsisteClick quirk: ALL OUT messages share the same sender_name (bot or agent header).
-// So we CANNOT trust sender_name to distinguish human vs bot messages.
-// Instead we:
-//   1. Get the real agent from cc_tickets.agent_name (already corrected)
-//   2. For each ticket's messages, use content heuristics to identify bot vs human messages
-//   3. Only count non-bot OUT messages as agent work
+// Strategy: Find the HANDOFF POINT per ticket — the message where the bot says
+// "en breve un operador se pondrá en contacto". Only count OUT messages
+// AFTER this handoff as human agent work.
+// This eliminates ALL bot messages regardless of content.
 
-// Bot message content patterns (same as fix_v4) — bot always sends these exact phrases
-const BOT_CONTENT_PATTERNS = [
-    'hola mi nombre es betina',
-    'soy asistente virtual',
-    '¿cómo te puedo ayudar?',
-    'selecciona una opción',
-    'selecciona una de estas opciones',
-    'por favor selecciona',
+const HANDOFF_PHRASES = [
     'en breve un operador se pondrá en contacto',
-    'ingresa el dni',
-    '¿cuál es el nombre del médico?',
-    'indica la fecha y hora',
-    '¿cuál es el día y horario preferido',
-    '¿quieres reprogramar',
-    'volver al menú',
-    'a. solicitar turnos',
-    'b. reprogramar',
-    'c. autorizaciones',
-    'd. chequeo preventivo',
-    'e. programa prevenir',
-    'f. información',
-    'a. turnos',
-    'b. guardias',
-    'c. otras consultas',
-    'selecciona el tipo de turno',
-    'a. turnos de consultas',
-    'b. turnos de tomografía',
+    'en breve un operador se pondra en contacto',
+    'te transfiero con un operador',
+    'te derivo con un agente',
 ]
 
-function _isBotContent(messageText) {
-    if (!messageText) return false
-    const lower = messageText.toLowerCase().trim()
-    return BOT_CONTENT_PATTERNS.some(p => lower.includes(p))
+/**
+ * For each ticket, find the timestamp of the handoff message (bot → human).
+ * Returns a map: ticketId → handoff ISO timestamp
+ * Messages before this timestamp are from the bot, after are from the human.
+ */
+function _findHandoffTimestamps(allMessages) {
+    // Group all messages by ticket_id
+    const byTicket = {}
+    allMessages.forEach(msg => {
+        if (!byTicket[msg.ticket_id]) byTicket[msg.ticket_id] = []
+        byTicket[msg.ticket_id].push(msg)
+    })
+
+    const handoffMap = {} // ticketId → handoff ISO timestamp
+
+    for (const [ticketId, msgs] of Object.entries(byTicket)) {
+        // Sort by timestamp
+        const sorted = msgs
+            .filter(m => m.message_timestamp)
+            .sort((a, b) => new Date(a.message_timestamp) - new Date(b.message_timestamp))
+
+        // Find the handoff message
+        let handoffTs = null
+        for (const msg of sorted) {
+            if (msg.action === 'OUT' && msg.message) {
+                const lower = msg.message.toLowerCase()
+                if (HANDOFF_PHRASES.some(p => lower.includes(p))) {
+                    handoffTs = msg.message_timestamp
+                    break // First handoff message wins
+                }
+            }
+        }
+
+        // Fallback: if no handoff phrase found, use temporal heuristic
+        // Look for a gap > 2 minutes between consecutive OUT messages (bot responds instantly)
+        if (!handoffTs) {
+            const outMsgs = sorted.filter(m => m.action === 'OUT')
+            for (let i = 1; i < outMsgs.length; i++) {
+                const prev = new Date(outMsgs[i - 1].message_timestamp)
+                const curr = new Date(outMsgs[i].message_timestamp)
+                const gapSeconds = (curr - prev) / 1000
+                // A gap > 120s between OUT messages = human agent took over
+                if (gapSeconds > 120) {
+                    handoffTs = outMsgs[i].message_timestamp
+                    break
+                }
+            }
+        }
+
+        if (handoffTs) {
+            handoffMap[ticketId] = handoffTs
+        }
+    }
+
+    return handoffMap
 }
 
 // Queries cc_messages by message_timestamp (the actual time the agent typed),
@@ -894,8 +922,7 @@ export async function fetchAgentActivity(targetDate = null) {
     dayEnd.setHours(23, 59, 59, 999)
 
     // 1. Fetch all OUT messages within the target date's timestamp range
-    //    We need the message text to detect bot content
-    const messages = await fetchAllRows('cc_messages',
+    const outMessages = await fetchAllRows('cc_messages',
         'sender_name, message_timestamp, ticket_id, action, message',
         [
             { type: 'eq', column: 'action', value: 'OUT' },
@@ -905,13 +932,12 @@ export async function fetchAgentActivity(targetDate = null) {
     )
 
     // 2. Get the distinct ticket_ids from these messages
-    const ticketIds = [...new Set(messages.map(m => m.ticket_id))]
+    const ticketIds = [...new Set(outMessages.map(m => m.ticket_id))]
     if (ticketIds.length === 0) {
         return { date: dayStart.toISOString().slice(0, 10), agents: [], total_messages: 0 }
     }
 
     // 3. Get the real agent_name from cc_tickets for each ticket
-    //    (agent_name is already corrected by fix scripts to reflect the actual human agent)
     const tickets = await fetchAllRows('cc_tickets',
         'ticket_id, agent_name',
         [{ type: 'in', column: 'ticket_id', value: ticketIds }]
@@ -919,14 +945,33 @@ export async function fetchAgentActivity(targetDate = null) {
     const ticketAgentMap = {}
     tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 4. Filter: only keep messages that are NOT bot content AND belong to a ticket with a human agent
+    // 4. For tickets with a human agent, fetch ALL messages (including older ones)
+    //    to find the handoff point per ticket
+    const humanTicketIds = ticketIds.filter(id => ticketAgentMap[id])
+    let allMessagesForHandoff = []
+    if (humanTicketIds.length > 0) {
+        allMessagesForHandoff = await fetchAllRows('cc_messages',
+            'ticket_id, action, message, message_timestamp',
+            [{ type: 'in', column: 'ticket_id', value: humanTicketIds }]
+        )
+    }
+
+    // 5. Find handoff timestamps per ticket
+    const handoffMap = _findHandoffTimestamps(allMessagesForHandoff)
+
+    // 6. Filter: only keep OUT messages AFTER the handoff for their ticket
     const agentMap = {}
     let totalHumanMessages = 0
 
-    messages.forEach(msg => {
+    outMessages.forEach(msg => {
         const agentName = ticketAgentMap[msg.ticket_id]
         if (!agentName) return // ticket has no human agent (bot-only conversation)
-        if (_isBotContent(msg.message)) return // this is a bot-generated message
+
+        const handoffTs = handoffMap[msg.ticket_id]
+        if (!handoffTs) return // no handoff found = pure bot conversation
+
+        // Only count messages AFTER the handoff timestamp
+        if (new Date(msg.message_timestamp) <= new Date(handoffTs)) return
 
         if (!agentMap[agentName]) {
             agentMap[agentName] = {
@@ -940,7 +985,7 @@ export async function fetchAgentActivity(targetDate = null) {
         totalHumanMessages++
     })
 
-    // 5. Calculate metrics per agent
+    // 7. Calculate metrics per agent
     const result = Object.values(agentMap).map(agent => {
         const sorted = agent.timestamps
             .filter(d => !isNaN(d.getTime()))
@@ -994,8 +1039,8 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
     const toEnd = new Date(to)
     toEnd.setHours(23, 59, 59, 999)
 
-    // 1. Fetch all OUT messages in the range (with message content for bot detection)
-    const messages = await fetchAllRows('cc_messages',
+    // 1. Fetch all OUT messages in the range
+    const outMessages = await fetchAllRows('cc_messages',
         'sender_name, message_timestamp, ticket_id, action, message',
         [
             { type: 'eq', column: 'action', value: 'OUT' },
@@ -1005,7 +1050,7 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
     )
 
     // 2. Get real agent names from cc_tickets
-    const ticketIds = [...new Set(messages.map(m => m.ticket_id))]
+    const ticketIds = [...new Set(outMessages.map(m => m.ticket_id))]
     if (ticketIds.length === 0) return []
 
     const tickets = await fetchAllRows('cc_tickets',
@@ -1015,12 +1060,26 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
     const ticketAgentMap = {}
     tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 3. Group by agent + day (filtering out bot content)
+    // 3. Fetch ALL messages for human tickets to find handoff points
+    const humanTicketIds = ticketIds.filter(id => ticketAgentMap[id])
+    let allMessagesForHandoff = []
+    if (humanTicketIds.length > 0) {
+        allMessagesForHandoff = await fetchAllRows('cc_messages',
+            'ticket_id, action, message, message_timestamp',
+            [{ type: 'in', column: 'ticket_id', value: humanTicketIds }]
+        )
+    }
+    const handoffMap = _findHandoffTimestamps(allMessagesForHandoff)
+
+    // 4. Group by agent + day (only post-handoff messages)
     const agentDayMap = {}
-    messages.forEach(msg => {
+    outMessages.forEach(msg => {
         const agentName = ticketAgentMap[msg.ticket_id]
         if (!agentName) return
-        if (_isBotContent(msg.message)) return
+
+        const handoffTs = handoffMap[msg.ticket_id]
+        if (!handoffTs) return
+        if (new Date(msg.message_timestamp) <= new Date(handoffTs)) return
 
         const dayKey = new Date(msg.message_timestamp).toISOString().slice(0, 10)
         const key = `${agentName}|${dayKey}`
@@ -1037,7 +1096,7 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
         agentDayMap[key].ticket_ids.add(msg.ticket_id)
     })
 
-    // 4. Calculate per agent summary across all days
+    // 5. Calculate per agent summary across all days
     const agentSummary = {}
     Object.values(agentDayMap).forEach(entry => {
         if (!agentSummary[entry.agent_name]) {
