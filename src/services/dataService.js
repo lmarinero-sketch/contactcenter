@@ -841,12 +841,11 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
 }
 
 // ===================== AGENT ACTIVITY CONTROL =====================
-// Uses the proven fix_v4 algorithm to separate bot vs human messages per ticket.
-// Bot detection: content patterns + temporal analysis (<5s gap between OUT = bot)
-// Human detection: first OUT message with gap >= 120s after bot cluster = human takeover
-// Once human takeover is identified, all subsequent OUT messages are attributed to the agent.
+// Separates bot/automated messages from real human agent messages.
+// KEY RULE: Human takeover is ONLY detected AFTER the handoff phrase
+// ("en breve un operador") has been seen in the ticket.
+// Without it → all messages are bot/auto.
 
-// Bot message content patterns (from fix_v4)
 const BOT_CONTENT_PATTERNS = [
     'hola mi nombre es betina',
     'soy asistente virtual',
@@ -874,20 +873,35 @@ const BOT_CONTENT_PATTERNS = [
     'selecciona el tipo de turno',
     'a. turnos de consultas',
     'b. turnos de tomografía',
+    '¿sos paciente del sanatorio',
+    '¿cuál es tu obra social',
+    'médico o especialidad requerida',
+    '¿quieres que contactemos al paciente',
 ]
 
-function _isBotContent(messageText) {
+// Template/macro patterns — automated messages, NOT typed by humans
+const AUTO_TEMPLATE_PATTERNS = [
+    'su turno fue agendado',
+    'apreciamos mucho tu tiempo',
+    'damos por finalizada',
+    'su turno ha sido reprogramado',
+    'su turno ha sido cancelado',
+    'le recordamos que tiene un turno',
+    'gracias por comunicarse',
+]
+
+function _isBotOrAutoContent(messageText) {
     if (!messageText) return false
     const lower = messageText.toLowerCase().trim()
-    return BOT_CONTENT_PATTERNS.some(p => lower.includes(p))
+    return BOT_CONTENT_PATTERNS.some(p => lower.includes(p)) ||
+           AUTO_TEMPLATE_PATTERNS.some(p => lower.includes(p))
 }
 
-const MIN_HANDOFF_GAP = 120 // 2 minutes — bot responds instantly, humans take longer
+const MIN_HANDOFF_GAP = 120 // 2 minutes
 
 /**
- * Per-ticket analysis: classify each OUT message as bot or human.
- * Returns a Set of message_timestamps (ISO) that are HUMAN.
- * Algorithm mirrors _fix_agents_v4.mjs detectHumanFromRawPayload().
+ * Per-ticket classification: returns Set of message_timestamps that are HUMAN.
+ * REQUIRES handoff phrase before detecting any human messages.
  */
 function _classifyHumanMessages(allMessages) {
     const byTicket = {}
@@ -906,41 +920,35 @@ function _classifyHumanMessages(allMessages) {
         const outMsgs = sorted.filter(m => m.action === 'OUT')
         if (outMsgs.length === 0) continue
 
-        let humanTakeoverFound = false
-
+        // Phase 1: Find the handoff phrase index
+        let handoffIndex = -1
         for (let i = 0; i < outMsgs.length; i++) {
+            if (outMsgs[i].message?.toLowerCase().includes('en breve un operador')) {
+                handoffIndex = i
+                break
+            }
+        }
+        // No handoff phrase → entire ticket is bot/auto, skip
+        if (handoffIndex === -1) continue
+
+        // Phase 2: After handoff, find first REAL human message
+        let humanTakeoverFound = false
+        for (let i = handoffIndex + 1; i < outMsgs.length; i++) {
             const msg = outMsgs[i]
-            const prevOut = i > 0 ? outMsgs[i - 1] : null
+            const prevOut = outMsgs[i - 1]
             const currTs = new Date(msg.message_timestamp).getTime()
-            const prevTs = prevOut ? new Date(prevOut.message_timestamp).getTime() : null
-            const gapFromPrevOut = prevTs ? (currTs - prevTs) / 1000 : 0
-
-            const contentIsBot = _isBotContent(msg.message)
-
-            // Check if previous message was the handoff phrase ("en breve un operador")
-            const prevIsHandoff = prevOut && prevOut.message &&
-                prevOut.message.toLowerCase().includes('en breve un operador')
+            const prevTs = new Date(prevOut.message_timestamp).getTime()
+            const gap = (currTs - prevTs) / 1000
+            const isAuto = _isBotOrAutoContent(msg.message)
 
             if (humanTakeoverFound) {
-                // Once human is identified, all subsequent OUT = human
-                humanMsgTimestamps.add(msg.message_timestamp)
-            } else if (prevIsHandoff && gapFromPrevOut >= MIN_HANDOFF_GAP) {
-                // Big gap after handoff phrase = human agent took over
-                humanTakeoverFound = true
-                humanMsgTimestamps.add(msg.message_timestamp)
-            } else if (!contentIsBot && gapFromPrevOut >= MIN_HANDOFF_GAP) {
-                // Big gap + non-bot content = human takeover
-                humanTakeoverFound = true
-                humanMsgTimestamps.add(msg.message_timestamp)
-            } else if (contentIsBot || (gapFromPrevOut < 5 && i < outMsgs.length - 1)) {
-                // Bot: content matches patterns OR rapid-fire (<5s gap, not last msg)
-                // Skip
-            } else if (gapFromPrevOut >= MIN_HANDOFF_GAP) {
-                // Big gap even if ambiguous → human
+                // Once human confirmed, non-auto messages = human
+                if (!isAuto) humanMsgTimestamps.add(msg.message_timestamp)
+            } else if (!isAuto && gap >= MIN_HANDOFF_GAP) {
+                // First non-bot msg with big gap after handoff = human
                 humanTakeoverFound = true
                 humanMsgTimestamps.add(msg.message_timestamp)
             }
-            // else: ambiguous, treat as bot (skip)
         }
     }
 
