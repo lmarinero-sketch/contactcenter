@@ -12,6 +12,7 @@ import RAGRules from './components/RAGRules'
 import SimonAnalytics from './components/SimonAnalytics'
 import ShiftCalendar from './components/ShiftCalendar'
 import BitacoraPanel from './components/BitacoraPanel'
+import AgentControlPanel from './components/AgentControlPanel'
 
 const VIEW_TITLES = {
     overview: 'Overview',
@@ -21,6 +22,7 @@ const VIEW_TITLES = {
     rag: 'Simon IA',
     'rag-rules': 'Reglas de Simon',
     'rag-analytics': 'Analytics de Simon',
+    'agent-control': 'Control de Agentes',
     shifts: 'Diagrama de Turnos',
     logbook: 'Bitácora',
 }
@@ -33,6 +35,7 @@ const VIEW_DESCRIPTIONS = {
     rag: 'Consultá documentos internos con IA — respuestas precisas con citación de fuentes',
     'rag-rules': 'Ingresá reglas e información que Simon debe recordar al responder',
     'rag-analytics': 'Métricas de uso, rendimiento y calidad de Simon IA',
+    'agent-control': 'Horarios de entrada/salida, horas trabajadas y mensajes respondidos por agente',
     shifts: 'Calendario mensual de turnos del equipo',
     logbook: 'Registro de novedades, sugerencias, problemas y cambios',
 }
@@ -95,6 +98,7 @@ function App() {
             case 'rag': return <RAGPanel key={refreshKey} />
             case 'rag-rules': return <RAGRules key={refreshKey} />
             case 'rag-analytics': return <SimonAnalytics key={refreshKey} />
+            case 'agent-control': return <AgentControlPanel key={refreshKey} />
             case 'shifts': return <ShiftCalendar key={refreshKey} />
             case 'logbook': return <BitacoraPanel key={refreshKey} />
             default: return <OverviewPanel key={refreshKey} />

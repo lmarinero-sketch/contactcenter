@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Users, Bot, MessageSquare,
     ChevronLeft, ChevronRight, Brain,
     Shield, BarChart3, CalendarDays, BookOpen,
-    LogOut, UserCircle
+    LogOut, UserCircle, Eye
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -21,6 +21,7 @@ const TOOL_ITEMS = [
 ]
 
 const GESTION_ITEMS = [
+    { id: 'agent-control', label: 'Control de Agentes', icon: Eye },
     { id: 'shifts', label: 'Diagrama de Turnos', icon: CalendarDays },
     { id: 'logbook', label: 'Bitácora', icon: BookOpen },
 ]

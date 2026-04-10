@@ -840,6 +840,245 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
     })
 }
 
+// ===================== AGENT ACTIVITY CONTROL =====================
+// AsisteClick quirk: ALL OUT messages share the same sender_name (bot or agent header).
+// So we CANNOT trust sender_name to distinguish human vs bot messages.
+// Instead we:
+//   1. Get the real agent from cc_tickets.agent_name (already corrected)
+//   2. For each ticket's messages, use content heuristics to identify bot vs human messages
+//   3. Only count non-bot OUT messages as agent work
+
+// Bot message content patterns (same as fix_v4) — bot always sends these exact phrases
+const BOT_CONTENT_PATTERNS = [
+    'hola mi nombre es betina',
+    'soy asistente virtual',
+    '¿cómo te puedo ayudar?',
+    'selecciona una opción',
+    'selecciona una de estas opciones',
+    'por favor selecciona',
+    'en breve un operador se pondrá en contacto',
+    'ingresa el dni',
+    '¿cuál es el nombre del médico?',
+    'indica la fecha y hora',
+    '¿cuál es el día y horario preferido',
+    '¿quieres reprogramar',
+    'volver al menú',
+    'a. solicitar turnos',
+    'b. reprogramar',
+    'c. autorizaciones',
+    'd. chequeo preventivo',
+    'e. programa prevenir',
+    'f. información',
+    'a. turnos',
+    'b. guardias',
+    'c. otras consultas',
+    'selecciona el tipo de turno',
+    'a. turnos de consultas',
+    'b. turnos de tomografía',
+]
+
+function _isBotContent(messageText) {
+    if (!messageText) return false
+    const lower = messageText.toLowerCase().trim()
+    return BOT_CONTENT_PATTERNS.some(p => lower.includes(p))
+}
+
+// Queries cc_messages by message_timestamp (the actual time the agent typed),
+// NOT by ticket date. If an agent replies today to yesterday's ticket, it counts as TODAY's work.
+export async function fetchAgentActivity(targetDate = null) {
+    // Default to today (in local timezone)
+    const date = targetDate ? new Date(targetDate) : new Date()
+    const dayStart = new Date(date)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(date)
+    dayEnd.setHours(23, 59, 59, 999)
+
+    // 1. Fetch all OUT messages within the target date's timestamp range
+    //    We need the message text to detect bot content
+    const messages = await fetchAllRows('cc_messages',
+        'sender_name, message_timestamp, ticket_id, action, message',
+        [
+            { type: 'eq', column: 'action', value: 'OUT' },
+            { type: 'gte', column: 'message_timestamp', value: dayStart.toISOString() },
+            { type: 'lte', column: 'message_timestamp', value: dayEnd.toISOString() },
+        ]
+    )
+
+    // 2. Get the distinct ticket_ids from these messages
+    const ticketIds = [...new Set(messages.map(m => m.ticket_id))]
+    if (ticketIds.length === 0) {
+        return { date: dayStart.toISOString().slice(0, 10), agents: [], total_messages: 0 }
+    }
+
+    // 3. Get the real agent_name from cc_tickets for each ticket
+    //    (agent_name is already corrected by fix scripts to reflect the actual human agent)
+    const tickets = await fetchAllRows('cc_tickets',
+        'ticket_id, agent_name',
+        [{ type: 'in', column: 'ticket_id', value: ticketIds }]
+    )
+    const ticketAgentMap = {}
+    tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
+
+    // 4. Filter: only keep messages that are NOT bot content AND belong to a ticket with a human agent
+    const agentMap = {}
+    let totalHumanMessages = 0
+
+    messages.forEach(msg => {
+        const agentName = ticketAgentMap[msg.ticket_id]
+        if (!agentName) return // ticket has no human agent (bot-only conversation)
+        if (_isBotContent(msg.message)) return // this is a bot-generated message
+
+        if (!agentMap[agentName]) {
+            agentMap[agentName] = {
+                agent_name: agentName,
+                timestamps: [],
+                ticket_ids: new Set(),
+            }
+        }
+        agentMap[agentName].timestamps.push(new Date(msg.message_timestamp))
+        agentMap[agentName].ticket_ids.add(msg.ticket_id)
+        totalHumanMessages++
+    })
+
+    // 5. Calculate metrics per agent
+    const result = Object.values(agentMap).map(agent => {
+        const sorted = agent.timestamps
+            .filter(d => !isNaN(d.getTime()))
+            .sort((a, b) => a - b)
+
+        const firstMsg = sorted.length > 0 ? sorted[0] : null
+        const lastMsg = sorted.length > 0 ? sorted[sorted.length - 1] : null
+
+        let hoursWorked = 0
+        if (firstMsg && lastMsg) {
+            hoursWorked = (lastMsg - firstMsg) / (1000 * 60 * 60)
+        }
+
+        // Calculate hourly distribution for this agent (messages per hour)
+        const hourlyBreakdown = Array(24).fill(0)
+        sorted.forEach(t => {
+            hourlyBreakdown[t.getHours()]++
+        })
+
+        return {
+            agent_name: agent.agent_name,
+            first_message: firstMsg ? firstMsg.toISOString() : null,
+            last_message: lastMsg ? lastMsg.toISOString() : null,
+            hours_worked: parseFloat(hoursWorked.toFixed(2)),
+            total_messages: sorted.length,
+            unique_tickets: agent.ticket_ids.size,
+            hourly_breakdown: hourlyBreakdown,
+        }
+    }).sort((a, b) => {
+        // Sort: who started first
+        if (!a.first_message) return 1
+        if (!b.first_message) return -1
+        return new Date(a.first_message) - new Date(b.first_message)
+    })
+
+    return {
+        date: dayStart.toISOString().slice(0, 10),
+        agents: result,
+        total_messages: totalHumanMessages,
+    }
+}
+
+// Fetch agent activity for a date range (for the weekly summary)
+export async function fetchAgentActivityRange(dateFrom, dateTo) {
+    const from = new Date(dateFrom)
+    const to = new Date(dateTo)
+
+    // Fetch all at once instead of day-by-day for efficiency
+    const fromStart = new Date(from)
+    fromStart.setHours(0, 0, 0, 0)
+    const toEnd = new Date(to)
+    toEnd.setHours(23, 59, 59, 999)
+
+    // 1. Fetch all OUT messages in the range (with message content for bot detection)
+    const messages = await fetchAllRows('cc_messages',
+        'sender_name, message_timestamp, ticket_id, action, message',
+        [
+            { type: 'eq', column: 'action', value: 'OUT' },
+            { type: 'gte', column: 'message_timestamp', value: fromStart.toISOString() },
+            { type: 'lte', column: 'message_timestamp', value: toEnd.toISOString() },
+        ]
+    )
+
+    // 2. Get real agent names from cc_tickets
+    const ticketIds = [...new Set(messages.map(m => m.ticket_id))]
+    if (ticketIds.length === 0) return []
+
+    const tickets = await fetchAllRows('cc_tickets',
+        'ticket_id, agent_name',
+        [{ type: 'in', column: 'ticket_id', value: ticketIds }]
+    )
+    const ticketAgentMap = {}
+    tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
+
+    // 3. Group by agent + day (filtering out bot content)
+    const agentDayMap = {}
+    messages.forEach(msg => {
+        const agentName = ticketAgentMap[msg.ticket_id]
+        if (!agentName) return
+        if (_isBotContent(msg.message)) return
+
+        const dayKey = new Date(msg.message_timestamp).toISOString().slice(0, 10)
+        const key = `${agentName}|${dayKey}`
+
+        if (!agentDayMap[key]) {
+            agentDayMap[key] = {
+                agent_name: agentName,
+                date: dayKey,
+                timestamps: [],
+                ticket_ids: new Set(),
+            }
+        }
+        agentDayMap[key].timestamps.push(new Date(msg.message_timestamp))
+        agentDayMap[key].ticket_ids.add(msg.ticket_id)
+    })
+
+    // 4. Calculate per agent summary across all days
+    const agentSummary = {}
+    Object.values(agentDayMap).forEach(entry => {
+        if (!agentSummary[entry.agent_name]) {
+            agentSummary[entry.agent_name] = {
+                agent_name: entry.agent_name,
+                days_worked: 0,
+                total_messages: 0,
+                total_hours: 0,
+                total_tickets: new Set(),
+                daily_details: [],
+            }
+        }
+
+        const sorted = entry.timestamps.sort((a, b) => a - b)
+        const first = sorted[0]
+        const last = sorted[sorted.length - 1]
+        const hours = (last - first) / (1000 * 60 * 60)
+
+        agentSummary[entry.agent_name].days_worked++
+        agentSummary[entry.agent_name].total_messages += sorted.length
+        agentSummary[entry.agent_name].total_hours += hours
+        entry.ticket_ids.forEach(id => agentSummary[entry.agent_name].total_tickets.add(id))
+        agentSummary[entry.agent_name].daily_details.push({
+            date: entry.date,
+            first_message: first.toISOString(),
+            last_message: last.toISOString(),
+            hours_worked: parseFloat(hours.toFixed(2)),
+            total_messages: sorted.length,
+            unique_tickets: entry.ticket_ids.size,
+        })
+    })
+
+    return Object.values(agentSummary).map(a => ({
+        ...a,
+        avg_hours_per_day: a.days_worked > 0 ? parseFloat((a.total_hours / a.days_worked).toFixed(2)) : 0,
+        avg_messages_per_day: a.days_worked > 0 ? Math.round(a.total_messages / a.days_worked) : 0,
+        total_tickets: a.total_tickets.size,
+        daily_details: a.daily_details.sort((a, b) => a.date.localeCompare(b.date)),
+    })).sort((a, b) => b.total_messages - a.total_messages)
+}
+
 // ===================== CSV EXPORT =====================
 export function exportToCSV(data, filename) {
     if (!data || data.length === 0) return
