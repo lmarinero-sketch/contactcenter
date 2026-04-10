@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseHub } from '../lib/supabase'
 
 // ===================== HELPER: FETCH ALL ROWS (bypass 1000-row default) =====================
 const BATCH_SIZE = 1000
@@ -1077,6 +1077,128 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
         total_tickets: a.total_tickets.size,
         daily_details: a.daily_details.sort((a, b) => a.date.localeCompare(b.date)),
     })).sort((a, b) => b.total_messages - a.total_messages)
+}
+
+// ===================== FICHADAS (RRHH Cross-DB) =====================
+// Maps Contact Center agent names → RRHH fichadas_colaboradores names
+// (AsisteClick uses first names; RRHH uses full names)
+const AGENT_FICHADA_MAP = {
+    'Sofia': 'OLIVIER SOFIA BELEN',
+    'Antonella': 'ESQUIVEL ANTONELLA',
+    'Daniela': 'AGUILERA DANIELA',
+}
+
+/**
+ * Fetch fichadas (clock-in/clock-out) from the RRHH database for CC agents.
+ * Queries fichadas_registros via the Hub Supabase client.
+ * @param {string} targetDate - ISO date string (YYYY-MM-DD)
+ * @returns {Object} Map of agentName → { fichada_entrada, fichada_salida, fecha }
+ */
+export async function fetchFichadasForAgents(targetDate) {
+    if (!supabaseHub) {
+        console.warn('[Fichadas] Hub Supabase not configured')
+        return {}
+    }
+
+    const date = targetDate || new Date().toISOString().slice(0, 10)
+
+    // 1. Get the colaborador IDs for our agents from RRHH
+    const fichadaNames = Object.values(AGENT_FICHADA_MAP)
+    const { data: colaboradores, error: colabError } = await supabaseHub
+        .from('fichadas_colaboradores')
+        .select('id, nombre_completo')
+        .in('nombre_completo', fichadaNames)
+
+    if (colabError || !colaboradores?.length) {
+        console.warn('[Fichadas] Could not find colaboradores:', colabError?.message)
+        return {}
+    }
+
+    const colabIds = colaboradores.map(c => c.id)
+
+    // 2. Fetch fichadas for this date
+    const { data: registros, error: regError } = await supabaseHub
+        .from('fichadas_registros')
+        .select('colaborador_id, fecha, fichada_entrada, fichada_salida, horas_trabajadas_min, tarde')
+        .in('colaborador_id', colabIds)
+        .eq('fecha', date)
+
+    if (regError) {
+        console.warn('[Fichadas] Error fetching registros:', regError.message)
+        return {}
+    }
+
+    // 3. Map back to CC agent names
+    const colabNameMap = {} // colabId → CC agent name
+    const reverseMap = {} // full name → CC name
+    Object.entries(AGENT_FICHADA_MAP).forEach(([ccName, fullName]) => {
+        reverseMap[fullName] = ccName
+    })
+    colaboradores.forEach(c => {
+        colabNameMap[c.id] = reverseMap[c.nombre_completo] || c.nombre_completo
+    })
+
+    const result = {}
+    ;(registros || []).forEach(reg => {
+        const agentName = colabNameMap[reg.colaborador_id]
+        if (!agentName) return
+        result[agentName] = {
+            fichada_entrada: reg.fichada_entrada,
+            fichada_salida: reg.fichada_salida,
+            horas_trabajadas_min: reg.horas_trabajadas_min || 0,
+            tarde: reg.tarde || false,
+            fecha: reg.fecha,
+        }
+    })
+
+    return result
+}
+
+/**
+ * Fetch fichadas for a date range — used by the range view.
+ */
+export async function fetchFichadasRange(dateFrom, dateTo) {
+    if (!supabaseHub) return {}
+
+    const fichadaNames = Object.values(AGENT_FICHADA_MAP)
+    const { data: colaboradores } = await supabaseHub
+        .from('fichadas_colaboradores')
+        .select('id, nombre_completo')
+        .in('nombre_completo', fichadaNames)
+
+    if (!colaboradores?.length) return {}
+
+    const colabIds = colaboradores.map(c => c.id)
+    const reverseMap = {}
+    Object.entries(AGENT_FICHADA_MAP).forEach(([ccName, fullName]) => {
+        reverseMap[fullName] = ccName
+    })
+    const colabNameMap = {}
+    colaboradores.forEach(c => { colabNameMap[c.id] = reverseMap[c.nombre_completo] })
+
+    const { data: registros } = await supabaseHub
+        .from('fichadas_registros')
+        .select('colaborador_id, fecha, fichada_entrada, fichada_salida, horas_trabajadas_min, tarde')
+        .in('colaborador_id', colabIds)
+        .gte('fecha', dateFrom)
+        .lte('fecha', dateTo)
+        .order('fecha', { ascending: true })
+
+    // Group by agent → date
+    const result = {} // agentName → { [date]: fichada }
+    ;(registros || []).forEach(reg => {
+        const agentName = colabNameMap[reg.colaborador_id]
+        if (!agentName) return
+        if (!result[agentName]) result[agentName] = {}
+        result[agentName][reg.fecha] = {
+            fichada_entrada: reg.fichada_entrada,
+            fichada_salida: reg.fichada_salida,
+            horas_trabajadas_min: reg.horas_trabajadas_min || 0,
+            tarde: reg.tarde || false,
+        }
+    })
+
+    return result
 }
 
 // ===================== CSV EXPORT =====================

@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import {
     Clock, MessageSquare, Users, ChevronLeft, ChevronRight,
     Calendar, Download, Eye, ArrowUpRight, ArrowDownRight,
-    Timer, AlertTriangle, Activity, Loader2, BarChart3, ChevronDown, ChevronUp
+    Timer, AlertTriangle, Activity, Loader2, BarChart3, ChevronDown, ChevronUp, Fingerprint
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
-import { fetchAgentActivity, fetchAgentActivityRange, exportToCSV } from '../services/dataService'
+import { fetchAgentActivity, fetchAgentActivityRange, fetchFichadasForAgents, exportToCSV } from '../services/dataService'
 
 // ── Agent color from name (consistent with AgentsPanel) ──
 function getAgentColor(name) {
@@ -50,6 +50,7 @@ export default function AgentControlPanel() {
     const [rangeData, setRangeData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [expandedAgent, setExpandedAgent] = useState(null)
+    const [fichadasData, setFichadasData] = useState({})
 
     // Range mode defaults to last 7 days
     const [dateFrom, setDateFrom] = useState(() => {
@@ -69,8 +70,12 @@ export default function AgentControlPanel() {
     async function loadDaily() {
         try {
             setLoading(true)
-            const data = await fetchAgentActivity(selectedDate)
+            const [data, fichadas] = await Promise.all([
+                fetchAgentActivity(selectedDate),
+                fetchFichadasForAgents(selectedDate),
+            ])
             setDailyData(data)
+            setFichadasData(fichadas || {})
         } catch (err) {
             console.error('Error loading agent activity:', err)
         } finally {
@@ -400,6 +405,12 @@ export default function AgentControlPanel() {
                                         </th>
                                         <th title="Total de mensajes OUT enviados por este agente">Mensajes</th>
                                         <th title="Cantidad de tickets únicos en los que participó">Tickets</th>
+                                        <th title="Fichada física del reloj (RRHH)">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Fingerprint size={12} color="#8b5cf6" />
+                                                Fichada
+                                            </div>
+                                        </th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -407,6 +418,7 @@ export default function AgentControlPanel() {
                                     {dailyData.agents.map(agent => {
                                         const colors = getAgentColor(agent.agent_name)
                                         const isExpanded = expandedAgent === agent.agent_name
+                                        const fichada = fichadasData[agent.agent_name]
                                         return (
                                             <>
                                                 <tr
@@ -457,6 +469,9 @@ export default function AgentControlPanel() {
                                                         <span className="badge info">{agent.unique_tickets}</span>
                                                     </td>
                                                     <td>
+                                                        <FichadaBadge fichada={fichada} />
+                                                    </td>
+                                                    <td>
                                                         {isExpanded
                                                             ? <ChevronUp size={16} color="#94a3b8" />
                                                             : <ChevronDown size={16} color="#94a3b8" />
@@ -465,7 +480,7 @@ export default function AgentControlPanel() {
                                                 </tr>
                                                 {isExpanded && (
                                                     <tr key={`${agent.agent_name}-detail`}>
-                                                        <td colSpan="7" style={{ padding: 0 }}>
+                                                        <td colSpan="8" style={{ padding: 0 }}>
                                                             <div style={{
                                                                 background: '#f8fafc', padding: '20px',
                                                                 borderTop: `2px solid ${colors.accent}`,
@@ -786,6 +801,70 @@ function TimelineBar({ agent }) {
                     </span>
                 </div>
             </div>
+        </div>
+    )
+}
+
+// ── Visual: Fichada badge showing clock-in/clock-out from RRHH ──
+function formatFichadaTime(timeStr) {
+    if (!timeStr) return '—'
+    // timeStr is TIME format like "08:30:00"
+    const parts = timeStr.split(':')
+    if (parts.length < 2) return timeStr
+    return `${parts[0]}:${parts[1]}`
+}
+
+function FichadaBadge({ fichada }) {
+    if (!fichada) {
+        return (
+            <span style={{
+                padding: '4px 10px', borderRadius: '6px',
+                background: '#f8fafc', color: '#cbd5e1',
+                fontWeight: 600, fontSize: '11px',
+            }}>
+                Sin datos
+            </span>
+        )
+    }
+
+    const entrada = formatFichadaTime(fichada.fichada_entrada)
+    const salida = formatFichadaTime(fichada.fichada_salida)
+    const isTarde = fichada.tarde
+    const horasFichada = fichada.horas_trabajadas_min
+        ? `${Math.floor(fichada.horas_trabajadas_min / 60)}h ${fichada.horas_trabajadas_min % 60}m`
+        : null
+
+    return (
+        <div
+            style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+            title={`Fichada física:\nEntrada: ${entrada}\nSalida: ${salida}${horasFichada ? `\nHoras: ${horasFichada}` : ''}${isTarde ? '\n⚠ Llegó tarde' : ''}`}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{
+                    padding: '2px 8px', borderRadius: '4px',
+                    background: isTarde ? '#fef3c7' : '#f5f3ff',
+                    color: isTarde ? '#b45309' : '#7c3aed',
+                    fontWeight: 700, fontSize: '11px', fontFamily: 'monospace',
+                }}>
+                    {entrada}
+                </span>
+                <span style={{ color: '#cbd5e1', fontSize: '10px' }}>→</span>
+                <span style={{
+                    padding: '2px 8px', borderRadius: '4px',
+                    background: '#f5f3ff', color: '#7c3aed',
+                    fontWeight: 700, fontSize: '11px', fontFamily: 'monospace',
+                }}>
+                    {salida}
+                </span>
+            </div>
+            {isTarde && (
+                <span style={{
+                    fontSize: '9px', fontWeight: 700, color: '#b45309',
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                }}>
+                    ⚠ tarde
+                </span>
+            )}
         </div>
     )
 }
