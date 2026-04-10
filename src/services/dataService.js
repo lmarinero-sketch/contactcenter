@@ -1011,22 +1011,9 @@ export async function fetchAgentActivity(targetDate = null) {
     const ticketAgentMap = {}
     tickets.forEach(t => { if (t.agent_name) ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 4. For transferred tickets, fetch only OUT messages to classify bot vs human
-    //    (we only need OUT messages for classification — not IN — big perf win)
-    const humanTicketIds = Object.keys(ticketAgentMap)
-    let allMsgsForClassification = []
-    if (humanTicketIds.length > 0) {
-        allMsgsForClassification = await fetchAllRows('cc_messages',
-            'ticket_id, action, message, message_timestamp',
-            [
-                { type: 'in', column: 'ticket_id', value: humanTicketIds },
-                { type: 'eq', column: 'action', value: 'OUT' },
-            ]
-        )
-    }
-
-    // 5. Classify each message as bot or human using fix_v4 algorithm
-    const humanTimestamps = _classifyHumanMessages(allMsgsForClassification)
+    // 4. Classify using outMessages we already have (no extra fetch!)
+    const humanTicketMsgs = outMessages.filter(m => ticketAgentMap[m.ticket_id])
+    const humanTimestamps = _classifyHumanMessages(humanTicketMsgs)
 
     // 6. Filter: only keep messages classified as human
     const agentMap = {}
@@ -1128,19 +1115,10 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
     const ticketAgentMap = {}
     tickets.forEach(t => { if (t.agent_name) ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 3. Fetch only OUT messages for classification (not IN — big perf win)
-    const humanTicketIds = Object.keys(ticketAgentMap)
-    let allMsgsForClassification = []
-    if (humanTicketIds.length > 0) {
-        allMsgsForClassification = await fetchAllRows('cc_messages',
-            'ticket_id, action, message, message_timestamp',
-            [
-                { type: 'in', column: 'ticket_id', value: humanTicketIds },
-                { type: 'eq', column: 'action', value: 'OUT' },
-            ]
-        )
-    }
-    const humanTimestamps = _classifyHumanMessages(allMsgsForClassification)
+    // 3. Classify using the OUT messages we ALREADY HAVE (no extra fetch needed!)
+    //    Filter to only transferred ticket messages for classification
+    const humanTicketMsgs = outMessages.filter(m => ticketAgentMap[m.ticket_id])
+    const humanTimestamps = _classifyHumanMessages(humanTicketMsgs)
 
     // 4. Group by agent + day (only human-classified messages)
     const agentDayMap = {}
