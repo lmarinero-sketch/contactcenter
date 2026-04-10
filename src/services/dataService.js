@@ -2,8 +2,24 @@ import { supabase, supabaseHub } from '../lib/supabase'
 
 // ===================== HELPER: FETCH ALL ROWS (bypass 1000-row default) =====================
 const BATCH_SIZE = 1000
+const IN_BATCH_SIZE = 200 // Max items per .in() clause to avoid PostgREST URL length limits
 
 async function fetchAllRows(tableName, selectColumns, filters = []) {
+    // Check if any 'in' filter has too many values — if so, batch the entire call
+    const largeInFilter = filters.find(f => f.type === 'in' && f.value?.length > IN_BATCH_SIZE)
+    if (largeInFilter) {
+        const allValues = largeInFilter.value
+        const otherFilters = filters.filter(f => f !== largeInFilter)
+        let combinedData = []
+        for (let i = 0; i < allValues.length; i += IN_BATCH_SIZE) {
+            const batch = allValues.slice(i, i + IN_BATCH_SIZE)
+            const batchFilters = [...otherFilters, { type: 'in', column: largeInFilter.column, value: batch }]
+            const batchData = await fetchAllRows(tableName, selectColumns, batchFilters)
+            combinedData = combinedData.concat(batchData)
+        }
+        return combinedData
+    }
+
     let allData = []
     let offset = 0
     let hasMore = true
@@ -43,6 +59,7 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
 
     return allData
 }
+
 
 // ===================== TICKETS =====================
 export async function fetchTickets({ limit = 50, offset = 0, agent = null, dateFrom = null, dateTo = null, ticketIds = null } = {}) {
