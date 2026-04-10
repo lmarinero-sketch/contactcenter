@@ -841,74 +841,110 @@ export async function fetchProblematicChats(dateFrom = null, dateTo = null) {
 }
 
 // ===================== AGENT ACTIVITY CONTROL =====================
-// AsisteClick quirk: ALL OUT messages share the same sender_name (bot or agent header).
-// Strategy: Find the HANDOFF POINT per ticket — the message where the bot says
-// "en breve un operador se pondrá en contacto". Only count OUT messages
-// AFTER this handoff as human agent work.
-// This eliminates ALL bot messages regardless of content.
+// Uses the proven fix_v4 algorithm to separate bot vs human messages per ticket.
+// Bot detection: content patterns + temporal analysis (<5s gap between OUT = bot)
+// Human detection: first OUT message with gap >= 120s after bot cluster = human takeover
+// Once human takeover is identified, all subsequent OUT messages are attributed to the agent.
 
-const HANDOFF_PHRASES = [
+// Bot message content patterns (from fix_v4)
+const BOT_CONTENT_PATTERNS = [
+    'hola mi nombre es betina',
+    'soy asistente virtual',
+    '¿cómo te puedo ayudar?',
+    'selecciona una opción',
+    'selecciona una de estas opciones',
+    'por favor selecciona',
     'en breve un operador se pondrá en contacto',
     'en breve un operador se pondra en contacto',
-    'te transfiero con un operador',
-    'te derivo con un agente',
+    'ingresa el dni',
+    '¿cuál es el nombre del médico?',
+    'indica la fecha y hora',
+    '¿cuál es el día y horario preferido',
+    '¿quieres reprogramar',
+    'volver al menú',
+    'a. solicitar turnos',
+    'b. reprogramar',
+    'c. autorizaciones',
+    'd. chequeo preventivo',
+    'e. programa prevenir',
+    'f. información',
+    'a. turnos',
+    'b. guardias',
+    'c. otras consultas',
+    'selecciona el tipo de turno',
+    'a. turnos de consultas',
+    'b. turnos de tomografía',
 ]
 
+function _isBotContent(messageText) {
+    if (!messageText) return false
+    const lower = messageText.toLowerCase().trim()
+    return BOT_CONTENT_PATTERNS.some(p => lower.includes(p))
+}
+
+const MIN_HANDOFF_GAP = 120 // 2 minutes — bot responds instantly, humans take longer
+
 /**
- * For each ticket, find the timestamp of the handoff message (bot → human).
- * Returns a map: ticketId → handoff ISO timestamp
- * Messages before this timestamp are from the bot, after are from the human.
+ * Per-ticket analysis: classify each OUT message as bot or human.
+ * Returns a Set of message_timestamps (ISO) that are HUMAN.
+ * Algorithm mirrors _fix_agents_v4.mjs detectHumanFromRawPayload().
  */
-function _findHandoffTimestamps(allMessages) {
-    // Group all messages by ticket_id
+function _classifyHumanMessages(allMessages) {
     const byTicket = {}
     allMessages.forEach(msg => {
         if (!byTicket[msg.ticket_id]) byTicket[msg.ticket_id] = []
         byTicket[msg.ticket_id].push(msg)
     })
 
-    const handoffMap = {} // ticketId → handoff ISO timestamp
+    const humanMsgTimestamps = new Set()
 
     for (const [ticketId, msgs] of Object.entries(byTicket)) {
-        // Sort by timestamp
         const sorted = msgs
             .filter(m => m.message_timestamp)
             .sort((a, b) => new Date(a.message_timestamp) - new Date(b.message_timestamp))
 
-        // Find the handoff message
-        let handoffTs = null
-        for (const msg of sorted) {
-            if (msg.action === 'OUT' && msg.message) {
-                const lower = msg.message.toLowerCase()
-                if (HANDOFF_PHRASES.some(p => lower.includes(p))) {
-                    handoffTs = msg.message_timestamp
-                    break // First handoff message wins
-                }
-            }
-        }
+        const outMsgs = sorted.filter(m => m.action === 'OUT')
+        if (outMsgs.length === 0) continue
 
-        // Fallback: if no handoff phrase found, use temporal heuristic
-        // Look for a gap > 2 minutes between consecutive OUT messages (bot responds instantly)
-        if (!handoffTs) {
-            const outMsgs = sorted.filter(m => m.action === 'OUT')
-            for (let i = 1; i < outMsgs.length; i++) {
-                const prev = new Date(outMsgs[i - 1].message_timestamp)
-                const curr = new Date(outMsgs[i].message_timestamp)
-                const gapSeconds = (curr - prev) / 1000
-                // A gap > 120s between OUT messages = human agent took over
-                if (gapSeconds > 120) {
-                    handoffTs = outMsgs[i].message_timestamp
-                    break
-                }
-            }
-        }
+        let humanTakeoverFound = false
 
-        if (handoffTs) {
-            handoffMap[ticketId] = handoffTs
+        for (let i = 0; i < outMsgs.length; i++) {
+            const msg = outMsgs[i]
+            const prevOut = i > 0 ? outMsgs[i - 1] : null
+            const currTs = new Date(msg.message_timestamp).getTime()
+            const prevTs = prevOut ? new Date(prevOut.message_timestamp).getTime() : null
+            const gapFromPrevOut = prevTs ? (currTs - prevTs) / 1000 : 0
+
+            const contentIsBot = _isBotContent(msg.message)
+
+            // Check if previous message was the handoff phrase ("en breve un operador")
+            const prevIsHandoff = prevOut && prevOut.message &&
+                prevOut.message.toLowerCase().includes('en breve un operador')
+
+            if (humanTakeoverFound) {
+                // Once human is identified, all subsequent OUT = human
+                humanMsgTimestamps.add(msg.message_timestamp)
+            } else if (prevIsHandoff && gapFromPrevOut >= MIN_HANDOFF_GAP) {
+                // Big gap after handoff phrase = human agent took over
+                humanTakeoverFound = true
+                humanMsgTimestamps.add(msg.message_timestamp)
+            } else if (!contentIsBot && gapFromPrevOut >= MIN_HANDOFF_GAP) {
+                // Big gap + non-bot content = human takeover
+                humanTakeoverFound = true
+                humanMsgTimestamps.add(msg.message_timestamp)
+            } else if (contentIsBot || (gapFromPrevOut < 5 && i < outMsgs.length - 1)) {
+                // Bot: content matches patterns OR rapid-fire (<5s gap, not last msg)
+                // Skip
+            } else if (gapFromPrevOut >= MIN_HANDOFF_GAP) {
+                // Big gap even if ambiguous → human
+                humanTakeoverFound = true
+                humanMsgTimestamps.add(msg.message_timestamp)
+            }
+            // else: ambiguous, treat as bot (skip)
         }
     }
 
-    return handoffMap
+    return humanMsgTimestamps
 }
 
 // Queries cc_messages by message_timestamp (the actual time the agent typed),
@@ -945,33 +981,27 @@ export async function fetchAgentActivity(targetDate = null) {
     const ticketAgentMap = {}
     tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 4. For tickets with a human agent, fetch ALL messages (including older ones)
-    //    to find the handoff point per ticket
+    // 4. For tickets with a human agent, fetch ALL messages to classify bot vs human
     const humanTicketIds = ticketIds.filter(id => ticketAgentMap[id])
-    let allMessagesForHandoff = []
+    let allMsgsForClassification = []
     if (humanTicketIds.length > 0) {
-        allMessagesForHandoff = await fetchAllRows('cc_messages',
+        allMsgsForClassification = await fetchAllRows('cc_messages',
             'ticket_id, action, message, message_timestamp',
             [{ type: 'in', column: 'ticket_id', value: humanTicketIds }]
         )
     }
 
-    // 5. Find handoff timestamps per ticket
-    const handoffMap = _findHandoffTimestamps(allMessagesForHandoff)
+    // 5. Classify each message as bot or human using fix_v4 algorithm
+    const humanTimestamps = _classifyHumanMessages(allMsgsForClassification)
 
-    // 6. Filter: only keep OUT messages AFTER the handoff for their ticket
+    // 6. Filter: only keep messages classified as human
     const agentMap = {}
     let totalHumanMessages = 0
 
     outMessages.forEach(msg => {
         const agentName = ticketAgentMap[msg.ticket_id]
-        if (!agentName) return // ticket has no human agent (bot-only conversation)
-
-        const handoffTs = handoffMap[msg.ticket_id]
-        if (!handoffTs) return // no handoff found = pure bot conversation
-
-        // Only count messages AFTER the handoff timestamp
-        if (new Date(msg.message_timestamp) <= new Date(handoffTs)) return
+        if (!agentName) return
+        if (!humanTimestamps.has(msg.message_timestamp)) return
 
         if (!agentMap[agentName]) {
             agentMap[agentName] = {
@@ -1060,26 +1090,23 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
     const ticketAgentMap = {}
     tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 3. Fetch ALL messages for human tickets to find handoff points
+    // 3. Fetch ALL messages for human tickets to classify bot vs human
     const humanTicketIds = ticketIds.filter(id => ticketAgentMap[id])
-    let allMessagesForHandoff = []
+    let allMsgsForClassification = []
     if (humanTicketIds.length > 0) {
-        allMessagesForHandoff = await fetchAllRows('cc_messages',
+        allMsgsForClassification = await fetchAllRows('cc_messages',
             'ticket_id, action, message, message_timestamp',
             [{ type: 'in', column: 'ticket_id', value: humanTicketIds }]
         )
     }
-    const handoffMap = _findHandoffTimestamps(allMessagesForHandoff)
+    const humanTimestamps = _classifyHumanMessages(allMsgsForClassification)
 
-    // 4. Group by agent + day (only post-handoff messages)
+    // 4. Group by agent + day (only human-classified messages)
     const agentDayMap = {}
     outMessages.forEach(msg => {
         const agentName = ticketAgentMap[msg.ticket_id]
         if (!agentName) return
-
-        const handoffTs = handoffMap[msg.ticket_id]
-        if (!handoffTs) return
-        if (new Date(msg.message_timestamp) <= new Date(handoffTs)) return
+        if (!humanTimestamps.has(msg.message_timestamp)) return
 
         const dayKey = new Date(msg.message_timestamp).toISOString().slice(0, 10)
         const key = `${agentName}|${dayKey}`
