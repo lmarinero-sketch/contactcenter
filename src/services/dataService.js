@@ -983,21 +983,28 @@ export async function fetchAgentActivity(targetDate = null) {
         return { date: dayStart.toISOString().slice(0, 10), agents: [], total_messages: 0 }
     }
 
-    // 3. Get the real agent_name from cc_tickets for each ticket
+    // 3. Get the real agent_name from cc_tickets — only transferred tickets matter
     const tickets = await fetchAllRows('cc_tickets',
         'ticket_id, agent_name',
-        [{ type: 'in', column: 'ticket_id', value: ticketIds }]
+        [
+            { type: 'in', column: 'ticket_id', value: ticketIds },
+            { type: 'eq', column: 'transferred_to_agent', value: true },
+        ]
     )
     const ticketAgentMap = {}
-    tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
+    tickets.forEach(t => { if (t.agent_name) ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 4. For tickets with a human agent, fetch ALL messages to classify bot vs human
-    const humanTicketIds = ticketIds.filter(id => ticketAgentMap[id])
+    // 4. For transferred tickets, fetch only OUT messages to classify bot vs human
+    //    (we only need OUT messages for classification — not IN — big perf win)
+    const humanTicketIds = Object.keys(ticketAgentMap)
     let allMsgsForClassification = []
     if (humanTicketIds.length > 0) {
         allMsgsForClassification = await fetchAllRows('cc_messages',
             'ticket_id, action, message, message_timestamp',
-            [{ type: 'in', column: 'ticket_id', value: humanTicketIds }]
+            [
+                { type: 'in', column: 'ticket_id', value: humanTicketIds },
+                { type: 'eq', column: 'action', value: 'OUT' },
+            ]
         )
     }
 
@@ -1090,24 +1097,30 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
         ]
     )
 
-    // 2. Get real agent names from cc_tickets
+    // 2. Get real agent names — only transferred tickets
     const ticketIds = [...new Set(outMessages.map(m => m.ticket_id))]
     if (ticketIds.length === 0) return []
 
     const tickets = await fetchAllRows('cc_tickets',
         'ticket_id, agent_name',
-        [{ type: 'in', column: 'ticket_id', value: ticketIds }]
+        [
+            { type: 'in', column: 'ticket_id', value: ticketIds },
+            { type: 'eq', column: 'transferred_to_agent', value: true },
+        ]
     )
     const ticketAgentMap = {}
-    tickets.forEach(t => { ticketAgentMap[t.ticket_id] = t.agent_name })
+    tickets.forEach(t => { if (t.agent_name) ticketAgentMap[t.ticket_id] = t.agent_name })
 
-    // 3. Fetch ALL messages for human tickets to classify bot vs human
-    const humanTicketIds = ticketIds.filter(id => ticketAgentMap[id])
+    // 3. Fetch only OUT messages for classification (not IN — big perf win)
+    const humanTicketIds = Object.keys(ticketAgentMap)
     let allMsgsForClassification = []
     if (humanTicketIds.length > 0) {
         allMsgsForClassification = await fetchAllRows('cc_messages',
             'ticket_id, action, message, message_timestamp',
-            [{ type: 'in', column: 'ticket_id', value: humanTicketIds }]
+            [
+                { type: 'in', column: 'ticket_id', value: humanTicketIds },
+                { type: 'eq', column: 'action', value: 'OUT' },
+            ]
         )
     }
     const humanTimestamps = _classifyHumanMessages(allMsgsForClassification)
