@@ -1080,12 +1080,14 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
 }
 
 // ===================== FICHADAS (RRHH Cross-DB) =====================
-// Maps Contact Center agent names → RRHH fichadas_colaboradores names
-// (AsisteClick uses first names; RRHH uses full names)
+// Maps Contact Center agent names → RRHH fichadas_colaboradores search patterns
+// Uses ILIKE for fuzzy matching since RRHH has full names (surname + multiple names)
+// Names confirmed from RRHH screenshots: OLIVIER SOFIA, AGUILERA DANIELA ROMINA,
+// ACOSTA ESQUIVEL MARIA ANTONELL...
 const AGENT_FICHADA_MAP = {
-    'Sofia': 'OLIVIER SOFIA BELEN',
-    'Antonella': 'ESQUIVEL ANTONELLA',
-    'Daniela': 'AGUILERA DANIELA',
+    'Sofia': '%OLIVIER%SOFIA%',
+    'Antonella': '%ESQUIVEL%ANTONELL%',
+    'Daniela': '%AGUILERA%DANIELA%',
 }
 
 /**
@@ -1102,19 +1104,26 @@ export async function fetchFichadasForAgents(targetDate) {
 
     const date = targetDate || new Date().toISOString().slice(0, 10)
 
-    // 1. Get the colaborador IDs for our agents from RRHH
-    const fichadaNames = Object.values(AGENT_FICHADA_MAP)
-    const { data: colaboradores, error: colabError } = await supabaseHub
-        .from('fichadas_colaboradores')
-        .select('id, nombre_completo')
-        .in('nombre_completo', fichadaNames)
+    // 1. Get the colaborador IDs for our agents from RRHH using fuzzy match
+    const colaboradorIds = {} // ccName → colabId
+    for (const [ccName, pattern] of Object.entries(AGENT_FICHADA_MAP)) {
+        const { data } = await supabaseHub
+            .from('fichadas_colaboradores')
+            .select('id, nombre_completo')
+            .ilike('nombre_completo', pattern)
+            .limit(1)
+            .maybeSingle()
 
-    if (colabError || !colaboradores?.length) {
-        console.warn('[Fichadas] Could not find colaboradores:', colabError?.message)
-        return {}
+        if (data) {
+            colaboradorIds[data.id] = ccName
+        }
     }
 
-    const colabIds = colaboradores.map(c => c.id)
+    const colabIds = Object.keys(colaboradorIds)
+    if (colabIds.length === 0) {
+        console.warn('[Fichadas] No matching colaboradores found')
+        return {}
+    }
 
     // 2. Fetch fichadas for this date
     const { data: registros, error: regError } = await supabaseHub
@@ -1128,19 +1137,12 @@ export async function fetchFichadasForAgents(targetDate) {
         return {}
     }
 
-    // 3. Map back to CC agent names
-    const colabNameMap = {} // colabId → CC agent name
-    const reverseMap = {} // full name → CC name
-    Object.entries(AGENT_FICHADA_MAP).forEach(([ccName, fullName]) => {
-        reverseMap[fullName] = ccName
-    })
-    colaboradores.forEach(c => {
-        colabNameMap[c.id] = reverseMap[c.nombre_completo] || c.nombre_completo
-    })
+    // 3. Map back to CC agent names (colaboradorIds already has colabId → ccName)
+
 
     const result = {}
     ;(registros || []).forEach(reg => {
-        const agentName = colabNameMap[reg.colaborador_id]
+        const agentName = colaboradorIds[reg.colaborador_id]
         if (!agentName) return
         result[agentName] = {
             fichada_entrada: reg.fichada_entrada,
@@ -1160,21 +1162,23 @@ export async function fetchFichadasForAgents(targetDate) {
 export async function fetchFichadasRange(dateFrom, dateTo) {
     if (!supabaseHub) return {}
 
-    const fichadaNames = Object.values(AGENT_FICHADA_MAP)
-    const { data: colaboradores } = await supabaseHub
-        .from('fichadas_colaboradores')
-        .select('id, nombre_completo')
-        .in('nombre_completo', fichadaNames)
+    // Fuzzy-match colaboradores (same approach as daily)
+    const colaboradorIds = {} // colabId → ccName
+    for (const [ccName, pattern] of Object.entries(AGENT_FICHADA_MAP)) {
+        const { data } = await supabaseHub
+            .from('fichadas_colaboradores')
+            .select('id, nombre_completo')
+            .ilike('nombre_completo', pattern)
+            .limit(1)
+            .maybeSingle()
 
-    if (!colaboradores?.length) return {}
+        if (data) {
+            colaboradorIds[data.id] = ccName
+        }
+    }
 
-    const colabIds = colaboradores.map(c => c.id)
-    const reverseMap = {}
-    Object.entries(AGENT_FICHADA_MAP).forEach(([ccName, fullName]) => {
-        reverseMap[fullName] = ccName
-    })
-    const colabNameMap = {}
-    colaboradores.forEach(c => { colabNameMap[c.id] = reverseMap[c.nombre_completo] })
+    const colabIds = Object.keys(colaboradorIds)
+    if (colabIds.length === 0) return {}
 
     const { data: registros } = await supabaseHub
         .from('fichadas_registros')
@@ -1187,7 +1191,7 @@ export async function fetchFichadasRange(dateFrom, dateTo) {
     // Group by agent → date
     const result = {} // agentName → { [date]: fichada }
     ;(registros || []).forEach(reg => {
-        const agentName = colabNameMap[reg.colaborador_id]
+        const agentName = colaboradorIds[reg.colaborador_id]
         if (!agentName) return
         if (!result[agentName]) result[agentName] = {}
         result[agentName][reg.fecha] = {
