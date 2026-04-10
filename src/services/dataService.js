@@ -959,7 +959,9 @@ function _classifyHumanMessages(allMessages) {
 // NOT by ticket date. If an agent replies today to yesterday's ticket, it counts as TODAY's work.
 export async function fetchAgentActivity(targetDate = null) {
     // Default to today (in local timezone)
-    const date = targetDate ? new Date(targetDate) : new Date()
+    // IMPORTANT: new Date('2026-04-10') = UTC midnight = previous day in Argentina!
+    // Use T12:00:00 to land on the correct local day.
+    const date = targetDate ? new Date(targetDate + 'T12:00:00') : new Date()
     const dayStart = new Date(date)
     dayStart.setHours(0, 0, 0, 0)
     const dayEnd = new Date(date)
@@ -1068,8 +1070,9 @@ export async function fetchAgentActivity(targetDate = null) {
 
 // Fetch agent activity for a date range (for the weekly summary)
 export async function fetchAgentActivityRange(dateFrom, dateTo) {
-    const from = new Date(dateFrom)
-    const to = new Date(dateTo)
+    // Use T12:00:00 to avoid UTC midnight shifting to previous day in Arg timezone
+    const from = new Date(dateFrom + 'T12:00:00')
+    const to = new Date(dateTo + 'T12:00:00')
 
     // Fetch all at once instead of day-by-day for efficiency
     const fromStart = new Date(from)
