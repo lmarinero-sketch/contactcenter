@@ -36,7 +36,7 @@ function timeAgo(isoStr) {
 }
 
 export default function BitacoraPanel() {
-    const { profile, canWriteLogbook, isCoordinador, user } = useAuth()
+    const { profile, canWriteLogbook, isCoordinador, isGerente, user } = useAuth()
     const [entries, setEntries] = useState([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -251,7 +251,7 @@ export default function BitacoraPanel() {
                                 const cat = CATEGORIES[entry.category] || CATEGORIES.novedad
                                 const Icon = cat.icon
                                 const { time } = formatDateTime(entry.created_at)
-                                const canModify = isCoordinador || entry.created_by === user?.id
+                                const canModify = isCoordinador || isGerente || entry.created_by === user?.id
 
                                 return (
                                     <div key={entry.id} className="bitacora-entry">

@@ -28,12 +28,14 @@ const GESTION_ITEMS = [
 
 const ROLE_LABELS = {
     coordinador: 'Coordinador',
+    gerente: 'Gte. Administrativo',
     agente: 'Agente',
     refuerzo: 'Refuerzo',
 }
 
 const ROLE_COLORS = {
     coordinador: '#10b981',
+    gerente: '#8b5cf6',
     agente: '#3b82f6',
     refuerzo: '#f59e0b',
 }

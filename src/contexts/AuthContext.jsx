@@ -146,11 +146,12 @@ export function AuthProvider({ children }) {
     }
 
     const isCoordinador = profile?.role === 'coordinador'
+    const isGerente = profile?.role === 'gerente'
     const isAgente = profile?.role === 'agente'
     const isRefuerzo = profile?.role === 'refuerzo'
 
-    const canEditShifts = isCoordinador
-    const canWriteLogbook = isCoordinador || isAgente
+    const canEditShifts = isCoordinador || isGerente
+    const canWriteLogbook = isCoordinador || isGerente || isAgente
 
     const value = {
         user,
@@ -159,6 +160,7 @@ export function AuthProvider({ children }) {
         signIn,
         signOut,
         isCoordinador,
+        isGerente,
         isAgente,
         isRefuerzo,
         canEditShifts,
