@@ -1063,6 +1063,7 @@ export async function fetchAgentActivity(targetDate = null) {
             hours_worked: parseFloat(hoursWorked.toFixed(2)),
             total_messages: sorted.length,
             unique_tickets: agent.ticket_ids.size,
+            ticket_ids: [...agent.ticket_ids],
             hourly_breakdown: hourlyBreakdown,
         }
     }).sort((a, b) => {
@@ -1179,135 +1180,170 @@ export async function fetchAgentActivityRange(dateFrom, dateTo) {
         ...a,
         avg_hours_per_day: a.days_worked > 0 ? parseFloat((a.total_hours / a.days_worked).toFixed(2)) : 0,
         avg_messages_per_day: a.days_worked > 0 ? Math.round(a.total_messages / a.days_worked) : 0,
+        ticket_ids: [...a.total_tickets],
         total_tickets: a.total_tickets.size,
         daily_details: a.daily_details.sort((a, b) => a.date.localeCompare(b.date)),
     })).sort((a, b) => b.total_messages - a.total_messages)
 }
 
-// ===================== FICHADAS (RRHH Cross-DB) =====================
-// Maps Contact Center agent names → RRHH fichadas_colaboradores search patterns
-// Uses ILIKE for fuzzy matching since RRHH has full names (surname + multiple names)
-// Names confirmed from RRHH screenshots: OLIVIER SOFIA, AGUILERA DANIELA ROMINA,
-// ACOSTA ESQUIVEL MARIA ANTONELL...
-const AGENT_FICHADA_MAP = {
-    'Sofia': '%OLIVIER%SOFIA%',
-    'Antonella': '%ESQUIVEL%ANTONELL%',
-    'Daniela': '%AGUILERA%DANIELA%',
+// ===================== FICHADAS (RRHH REST Endpoint) =====================
+// Calls the RRHH Edge Function endpoint to get clock-in/clock-out data.
+// Endpoint: POST /functions/v1/get-fichadas
+// The endpoint filters by sector: "CONTACT CENTER" and returns colaboradores with their fichadas.
+
+const FICHADAS_URL = `${import.meta.env.VITE_HUB_SUPABASE_URL}/functions/v1/get-fichadas`
+const FICHADAS_AUTH = import.meta.env.VITE_HUB_SUPABASE_ANON_KEY
+
+// Reverse map: nombre_completo (as stored in RRHH) → CC agent short name
+// Must match the names used in cc_tickets.agent_name
+const NOMBRE_TO_CC_AGENT = {
+    'OLIVIER SOFIA': 'Sofia',
+    'ACOSTA ESQUIVEL MARIA ANTONELL': 'Antonella',
+    'AGUILERA DANIELA ROMINA': 'Daniela',
+    'MARINERO LUCAS MAXIMILIANO': 'Lucas',
+}
+
+function _mapNombreToAgent(nombreCompleto) {
+    if (!nombreCompleto) return null
+    const upper = nombreCompleto.toUpperCase().trim()
+    // Exact match first
+    if (NOMBRE_TO_CC_AGENT[upper]) return NOMBRE_TO_CC_AGENT[upper]
+    // Partial match fallback
+    for (const [key, val] of Object.entries(NOMBRE_TO_CC_AGENT)) {
+        if (upper.includes(key) || key.includes(upper)) return val
+    }
+    return null
 }
 
 /**
- * Fetch fichadas (clock-in/clock-out) from the RRHH database for CC agents.
- * Queries fichadas_registros via the Hub Supabase client.
+ * Fetch fichadas (clock-in/clock-out) from the RRHH endpoint for CC agents.
  * @param {string} targetDate - ISO date string (YYYY-MM-DD)
- * @returns {Object} Map of agentName → { fichada_entrada, fichada_salida, fecha }
+ * @returns {Object} Map of agentName → { fichada_entrada, fichada_salida, horas_trabajadas_min, tarde, fecha }
  */
 export async function fetchFichadasForAgents(targetDate) {
-    if (!supabaseHub) {
-        console.warn('[Fichadas] Hub Supabase not configured')
+    if (!FICHADAS_URL || !FICHADAS_AUTH) {
+        console.warn('[Fichadas] Hub Supabase URL/Key not configured')
         return {}
     }
 
     const date = targetDate || new Date().toISOString().slice(0, 10)
 
-    // 1. Get the colaborador IDs for our agents from RRHH using fuzzy match
-    const colaboradorIds = {} // ccName → colabId
-    for (const [ccName, pattern] of Object.entries(AGENT_FICHADA_MAP)) {
-        const { data } = await supabaseHub
-            .from('fichadas_colaboradores')
-            .select('id, nombre_completo')
-            .ilike('nombre_completo', pattern)
-            .limit(1)
-            .maybeSingle()
+    try {
+        const response = await fetch(FICHADAS_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${FICHADAS_AUTH}`,
+            },
+            body: JSON.stringify({ fecha: date, sector: 'CONTACT CENTER' }),
+        })
 
-        if (data) {
-            colaboradorIds[data.id] = ccName
+        if (!response.ok) {
+            console.warn('[Fichadas] Endpoint error:', response.status, await response.text())
+            return {}
         }
-    }
 
-    const colabIds = Object.keys(colaboradorIds)
-    if (colabIds.length === 0) {
-        console.warn('[Fichadas] No matching colaboradores found')
+        const data = await response.json()
+        const result = {}
+
+        ;(data.colaboradores || []).forEach(colab => {
+            const agentName = _mapNombreToAgent(colab.nombre_completo)
+            if (!agentName) return
+            result[agentName] = {
+                fichada_entrada: colab.fichada_entrada,
+                fichada_salida: colab.fichada_salida,
+                horas_trabajadas_min: colab.horas_trabajadas_min || 0,
+                tarde: colab.tarde || false,
+                fecha: date,
+            }
+        })
+
+        return result
+    } catch (err) {
+        console.warn('[Fichadas] Network error:', err.message)
         return {}
     }
-
-    // 2. Fetch fichadas for this date
-    const { data: registros, error: regError } = await supabaseHub
-        .from('fichadas_registros')
-        .select('colaborador_id, fecha, fichada_entrada, fichada_salida, horas_trabajadas_min, tarde')
-        .in('colaborador_id', colabIds)
-        .eq('fecha', date)
-
-    if (regError) {
-        console.warn('[Fichadas] Error fetching registros:', regError.message)
-        return {}
-    }
-
-    // 3. Map back to CC agent names (colaboradorIds already has colabId → ccName)
-
-
-    const result = {}
-    ;(registros || []).forEach(reg => {
-        const agentName = colaboradorIds[reg.colaborador_id]
-        if (!agentName) return
-        result[agentName] = {
-            fichada_entrada: reg.fichada_entrada,
-            fichada_salida: reg.fichada_salida,
-            horas_trabajadas_min: reg.horas_trabajadas_min || 0,
-            tarde: reg.tarde || false,
-            fecha: reg.fecha,
-        }
-    })
-
-    return result
 }
 
 /**
  * Fetch fichadas for a date range — used by the range view.
+ * @param {string} dateFrom - ISO date string (YYYY-MM-DD)
+ * @param {string} dateTo - ISO date string (YYYY-MM-DD)
+ * @returns {Object} Map of agentName → { [date]: fichada }
  */
 export async function fetchFichadasRange(dateFrom, dateTo) {
-    if (!supabaseHub) return {}
+    if (!FICHADAS_URL || !FICHADAS_AUTH) return {}
 
-    // Fuzzy-match colaboradores (same approach as daily)
-    const colaboradorIds = {} // colabId → ccName
-    for (const [ccName, pattern] of Object.entries(AGENT_FICHADA_MAP)) {
-        const { data } = await supabaseHub
-            .from('fichadas_colaboradores')
-            .select('id, nombre_completo')
-            .ilike('nombre_completo', pattern)
-            .limit(1)
-            .maybeSingle()
+    try {
+        const response = await fetch(FICHADAS_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${FICHADAS_AUTH}`,
+            },
+            body: JSON.stringify({
+                fecha_desde: dateFrom,
+                fecha_hasta: dateTo,
+                sector: 'CONTACT CENTER',
+            }),
+        })
 
-        if (data) {
-            colaboradorIds[data.id] = ccName
+        if (!response.ok) {
+            console.warn('[Fichadas] Range endpoint error:', response.status)
+            return {}
         }
+
+        const data = await response.json()
+
+        // Group by agent → date
+        const result = {} // agentName → { [date]: fichada }
+        ;(data.colaboradores || []).forEach(colab => {
+            const agentName = _mapNombreToAgent(colab.nombre_completo)
+            if (!agentName) return
+            if (!result[agentName]) result[agentName] = {}
+
+            ;(colab.registros || []).forEach(reg => {
+                result[agentName][reg.fecha] = {
+                    fichada_entrada: reg.fichada_entrada,
+                    fichada_salida: reg.fichada_salida,
+                    horas_trabajadas_min: reg.horas_trabajadas_min || 0,
+                    tarde: reg.tarde || false,
+                }
+            })
+        })
+
+        return result
+    } catch (err) {
+        console.warn('[Fichadas] Range network error:', err.message)
+        return {}
     }
+}
 
-    const colabIds = Object.keys(colaboradorIds)
-    if (colabIds.length === 0) return {}
+// ===================== AGENT CONVERSATIONS (for Control Panel) =====================
+/**
+ * Fetch full conversation details for a list of ticket IDs.
+ * Used by the Agent Control Panel to show all chats handled by an agent on a given day.
+ * @param {string[]} ticketIds - Array of ticket_id strings
+ * @returns {Array} Enriched ticket objects with analysis data
+ */
+export async function fetchConversationsByTicketIds(ticketIds) {
+    if (!ticketIds || ticketIds.length === 0) return []
 
-    const { data: registros } = await supabaseHub
-        .from('fichadas_registros')
-        .select('colaborador_id, fecha, fichada_entrada, fichada_salida, horas_trabajadas_min, tarde')
-        .in('colaborador_id', colabIds)
-        .gte('fecha', dateFrom)
-        .lte('fecha', dateTo)
-        .order('fecha', { ascending: true })
+    const tickets = await fetchAllRows('cc_tickets',
+        `ticket_id, channel, status, subject, customer_name, customer_phone, chat_started_at, received_at,
+         cc_analysis (
+            conversation_summary, overall_sentiment, sentiment_score, detected_intent, category, message_count, agent_message_count
+         )`,
+        [
+            { type: 'in', column: 'ticket_id', value: ticketIds },
+            { type: 'order', column: 'received_at', options: { ascending: false } },
+        ]
+    )
 
-    // Group by agent → date
-    const result = {} // agentName → { [date]: fichada }
-    ;(registros || []).forEach(reg => {
-        const agentName = colaboradorIds[reg.colaborador_id]
-        if (!agentName) return
-        if (!result[agentName]) result[agentName] = {}
-        result[agentName][reg.fecha] = {
-            fichada_entrada: reg.fichada_entrada,
-            fichada_salida: reg.fichada_salida,
-            horas_trabajadas_min: reg.horas_trabajadas_min || 0,
-            tarde: reg.tarde || false,
-        }
+    return (tickets || []).map(t => {
+        const analysis = Array.isArray(t.cc_analysis) ? t.cc_analysis[0] : t.cc_analysis
+        return { ...t, analysis }
     })
-
-    return result
 }
 
 // ===================== CSV EXPORT =====================

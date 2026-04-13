@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import {
     Clock, MessageSquare, Users, ChevronLeft, ChevronRight,
     Calendar, Download, Eye, ArrowUpRight, ArrowDownRight,
-    Timer, AlertTriangle, Activity, Loader2, BarChart3, ChevronDown, ChevronUp, Fingerprint
+    Timer, AlertTriangle, Activity, Loader2, BarChart3, ChevronDown, ChevronUp, Fingerprint, MessageCircle
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
-import { fetchAgentActivity, fetchAgentActivityRange, fetchFichadasForAgents, exportToCSV } from '../services/dataService'
+import { fetchAgentActivity, fetchAgentActivityRange, fetchFichadasForAgents, fetchConversationsByTicketIds, exportToCSV } from '../services/dataService'
 
 // ── Agent color from name (consistent with AgentsPanel) ──
 function getAgentColor(name) {
@@ -517,6 +517,10 @@ export default function AgentControlPanel() {
                                                                     </div>
                                                                     <TimelineBar agent={agent} />
                                                                 </div>
+                                                                {/* Conversations section */}
+                                                                <div style={{ marginTop: '16px' }}>
+                                                                    <ConversationsSection agent={agent} colors={colors} />
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -705,6 +709,10 @@ export default function AgentControlPanel() {
                                                                         ))}
                                                                     </tbody>
                                                                 </table>
+                                                                {/* Conversations section */}
+                                                                <div style={{ marginTop: '16px' }}>
+                                                                    <ConversationsSection agent={agent} colors={colors} />
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -865,6 +873,217 @@ function FichadaBadge({ fichada }) {
                     ⚠ tarde
                 </span>
             )}
+        </div>
+    )
+}
+
+// ── Collapsible: All conversations handled by an agent ──
+function ConversationsSection({ agent, colors }) {
+    const [expanded, setExpanded] = useState(false)
+    const [conversations, setConversations] = useState(null)
+    const [loading, setLoading] = useState(false)
+
+    async function handleToggle() {
+        if (expanded) {
+            setExpanded(false)
+            return
+        }
+        setExpanded(true)
+        if (!conversations && agent.ticket_ids?.length > 0) {
+            setLoading(true)
+            try {
+                const data = await fetchConversationsByTicketIds(agent.ticket_ids)
+                setConversations(data)
+            } catch (err) {
+                console.error('Error loading conversations:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+    }
+
+    const ticketCount = agent.ticket_ids?.length || agent.unique_tickets || 0
+
+    return (
+        <div>
+            <button
+                onClick={handleToggle}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    background: expanded ? colors.bg : '#ffffff',
+                    border: `1px solid ${expanded ? colors.accent + '44' : '#e2e8f0'}`,
+                    borderRadius: '8px', padding: '10px 14px',
+                    cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                    color: expanded ? colors.text : '#475569',
+                    width: '100%', fontFamily: 'inherit',
+                    transition: 'all 0.2s',
+                }}
+            >
+                <MessageCircle size={14} color={colors.accent} />
+                Conversaciones Atendidas
+                <span style={{
+                    background: colors.accent, color: 'white',
+                    padding: '2px 8px', borderRadius: '10px',
+                    fontSize: '11px', fontWeight: 700,
+                }}>
+                    {ticketCount}
+                </span>
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                    {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </span>
+            </button>
+
+            {expanded && (
+                <div style={{
+                    marginTop: '8px',
+                    maxHeight: '420px',
+                    overflowY: 'auto',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    background: 'white',
+                }}>
+                    {loading && (
+                        <div style={{ padding: '30px', textAlign: 'center' }}>
+                            <Loader2 size={20} style={{ color: colors.accent, animation: 'spin 1s linear infinite' }} />
+                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px' }}>
+                                Cargando conversaciones...
+                            </div>
+                        </div>
+                    )}
+
+                    {!loading && conversations && conversations.length === 0 && (
+                        <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>
+                            No se encontraron conversaciones
+                        </div>
+                    )}
+
+                    {!loading && conversations && conversations.map((conv, idx) => (
+                        <ConversationCard key={conv.ticket_id} conv={conv} isLast={idx === conversations.length - 1} />
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Card: Single conversation in the agent's list ──
+function ConversationCard({ conv, isLast }) {
+    const analysis = conv.analysis
+    const sentimentColor = {
+        'positive': '#16a34a',
+        'neutral': '#64748b',
+        'negative': '#dc2626',
+        'frustrated': '#dc2626',
+    }[analysis?.overall_sentiment] || '#94a3b8'
+
+    const sentimentBg = {
+        'positive': '#f0fdf4',
+        'neutral': '#f8fafc',
+        'negative': '#fef2f2',
+        'frustrated': '#fef2f2',
+    }[analysis?.overall_sentiment] || '#f8fafc'
+
+    const sentimentLabel = {
+        'positive': 'Positivo',
+        'neutral': 'Neutro',
+        'negative': 'Negativo',
+        'frustrated': 'Frustrado',
+    }[analysis?.overall_sentiment] || analysis?.overall_sentiment || '—'
+
+    const channelIcon = conv.channel === 'WHATSAPP' ? '📱' : '💻'
+    const channelLabel = conv.channel === 'WHATSAPP' ? 'WhatsApp' : 'Web'
+    const timeStr = conv.chat_started_at
+        ? new Date(conv.chat_started_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+        : '—'
+
+    return (
+        <div
+            style={{
+                padding: '12px 16px',
+                borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
+                display: 'flex', gap: '12px', alignItems: 'flex-start',
+                transition: 'background 0.15s',
+                cursor: 'default',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+            {/* Left: sentiment color bar */}
+            <div style={{
+                width: '4px', minHeight: '44px', borderRadius: '2px',
+                background: sentimentColor, flexShrink: 0, marginTop: '2px',
+            }} />
+
+            {/* Content */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Top row: ticket ID, customer, time, channel */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                    <span style={{
+                        fontFamily: 'monospace', fontSize: '11px', fontWeight: 700,
+                        color: '#1a6bb5', background: '#eff6ff',
+                        padding: '2px 6px', borderRadius: '4px',
+                    }}>
+                        {conv.ticket_id}
+                    </span>
+                    <span style={{ fontWeight: 600, fontSize: '12px', color: '#1e293b' }}>
+                        {conv.customer_name || 'Sin nombre'}
+                    </span>
+                    {conv.customer_phone && (
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                            {conv.customer_phone}
+                        </span>
+                    )}
+                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                        <span>{channelIcon} {channelLabel}</span>
+                        <span style={{ fontFamily: 'monospace' }}>{timeStr}</span>
+                    </span>
+                </div>
+
+                {/* Summary */}
+                {analysis?.conversation_summary && (
+                    <p style={{
+                        fontSize: '11px', color: '#64748b', margin: '0 0 6px 0',
+                        lineHeight: '1.5',
+                        overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}>
+                        {analysis.conversation_summary}
+                    </p>
+                )}
+
+                {/* Bottom badges */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{
+                        fontSize: '10px', fontWeight: 600,
+                        padding: '2px 8px', borderRadius: '4px',
+                        background: sentimentBg, color: sentimentColor,
+                    }}>
+                        {sentimentLabel}
+                    </span>
+                    {analysis?.detected_intent && (
+                        <span style={{
+                            fontSize: '10px', fontWeight: 600,
+                            padding: '2px 8px', borderRadius: '4px',
+                            background: '#f5f3ff', color: '#7c3aed',
+                        }}>
+                            {analysis.detected_intent}
+                        </span>
+                    )}
+                    {analysis?.message_count && (
+                        <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                            {analysis.message_count} msgs
+                        </span>
+                    )}
+                    <span style={{
+                        fontSize: '10px', fontWeight: 600,
+                        padding: '2px 8px', borderRadius: '4px',
+                        background: conv.status === 'CLOSED' ? '#f1f5f9' : '#fefce8',
+                        color: conv.status === 'CLOSED' ? '#64748b' : '#ca8a04',
+                    }}>
+                        {conv.status || '—'}
+                    </span>
+                </div>
+            </div>
         </div>
     )
 }
