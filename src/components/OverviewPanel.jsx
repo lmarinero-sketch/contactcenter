@@ -315,11 +315,25 @@ export default function OverviewPanel({ onNavigateToChat, forceRefresh = false }
                         )}
                     </div>
                     <div className="exec-kpi">
-                        <div className="exec-kpi-value">
-                            <span className={`semaphore ${getSemaphore('sentiment', stats.avgSentiment)}`}></span>
-                            {stats.avgSentiment}
-                        </div>
-                        <div className="exec-kpi-label">Sentimiento Prom.</div>
+                        {(() => {
+                            // Convert -1.0 → +1.0 score to 0–100% satisfaction
+                            const raw = parseFloat(stats.avgSentiment) || 0
+                            const pct = Math.round(((raw + 1) / 2) * 100)
+                            const semaphore = getSemaphore('sentiment', raw)
+                            const label = pct >= 75 ? 'Excelente' : pct >= 55 ? 'Bueno' : pct >= 40 ? 'Regular' : 'Bajo'
+                            return (
+                                <>
+                                    <div className="exec-kpi-value">
+                                        <span className={`semaphore ${semaphore}`}></span>
+                                        {pct}%
+                                    </div>
+                                    <div className="exec-kpi-label">Satisfacción</div>
+                                    <div style={{ fontSize: '10px', color: semaphore === 'green' ? '#10b981' : semaphore === 'yellow' ? '#f59e0b' : '#ef4444', fontWeight: 600, marginTop: '2px' }}>
+                                        {label}
+                                    </div>
+                                </>
+                            )
+                        })()}
                     </div>
                     <div className="exec-kpi">
                         <div className="exec-kpi-value">{stats.botResolutionRate}%</div>
