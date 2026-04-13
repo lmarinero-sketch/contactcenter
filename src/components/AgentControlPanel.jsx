@@ -7,7 +7,7 @@ import {
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
-import { fetchAgentActivity, fetchAgentActivityRange, fetchFichadasForAgents, fetchConversationsByTicketIds, exportToCSV } from '../services/dataService'
+import { fetchAgentActivity, fetchAgentActivityRange, fetchFichadasForAgents, fetchConversationsByTicketIds, fetchTicketMessages, exportToCSV } from '../services/dataService'
 
 // ── Agent color from name (consistent with AgentsPanel) ──
 function getAgentColor(name) {
@@ -966,8 +966,12 @@ function ConversationsSection({ agent, colors }) {
     )
 }
 
-// ── Card: Single conversation in the agent's list ──
+// ── Card: Single conversation in the agent's list (expandable with chat) ──
 function ConversationCard({ conv, isLast }) {
+    const [expanded, setExpanded] = useState(false)
+    const [messages, setMessages] = useState(null)
+    const [loadingMsgs, setLoadingMsgs] = useState(false)
+
     const analysis = conv.analysis
     const sentimentColor = {
         'positive': '#16a34a',
@@ -996,92 +1000,190 @@ function ConversationCard({ conv, isLast }) {
         ? new Date(conv.chat_started_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
         : '—'
 
+    async function handleToggleChat() {
+        if (expanded) {
+            setExpanded(false)
+            return
+        }
+        setExpanded(true)
+        if (!messages) {
+            setLoadingMsgs(true)
+            try {
+                const data = await fetchTicketMessages(conv.ticket_id)
+                setMessages(data)
+            } catch (err) {
+                console.error('Error loading messages:', err)
+            } finally {
+                setLoadingMsgs(false)
+            }
+        }
+    }
+
     return (
-        <div
-            style={{
-                padding: '12px 16px',
-                borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
-                display: 'flex', gap: '12px', alignItems: 'flex-start',
-                transition: 'background 0.15s',
-                cursor: 'default',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#fafbfc'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-            {/* Left: sentiment color bar */}
-            <div style={{
-                width: '4px', minHeight: '44px', borderRadius: '2px',
-                background: sentimentColor, flexShrink: 0, marginTop: '2px',
-            }} />
+        <div style={{ borderBottom: isLast ? 'none' : '1px solid #f1f5f9' }}>
+            {/* Clickable header */}
+            <div
+                onClick={handleToggleChat}
+                style={{
+                    padding: '12px 16px',
+                    display: 'flex', gap: '12px', alignItems: 'flex-start',
+                    transition: 'background 0.15s',
+                    cursor: 'pointer',
+                    background: expanded ? '#f8fafc' : 'transparent',
+                }}
+                onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = '#fafbfc' }}
+                onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = 'transparent' }}
+            >
+                {/* Left: sentiment color bar */}
+                <div style={{
+                    width: '4px', minHeight: '44px', borderRadius: '2px',
+                    background: sentimentColor, flexShrink: 0, marginTop: '2px',
+                }} />
 
-            {/* Content */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-                {/* Top row: ticket ID, customer, time, channel */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                    <span style={{
-                        fontFamily: 'monospace', fontSize: '11px', fontWeight: 700,
-                        color: '#1a6bb5', background: '#eff6ff',
-                        padding: '2px 6px', borderRadius: '4px',
-                    }}>
-                        {conv.ticket_id}
-                    </span>
-                    <span style={{ fontWeight: 600, fontSize: '12px', color: '#1e293b' }}>
-                        {conv.customer_name || 'Sin nombre'}
-                    </span>
-                    {conv.customer_phone && (
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                            {conv.customer_phone}
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Top row: ticket ID, customer, time, channel */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                        <span style={{
+                            fontFamily: 'monospace', fontSize: '11px', fontWeight: 700,
+                            color: '#1a6bb5', background: '#eff6ff',
+                            padding: '2px 6px', borderRadius: '4px',
+                        }}>
+                            {conv.ticket_id}
                         </span>
+                        <span style={{ fontWeight: 600, fontSize: '12px', color: '#1e293b' }}>
+                            {conv.customer_name || 'Sin nombre'}
+                        </span>
+                        {conv.customer_phone && (
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                {conv.customer_phone}
+                            </span>
+                        )}
+                        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                            <span>{channelIcon} {channelLabel}</span>
+                            <span style={{ fontFamily: 'monospace' }}>{timeStr}</span>
+                            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        </span>
+                    </div>
+
+                    {/* Summary */}
+                    {analysis?.conversation_summary && (
+                        <p style={{
+                            fontSize: '11px', color: '#64748b', margin: '0 0 6px 0',
+                            lineHeight: '1.5',
+                            overflow: 'hidden', textOverflow: 'ellipsis',
+                            display: '-webkit-box', WebkitLineClamp: expanded ? 'unset' : 2, WebkitBoxOrient: 'vertical',
+                        }}>
+                            {analysis.conversation_summary}
+                        </p>
                     )}
-                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
-                        <span>{channelIcon} {channelLabel}</span>
-                        <span style={{ fontFamily: 'monospace' }}>{timeStr}</span>
-                    </span>
-                </div>
 
-                {/* Summary */}
-                {analysis?.conversation_summary && (
-                    <p style={{
-                        fontSize: '11px', color: '#64748b', margin: '0 0 6px 0',
-                        lineHeight: '1.5',
-                        overflow: 'hidden', textOverflow: 'ellipsis',
-                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                    }}>
-                        {analysis.conversation_summary}
-                    </p>
-                )}
-
-                {/* Bottom badges */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{
-                        fontSize: '10px', fontWeight: 600,
-                        padding: '2px 8px', borderRadius: '4px',
-                        background: sentimentBg, color: sentimentColor,
-                    }}>
-                        {sentimentLabel}
-                    </span>
-                    {analysis?.detected_intent && (
+                    {/* Bottom badges */}
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{
                             fontSize: '10px', fontWeight: 600,
                             padding: '2px 8px', borderRadius: '4px',
-                            background: '#f5f3ff', color: '#7c3aed',
+                            background: sentimentBg, color: sentimentColor,
                         }}>
-                            {analysis.detected_intent}
+                            {sentimentLabel}
                         </span>
-                    )}
-                    {analysis?.message_count && (
-                        <span style={{ fontSize: '10px', color: '#94a3b8' }}>
-                            {analysis.message_count} msgs
+                        {analysis?.detected_intent && (
+                            <span style={{
+                                fontSize: '10px', fontWeight: 600,
+                                padding: '2px 8px', borderRadius: '4px',
+                                background: '#f5f3ff', color: '#7c3aed',
+                            }}>
+                                {analysis.detected_intent}
+                            </span>
+                        )}
+                        {analysis?.message_count && (
+                            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                                {analysis.message_count} msgs
+                            </span>
+                        )}
+                        <span style={{
+                            fontSize: '10px', fontWeight: 600,
+                            padding: '2px 8px', borderRadius: '4px',
+                            background: conv.status === 'CLOSED' ? '#f1f5f9' : '#fefce8',
+                            color: conv.status === 'CLOSED' ? '#64748b' : '#ca8a04',
+                        }}>
+                            {conv.status || '—'}
                         </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Expanded chat messages */}
+            {expanded && (
+                <div style={{
+                    padding: '0 16px 16px 32px',
+                    background: '#f8fafc',
+                    borderTop: '1px solid #f1f5f9',
+                }}>
+                    {loadingMsgs && (
+                        <div style={{ padding: '20px', textAlign: 'center' }}>
+                            <Loader2 size={16} style={{ color: '#64748b', animation: 'spin 1s linear infinite' }} />
+                            <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '8px' }}>Cargando mensajes...</span>
+                        </div>
                     )}
-                    <span style={{
-                        fontSize: '10px', fontWeight: 600,
-                        padding: '2px 8px', borderRadius: '4px',
-                        background: conv.status === 'CLOSED' ? '#f1f5f9' : '#fefce8',
-                        color: conv.status === 'CLOSED' ? '#64748b' : '#ca8a04',
-                    }}>
-                        {conv.status || '—'}
-                    </span>
+                    {!loadingMsgs && messages && messages.length === 0 && (
+                        <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
+                            Sin mensajes registrados
+                        </div>
+                    )}
+                    {!loadingMsgs && messages && messages.length > 0 && (
+                        <div style={{
+                            display: 'flex', flexDirection: 'column', gap: '6px',
+                            maxHeight: '400px', overflowY: 'auto',
+                            paddingTop: '12px',
+                        }}>
+                            {messages.map((msg, i) => (
+                                <ChatBubble key={i} msg={msg} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Chat bubble for inline message view ──
+function ChatBubble({ msg }) {
+    const isOutgoing = msg.action === 'OUT'
+    const timeStr = msg.message_timestamp
+        ? new Date(msg.message_timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+        : ''
+
+    return (
+        <div style={{
+            display: 'flex',
+            justifyContent: isOutgoing ? 'flex-end' : 'flex-start',
+        }}>
+            <div style={{
+                maxWidth: '78%',
+                padding: '8px 12px',
+                borderRadius: '12px',
+                borderBottomRightRadius: isOutgoing ? '4px' : '12px',
+                borderBottomLeftRadius: isOutgoing ? '12px' : '4px',
+                background: isOutgoing ? '#eff6ff' : 'white',
+                border: `1px solid ${isOutgoing ? '#bfdbfe' : '#e2e8f0'}`,
+                fontSize: '12px',
+                lineHeight: '1.5',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            }}>
+                <div style={{
+                    fontSize: '10px', fontWeight: 700,
+                    color: isOutgoing ? '#1a6bb5' : '#64748b',
+                    marginBottom: '2px',
+                }}>
+                    {msg.sender_name || (isOutgoing ? 'Agente' : 'Cliente')}
+                </div>
+                <div style={{ color: '#1e293b', wordBreak: 'break-word' }}>
+                    {msg.message}
+                </div>
+                <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'right', marginTop: '3px' }}>
+                    {timeStr}
                 </div>
             </div>
         </div>

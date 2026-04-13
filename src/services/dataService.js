@@ -1346,6 +1346,25 @@ export async function fetchConversationsByTicketIds(ticketIds) {
     })
 }
 
+/**
+ * Fetch messages for a single ticket (lightweight, for inline chat view).
+ * @param {string} ticketId - The ticket_id to fetch messages for
+ * @returns {Array} Ordered messages with action, sender_name, message, timestamp
+ */
+export async function fetchTicketMessages(ticketId) {
+    if (!ticketId) return []
+    const { data, error } = await supabase
+        .from('cc_messages')
+        .select('action, sender_name, message, message_timestamp, message_order')
+        .eq('ticket_id', ticketId)
+        .order('message_order', { ascending: true })
+    if (error) {
+        console.warn('[Messages] Error:', error.message)
+        return []
+    }
+    return data || []
+}
+
 // ===================== CSV EXPORT =====================
 export function exportToCSV(data, filename) {
     if (!data || data.length === 0) return
