@@ -21,8 +21,8 @@ BEGIN
       SELECT json_build_object(
         'total_turnos', COUNT(*),
         'asistidos', SUM(CASE WHEN asistencia = 'Presente' THEN 1 ELSE 0 END),
-        'ausentes', SUM(CASE WHEN asistencia = 'Ausencia injustificada' THEN 1 ELSE 0 END),
-        'ausentes_justificados', SUM(CASE WHEN asistencia = 'Ausencia justificada' THEN 1 ELSE 0 END)
+        'ausentes', SUM(CASE WHEN asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END),
+        'ausentes_justificados', SUM(CASE WHEN asistencia = 'Ausencia justificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END)
       )
       FROM salus_visitas
       WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
@@ -62,7 +62,7 @@ BEGIN
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
           AND fecha_visita IS NOT NULL
-          AND fecha_visita >= '2025-06-01'
+          AND fecha_visita < CURRENT_DATE
           AND asistencia = 'Ausencia injustificada'
         GROUP BY 1 ORDER BY 1
       ) sub
@@ -75,7 +75,6 @@ BEGIN
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
           AND fecha_visita IS NOT NULL
-          AND fecha_visita >= '2025-06-01'
         GROUP BY 1 ORDER BY 1
       ) sub
     ), '[]'::json),
