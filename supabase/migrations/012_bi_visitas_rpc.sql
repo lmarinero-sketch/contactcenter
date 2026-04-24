@@ -33,7 +33,9 @@ BEGIN
     'heatmap', COALESCE((
       SELECT json_agg(json_build_object('dia_semana', dia_semana, 'hora', hora, 'cantidad', cantidad))
       FROM (
-        SELECT EXTRACT(ISODOW FROM fecha_hora_creacion) as dia_semana, EXTRACT(HOUR FROM fecha_hora_creacion) as hora, COUNT(*) as cantidad
+        SELECT EXTRACT(ISODOW FROM fecha_hora_creacion AT TIME ZONE 'America/Argentina/Buenos_Aires') as dia_semana, 
+               EXTRACT(HOUR FROM fecha_hora_creacion AT TIME ZONE 'America/Argentina/Buenos_Aires') as hora, 
+               COUNT(*) as cantidad
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)

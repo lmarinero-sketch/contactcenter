@@ -102,7 +102,10 @@ export default function TurnosDashboard() {
 
   const { kpis, heatmap, tendencia, agentes, especialidades, responsables } = data
   const maxHeatmapVal = Math.max(...heatmap.flat(), 1)
-  const tasaAsistencia = kpis && kpis.total_turnos > 0 ? ((kpis.asistidos / kpis.total_turnos) * 100).toFixed(1) : 0
+  
+  // Tasa de asistencia solo sobre los turnos cerrados (Asistidos + Ausentes Injustificados + Ausentes Justificados)
+  const totalCerrados = kpis ? (kpis.asistidos + kpis.ausentes + kpis.ausentes_justificados) : 0
+  const tasaAsistencia = totalCerrados > 0 ? ((kpis.asistidos / totalCerrados) * 100).toFixed(1) : 0
 
   // Data para el gráfico de torta de asistencia
   const asistenciaData = [
