@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie
+  BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area
 } from 'recharts'
-import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Briefcase, UserCheck, PieChart as PieChartIcon } from 'lucide-react'
+import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Briefcase, UserCheck, PieChart as PieChartIcon, AlertCircle } from 'lucide-react'
 import DateFilter from '../DateFilter'
 
 const COLORS = ['#1a6bb5', '#0d9488', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b', '#ec4899', '#3b82f6', '#f97316']
@@ -26,6 +26,8 @@ export default function TurnosDashboard() {
       heatmap: [],
       heatmapBrindados: [],
       tendencia: [],
+      tendenciaBrindados: [],
+      ausentismoDiaMes: [],
       agentes: [],
       especialidades: [],
       responsables: []
@@ -60,6 +62,21 @@ export default function TurnosDashboard() {
                 }
             })
 
+            // Formatear Tendencia Brindados
+            const tendenciaBrindadosFormateada = rpcData.tendencia_brindados ? rpcData.tendencia_brindados.map(d => {
+                const date = new Date(d.mes)
+                return {
+                ...d,
+                nombreMes: date.toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+                }
+            }) : []
+
+            // Formatear Ausentismo Dia Mes
+            const ausentismoFormateado = rpcData.ausentismo_dia_mes ? rpcData.ausentismo_dia_mes.map(t => ({
+                dia: t.dia,
+                Ausentes: t.cantidad
+            })) : []
+
             // Formatear Heatmap (Matriz 7x24) - Creados
             const matrix = Array(7).fill(0).map(() => Array(24).fill(0))
             rpcData.heatmap.forEach(d => {
@@ -81,6 +98,8 @@ export default function TurnosDashboard() {
             setData({
                 kpis: rpcData.kpis,
                 tendencia: tendenciaFormateada,
+                tendenciaBrindados: tendenciaBrindadosFormateada,
+                ausentismoDiaMes: ausentismoFormateado,
                 heatmap: matrix,
                 heatmapBrindados: matrixBrindados,
                 agentes: rpcData.top_agentes,
@@ -112,7 +131,7 @@ export default function TurnosDashboard() {
     )
   }
 
-  const { kpis, heatmap, heatmapBrindados, tendencia, agentes, especialidades, responsables } = data
+  const { kpis, heatmap, heatmapBrindados, tendencia, tendenciaBrindados, ausentismoDiaMes, agentes, especialidades, responsables } = data
   const maxHeatmapVal = Math.max(...heatmap.flat(), 1)
   const maxHeatmapBrindadosVal = heatmapBrindados ? Math.max(...heatmapBrindados.flat(), 1) : 1
   
@@ -282,8 +301,61 @@ export default function TurnosDashboard() {
                 </div>
             </div>
 
-            {/* ═══ ROW 2: TENDENCIA + TOP ESPECIALIDADES ═══ */}
-            <div className="grid-2" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+            {/* ═══ ROW 3: CRECIMIENTO BRINDADOS + AUSENTISMO DIA MES ═══ */}
+            <div className="grid-2" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s', marginBottom: '20px' }}>
+                <div className="card">
+                    <div className="card-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <TrendingUp size={16} color="#8b5cf6" />
+                            <h3 style={{ margin: 0 }}>Crecimiento Turnos Brindados (Histórico)</h3>
+                        </div>
+                    </div>
+                    <div className="card-body">
+                        <div className="chart-container" style={{ height: '300px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={tendenciaBrindados} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorBrindados" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis dataKey="nombreMes" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                                    <Area type="monotone" name="Turnos" dataKey="cantidad" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorBrindados)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card">
+                    <div className="card-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertCircle size={16} color="#ef4444" />
+                            <h3 style={{ margin: 0 }}>Evolución de Ausentismo por Día del Mes</h3>
+                        </div>
+                    </div>
+                    <div className="card-body">
+                        <div className="chart-container" style={{ height: '300px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={ausentismoDiaMes} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis dataKey="dia" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} labelFormatter={(label) => `Día ${label} del mes`} />
+                                    <Line type="monotone" name="Ausentes" dataKey="Ausentes" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ═══ ROW 4: TENDENCIA + TOP ESPECIALIDADES ═══ */}
+            <div className="grid-2" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s', marginBottom: '20px' }}>
                 {/* TENDENCIA */}
                 <div className="card">
                     <div className="card-header">
