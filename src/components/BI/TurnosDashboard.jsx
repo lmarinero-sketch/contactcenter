@@ -110,10 +110,9 @@ export default function TurnosDashboard() {
 
             // Formatear Ausentismo Dia Mes
             const ausentismoFormateado = rpcData.ausentismo_dia_mes ? rpcData.ausentismo_dia_mes.map(t => {
-                const date = new Date(t.dia)
                 return {
                     diaOriginal: t.dia,
-                    dia: date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }),
+                    dia: `Día ${t.dia}`,
                     Ausentes: t.cantidad
                 }
             }) : []

@@ -46,7 +46,7 @@ BEGIN
       SELECT json_agg(json_build_object('dia_semana', dia_semana, 'hora', hora, 'cantidad', cantidad))
       FROM (
         SELECT EXTRACT(ISODOW FROM fecha_visita) as dia_semana, 
-               CAST(SPLIT_PART(hora_inicio, ':', 1) AS INTEGER) as hora, 
+               CAST(SPLIT_PART(hora_inicio, ':', 1) AS integer) as hora, 
                COUNT(*) as cantidad
         FROM filtered_visitas
         WHERE fecha_visita IS NOT NULL
@@ -57,11 +57,17 @@ BEGIN
     'ausentismo_dia_mes', COALESCE((
       SELECT json_agg(json_build_object('dia', dia, 'cantidad', cantidad))
       FROM (
-        SELECT DATE_TRUNC('day', fecha_visita) as dia, COUNT(*) as cantidad
-        FROM filtered_visitas
-        WHERE fecha_visita IS NOT NULL
-          AND fecha_visita < CURRENT_DATE
-          AND asistencia = 'Ausencia injustificada'
+        SELECT 
+          EXTRACT(DAY FROM fecha) as dia, 
+          ROUND(AVG(ausentes), 1) as cantidad
+        FROM (
+          SELECT DATE_TRUNC('day', fecha_visita) as fecha, COUNT(*) as ausentes
+          FROM filtered_visitas
+          WHERE fecha_visita IS NOT NULL
+            AND fecha_visita < CURRENT_DATE
+            AND asistencia = 'Ausencia injustificada'
+          GROUP BY 1
+        ) daily
         GROUP BY 1 ORDER BY 1
       ) sub
     ), '[]'::json),
