@@ -83,8 +83,7 @@ export default function TurnosDashboard() {
   const [aiReport, setAiReport] = useState(null)
 
   const generateAI = async (currentData) => {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      if (!apiKey || !currentData || !currentData.kpis) return null;
+      if (!currentData || !currentData.kpis) return null;
       
       try {
           const payload = {
@@ -95,16 +94,17 @@ export default function TurnosDashboard() {
             top_especialidades_ausentismo: currentData.ausentismoAnalisis?.por_grupo_agenda?.slice(0,3).map(x => `${x.nombre} (${x.ausentes})`) || [],
             top_responsables_ausentismo: currentData.ausentismoAnalisis?.por_responsable?.slice(0,3).map(x => `${x.nombre} (${x.ausentes})`) || [],
           }
-          
-          const prompt = `Actúa como un experto consultor de salud y analista de datos. Redacta un reporte ejecutivo tipo "revista de finanzas y negocios" de 3 párrafos analizando estos datos de presentismo del Sanatorio Argentino: ${JSON.stringify(payload)}. Escribe con estilo sofisticado, muy profesional, periodístico y directivo. Enfócate en el impacto de los ausentes. Usa markdown básico (**negrita**). Devuelve solo el texto del artículo.`;
 
-          const res = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-              body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7 })
+          const { data: result, error } = await supabase.functions.invoke('generate-visitas-insights', {
+              body: { data: payload }
           });
-          const json = await res.json();
-          return json.choices[0].message.content;
+          
+          if (error) {
+              console.error("Supabase Edge Function Error:", error);
+              return null;
+          }
+          
+          return result?.content;
       } catch (e) {
           console.error("AI Error:", e);
           return null;
