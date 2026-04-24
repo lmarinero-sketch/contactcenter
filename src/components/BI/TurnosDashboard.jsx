@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area, ReferenceLine
 } from 'recharts'
-import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Briefcase, UserCheck, PieChart as PieChartIcon, AlertCircle, MapPin } from 'lucide-react'
+import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Briefcase, UserCheck, PieChart as PieChartIcon, AlertCircle, MapPin, Download } from 'lucide-react'
 import DateFilter from '../DateFilter'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 const COLORS = ['#1a6bb5', '#0d9488', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b', '#ec4899', '#3b82f6', '#f97316']
 const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -56,6 +58,8 @@ const AusentismoChart = ({ data, title, icon }) => (
 )
 
 export default function TurnosDashboard() {
+  const printRef = useRef(null)
+  const [isExporting, setIsExporting] = useState(false)
   const [data, setData] = useState({
       kpis: null,
       heatmap: [],
@@ -76,6 +80,39 @@ export default function TurnosDashboard() {
   // Filtros
   const [dateFrom, setDateFrom] = useState(null)
   const [dateTo, setDateTo] = useState(null)
+
+  const handleDownloadPdf = async () => {
+    const element = printRef.current;
+    if (!element) return;
+
+    setIsExporting(true);
+    try {
+        const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#f8fafc'
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        
+        const pdfWidth = 210; // A4 width in mm
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min(pdfWidth / imgWidth, pdfWidth / imgWidth); 
+        
+        const pdfHeight = imgHeight * ratio;
+
+        const pdf = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`Reporte_Contact_Center_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+        console.error("Error generando PDF:", error);
+        alert("Hubo un error al generar el PDF.");
+    } finally {
+        setIsExporting(false);
+    }
+  }
 
   useEffect(() => {
     async function fetchBI() {
@@ -201,9 +238,33 @@ export default function TurnosDashboard() {
   return (
     <div className="fade-in">
       {/* ═══ BARRA DE FILTROS ═══ */}
-      <div className="overview-filters-bar" style={{ marginBottom: '20px' }}>
+      <div className="overview-filters-bar" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={(from, to) => { setDateFrom(from); setDateTo(to); }} />
+          <button 
+              onClick={handleDownloadPdf} 
+              disabled={isExporting || loading}
+              style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  backgroundColor: isExporting ? '#94a3b8' : '#1a6bb5',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isExporting || loading ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+          >
+              <Download size={18} />
+              {isExporting ? 'Generando PDF...' : 'Descargar Reporte'}
+          </button>
       </div>
+
+      <div ref={printRef} style={{ padding: '10px', backgroundColor: '#f8fafc' }}>
 
       {loading && !kpis ? (
           <div className="loading-spinner"><div className="spinner"></div></div>
@@ -595,6 +656,7 @@ export default function TurnosDashboard() {
             )}
           </>
       )}
+      </div>
     </div>
   )
 }
