@@ -137,6 +137,19 @@ BEGIN
           AND responsable IS NOT NULL AND responsable != 'NULL'
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
       ) sub
+    ), '[]'::json),
+    'top_poblacion', COALESCE((
+      SELECT json_agg(json_build_object('poblacion', poblacion, 'cantidad', cantidad))
+      FROM (
+        SELECT poblacion, COUNT(*) as cantidad
+        FROM salus_visitas
+        WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
+          AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
+          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
+          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
+          AND poblacion IS NOT NULL AND poblacion != 'NULL' AND TRIM(poblacion) != ''
+        GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+      ) sub
     ), '[]'::json)
   ) INTO result;
 

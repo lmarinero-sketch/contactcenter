@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area
+  BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area, ReferenceLine
 } from 'recharts'
-import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Briefcase, UserCheck, PieChart as PieChartIcon, AlertCircle } from 'lucide-react'
+import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Briefcase, UserCheck, PieChart as PieChartIcon, AlertCircle, MapPin } from 'lucide-react'
 import DateFilter from '../DateFilter'
 
 const COLORS = ['#1a6bb5', '#0d9488', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b', '#ec4899', '#3b82f6', '#f97316']
@@ -30,7 +30,8 @@ export default function TurnosDashboard() {
       ausentismoDiaMes: [],
       agentes: [],
       especialidades: [],
-      responsables: []
+      responsables: [],
+      poblaciones: []
   })
   
   const [loading, setLoading] = useState(true)
@@ -104,7 +105,8 @@ export default function TurnosDashboard() {
                 heatmapBrindados: matrixBrindados,
                 agentes: rpcData.top_agentes,
                 especialidades: rpcData.top_especialidades,
-                responsables: rpcData.top_responsables
+                responsables: rpcData.top_responsables,
+                poblaciones: rpcData.top_poblacion
             })
         }
       } catch (err) {
@@ -131,10 +133,19 @@ export default function TurnosDashboard() {
     )
   }
 
-  const { kpis, heatmap, heatmapBrindados, tendencia, tendenciaBrindados, ausentismoDiaMes, agentes, especialidades, responsables } = data
+  const { kpis, heatmap, heatmapBrindados, tendencia, tendenciaBrindados, ausentismoDiaMes, agentes, especialidades, responsables, poblaciones } = data
   const maxHeatmapVal = Math.max(...heatmap.flat(), 1)
   const maxHeatmapBrindadosVal = heatmapBrindados ? Math.max(...heatmapBrindados.flat(), 1) : 1
   
+  // Promedios para los gráficos de línea
+  const avgBrindados = tendenciaBrindados && tendenciaBrindados.length > 0 
+      ? Math.round(tendenciaBrindados.reduce((acc, curr) => acc + curr.Turnos, 0) / tendenciaBrindados.length) 
+      : 0;
+      
+  const avgAusentismo = ausentismoDiaMes && ausentismoDiaMes.length > 0 
+      ? Math.round(ausentismoDiaMes.reduce((acc, curr) => acc + curr.Ausentes, 0) / ausentismoDiaMes.length) 
+      : 0;
+
   // Tasa de asistencia solo sobre los turnos cerrados (Asistidos + Ausentes Injustificados + Ausentes Justificados)
   const totalCerrados = kpis ? (kpis.asistidos + kpis.ausentes + kpis.ausentes_justificados) : 0
   const tasaAsistencia = totalCerrados > 0 ? ((kpis.asistidos / totalCerrados) * 100).toFixed(1) : 0
@@ -324,7 +335,10 @@ export default function TurnosDashboard() {
                                     <XAxis dataKey="nombreMes" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                                     <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
-                                    <Area type="monotone" name="Turnos" dataKey="cantidad" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorBrindados)" />
+                                    {avgBrindados > 0 && (
+                                        <ReferenceLine y={avgBrindados} stroke="#64748b" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: `Promedio: ${avgBrindados}`, fill: '#64748b', fontSize: 11 }} />
+                                    )}
+                                    <Area type="monotone" name="Turnos" dataKey="Turnos" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorBrindados)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -346,6 +360,9 @@ export default function TurnosDashboard() {
                                     <XAxis dataKey="dia" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                                     <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} labelFormatter={(label) => `Día ${label} del mes`} />
+                                    {avgAusentismo > 0 && (
+                                        <ReferenceLine y={avgAusentismo} stroke="#f87171" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: `Promedio: ${avgAusentismo}`, fill: '#f87171', fontSize: 11 }} />
+                                    )}
                                     <Line type="monotone" name="Ausentes" dataKey="Ausentes" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 0 }} activeDot={{ r: 6 }} />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -472,6 +489,38 @@ export default function TurnosDashboard() {
                                 </ResponsiveContainer>
                             ) : (
                                 <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Sin datos de agentes</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {/* ═══ ROW 5: TOP POBLACIONES ═══ */}
+            <div className="grid-2" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s', paddingBottom: '30px' }}>
+                <div className="card">
+                    <div className="card-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <MapPin size={16} color="#f97316" />
+                            <h3 style={{ margin: 0 }}>Top 10 Localidades (Población)</h3>
+                        </div>
+                    </div>
+                    <div className="card-body">
+                        <div className="chart-container" style={{ height: '300px' }}>
+                            {poblaciones && poblaciones.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={poblaciones} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                        <XAxis type="number" tick={{ fontSize: 11 }} />
+                                        <YAxis dataKey="poblacion" type="category" tick={{ fontSize: 11 }} width={140} />
+                                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
+                                        <Bar dataKey="cantidad" name="Pacientes" radius={[0, 4, 4, 0]} animationDuration={600}>
+                                            {poblaciones.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[(index+7) % COLORS.length]} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Sin datos de localidades</div>
                             )}
                         </div>
                     </div>
