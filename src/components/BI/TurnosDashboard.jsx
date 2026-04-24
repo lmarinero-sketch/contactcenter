@@ -24,6 +24,7 @@ export default function TurnosDashboard() {
   const [data, setData] = useState({
       kpis: null,
       heatmap: [],
+      heatmapBrindados: [],
       tendencia: [],
       agentes: [],
       especialidades: [],
@@ -59,7 +60,7 @@ export default function TurnosDashboard() {
                 }
             })
 
-            // Formatear Heatmap (Matriz 7x24)
+            // Formatear Heatmap (Matriz 7x24) - Creados
             const matrix = Array(7).fill(0).map(() => Array(24).fill(0))
             rpcData.heatmap.forEach(d => {
                 if (d.dia_semana >= 1 && d.dia_semana <= 7 && d.hora >= 0 && d.hora <= 23) {
@@ -67,10 +68,21 @@ export default function TurnosDashboard() {
                 }
             })
 
+            // Formatear Heatmap Brindados
+            const matrixBrindados = Array(7).fill(0).map(() => Array(24).fill(0))
+            if (rpcData.heatmap_brindados) {
+                rpcData.heatmap_brindados.forEach(d => {
+                    if (d.dia_semana >= 1 && d.dia_semana <= 7 && d.hora >= 0 && d.hora <= 23) {
+                        matrixBrindados[d.dia_semana - 1][d.hora] = d.cantidad
+                    }
+                })
+            }
+
             setData({
                 kpis: rpcData.kpis,
                 tendencia: tendenciaFormateada,
                 heatmap: matrix,
+                heatmapBrindados: matrixBrindados,
                 agentes: rpcData.top_agentes,
                 especialidades: rpcData.top_especialidades,
                 responsables: rpcData.top_responsables
@@ -100,8 +112,9 @@ export default function TurnosDashboard() {
     )
   }
 
-  const { kpis, heatmap, tendencia, agentes, especialidades, responsables } = data
+  const { kpis, heatmap, heatmapBrindados, tendencia, agentes, especialidades, responsables } = data
   const maxHeatmapVal = Math.max(...heatmap.flat(), 1)
+  const maxHeatmapBrindadosVal = heatmapBrindados ? Math.max(...heatmapBrindados.flat(), 1) : 1
   
   // Tasa de asistencia solo sobre los turnos cerrados (Asistidos + Ausentes Injustificados + Ausentes Justificados)
   const totalCerrados = kpis ? (kpis.asistidos + kpis.ausentes + kpis.ausentes_justificados) : 0
@@ -226,6 +239,44 @@ export default function TurnosDashboard() {
                                     </>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* HEATMAP BRINDADOS */}
+            <div className="card" style={{ marginBottom: '20px', opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                <div className="card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Clock size={16} color="#8b5cf6" />
+                        <h3 style={{ margin: 0 }}>Horarios de los Turnos Brindados (Cita del Paciente)</h3>
+                    </div>
+                </div>
+                <div className="card-body">
+                    <div className="heatmap-container" style={{ overflowX: 'auto', paddingBottom: '10px' }}>
+                        <div className="heatmap-grid" style={{ gridTemplateColumns: '40px repeat(24, 1fr)', minWidth: '800px' }}>
+                            <div className="heatmap-label"></div>
+                            {HEATMAP_HOURS.map(h => (
+                                <div key={h} className="heatmap-hour-label">{h}h</div>
+                            ))}
+                            {[0, 1, 2, 3, 4, 5, 6].map(dayIdx => (
+                                <>
+                                    <div key={`label-brin-${dayIdx}`} className="heatmap-day-label">{DAY_LABELS[dayIdx]}</div>
+                                    {HEATMAP_HOURS.map(h => {
+                                        const val = heatmapBrindados ? (heatmapBrindados[dayIdx]?.[h] || 0) : 0
+                                        return (
+                                            <div
+                                                key={`brin-${dayIdx}-${h}`}
+                                                className="heatmap-cell"
+                                                style={{ background: getHeatmapColor(val, maxHeatmapBrindadosVal), transition: 'background 0.4s ease' }}
+                                                title={`${DAY_LABELS[dayIdx]} a las ${h}h — ${val} turnos asignados`}
+                                            >
+                                                {val > 0 && <span className="heatmap-cell-value" style={{ opacity: val / maxHeatmapBrindadosVal > 0.5 ? 1 : 0, color: val / maxHeatmapBrindadosVal > 0.6 ? '#fff' : '#1e293b' }}>{val}</span>}
+                                            </div>
+                                        )
+                                    })}
+                                </>
+                            ))}
                         </div>
                     </div>
                 </div>

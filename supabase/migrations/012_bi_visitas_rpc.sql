@@ -44,6 +44,22 @@ BEGIN
         GROUP BY 1, 2
       ) sub
     ), '[]'::json),
+    'heatmap_brindados', COALESCE((
+      SELECT json_agg(json_build_object('dia_semana', dia_semana, 'hora', hora, 'cantidad', cantidad))
+      FROM (
+        SELECT EXTRACT(ISODOW FROM fecha_visita) as dia_semana, 
+               CAST(SPLIT_PART(hora_inicio, ':', 1) AS INTEGER) as hora, 
+               COUNT(*) as cantidad
+        FROM salus_visitas
+        WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
+          AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
+          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
+          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
+          AND fecha_visita IS NOT NULL
+          AND hora_inicio ~ '^[0-9]{1,2}:'
+        GROUP BY 1, 2
+      ) sub
+    ), '[]'::json),
     'tendencia', COALESCE((
       SELECT json_agg(json_build_object('mes', mes, 'cantidad', cantidad, 'asistidos', asistidos))
       FROM (
