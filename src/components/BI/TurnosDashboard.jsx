@@ -179,7 +179,7 @@ export default function TurnosDashboard() {
   
   // Promedios para los gráficos de línea
   const avgBrindados = tendenciaBrindados && tendenciaBrindados.length > 0 
-      ? Math.round(tendenciaBrindados.reduce((acc, curr) => acc + curr.Turnos, 0) / tendenciaBrindados.length) 
+      ? Math.round(tendenciaBrindados.reduce((acc, curr) => acc + curr.cantidad, 0) / tendenciaBrindados.length) 
       : 0;
       
   const avgAusentismo = ausentismoDiaMes && ausentismoDiaMes.length > 0 
@@ -378,7 +378,7 @@ export default function TurnosDashboard() {
                                     {avgBrindados > 0 && (
                                         <ReferenceLine y={avgBrindados} stroke="#64748b" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: `Promedio: ${avgBrindados}`, fill: '#64748b', fontSize: 11 }} />
                                     )}
-                                    <Area type="monotone" name="Turnos" dataKey="Turnos" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorBrindados)" />
+                                    <Area type="monotone" name="Turnos" dataKey="cantidad" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorBrindados)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
