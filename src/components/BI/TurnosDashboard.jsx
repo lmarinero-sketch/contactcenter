@@ -90,6 +90,7 @@ export default function TurnosDashboard() {
         if (error) throw new Error(error.message)
 
         if (rpcData) {
+            console.log("Datos del RPC:", rpcData);
             // Formatear Tendencia
             const tendenciaFormateada = rpcData.tendencia.map(d => {
                 const date = new Date(d.mes)
@@ -145,7 +146,8 @@ export default function TurnosDashboard() {
                 agentes: rpcData.top_agentes,
                 especialidades: rpcData.top_especialidades,
                 responsables: rpcData.top_responsables,
-                poblaciones: rpcData.top_poblacion
+                poblaciones: rpcData.top_poblacion,
+                ausentismoAnalisis: rpcData.ausentismo_analisis
             })
         }
       } catch (err) {
