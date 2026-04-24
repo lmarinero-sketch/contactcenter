@@ -1,0 +1,16 @@
+{
+  "name": "contactcenter-sync-server",
+  "version": "1.0.0",
+  "description": "Proxy local SQL Server (SALUS) → Supabase para Contact Center Analytics",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.0",
+    "mssql": "^11.0.1"
+  }
+}
