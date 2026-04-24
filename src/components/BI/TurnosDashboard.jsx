@@ -34,15 +34,15 @@ const AusentismoChart = ({ data, title, icon }) => (
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={true} />
-                            <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 'auto']} unit="%" />
+                            <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 'auto']} />
                             <YAxis dataKey="nombre" type="category" tick={{ fontSize: 10 }} width={200} interval={0} />
                             <RechartsTooltip 
                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                                formatter={(value, name) => name === 'Tasa Ausentismo' ? `${value}%` : value}
+                                formatter={(value, name) => name === 'Inasistencias' ? value : value}
                             />
-                            <Bar dataKey="tasa" name="Tasa Ausentismo" radius={[0, 4, 4, 0]} animationDuration={600} fill="#ef4444">
+                            <Bar dataKey="ausentes" name="Inasistencias" radius={[0, 4, 4, 0]} animationDuration={600} fill="#ef4444">
                                 {data.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.tasa > 30 ? '#dc2626' : entry.tasa > 15 ? '#ef4444' : '#f87171'} />
+                                    <Cell key={`cell-${index}`} fill={COLORS[(index+5) % COLORS.length]} />
                                 ))}
                             </Bar>
                         </BarChart>
@@ -574,22 +574,22 @@ export default function TurnosDashboard() {
                 <div style={{ padding: '20px 0 15px', borderBottom: '1px solid #e2e8f0', marginBottom: '20px' }}>
                     <h2 style={{ fontSize: '18px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 5px' }}>
                         <AlertCircle color="#ef4444" />
-                        Análisis Detallado de Inasistencias (Ausentismo)
+                        Análisis Detallado de Inasistencias (Cantidad Neta)
                     </h2>
-                    <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>Análisis porcentual de ausencias injustificadas sobre el total de turnos (mínimo 10 turnos asignados con fecha pasada).</p>
+                    <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>Volumen total de ausencias injustificadas en turnos de fecha pasada, rankeados de mayor a menor.</p>
                 </div>
 
                 <div className="grid-2" style={{ marginBottom: '20px' }}>
-                    <AusentismoChart data={ausentismoAnalisis.por_responsable} title="Responsables con más Ausentismo (%)" icon={<UserCheck size={16} color="#ef4444"/>} />
-                    <AusentismoChart data={ausentismoAnalisis.por_grupo_agenda} title="Grupo Agenda con más Ausentismo (%)" icon={<Calendar size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_responsable} title="Responsables con más Ausentismo" icon={<UserCheck size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_grupo_agenda} title="Grupo Agenda con más Ausentismo" icon={<Calendar size={16} color="#ef4444"/>} />
                 </div>
                 <div className="grid-2" style={{ marginBottom: '20px' }}>
-                    <AusentismoChart data={ausentismoAnalisis.por_tipo_visita} title="Tipo de Visita con más Ausentismo (%)" icon={<Briefcase size={16} color="#ef4444"/>} />
-                    <AusentismoChart data={ausentismoAnalisis.por_obra_social} title="Obras Sociales con más Ausentismo (%)" icon={<Activity size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_tipo_visita} title="Tipo de Visita con más Ausentismo" icon={<Briefcase size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_obra_social} title="Obras Sociales con más Ausentismo" icon={<Activity size={16} color="#ef4444"/>} />
                 </div>
                 <div className="grid-2" style={{ marginBottom: '30px' }}>
-                    <AusentismoChart data={ausentismoAnalisis.por_centro} title="Centros con más Ausentismo (%)" icon={<MapPin size={16} color="#ef4444"/>} />
-                    <AusentismoChart data={ausentismoAnalisis.por_usuario_creacion} title="Creadores con más Ausentismo (%)" icon={<Users size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_centro} title="Centros con más Ausentismo" icon={<MapPin size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_usuario_creacion} title="Creadores con más Ausentismo" icon={<Users size={16} color="#ef4444"/>} />
                 </div>
             </div>
             )}

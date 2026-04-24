@@ -134,8 +134,8 @@ BEGIN
                    ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
             FROM filtered_visitas
             WHERE responsable IS NOT NULL AND TRIM(responsable) != ''
-            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
-            ORDER BY tasa DESC LIMIT 10
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) > 0
+            ORDER BY ausentes DESC LIMIT 10
           ) sub
         ), '[]'::json),
         'por_grupo_agenda', COALESCE((
@@ -147,8 +147,8 @@ BEGIN
                    ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
             FROM filtered_visitas
             WHERE grupo_agenda IS NOT NULL AND TRIM(grupo_agenda) != '' AND grupo_agenda != 'NULL'
-            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
-            ORDER BY tasa DESC LIMIT 10
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) > 0
+            ORDER BY ausentes DESC LIMIT 10
           ) sub
         ), '[]'::json),
         'por_tipo_visita', COALESCE((
@@ -160,8 +160,8 @@ BEGIN
                    ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
             FROM filtered_visitas
             WHERE tipo_visita IS NOT NULL AND TRIM(tipo_visita) != ''
-            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
-            ORDER BY tasa DESC LIMIT 10
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) > 0
+            ORDER BY ausentes DESC LIMIT 10
           ) sub
         ), '[]'::json),
         'por_obra_social', COALESCE((
@@ -173,8 +173,8 @@ BEGIN
                    ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
             FROM filtered_visitas
             WHERE cliente IS NOT NULL AND TRIM(cliente) != ''
-            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
-            ORDER BY tasa DESC LIMIT 10
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) > 0
+            ORDER BY ausentes DESC LIMIT 10
           ) sub
         ), '[]'::json),
         'por_centro', COALESCE((
@@ -186,8 +186,8 @@ BEGIN
                    ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
             FROM filtered_visitas
             WHERE centro IS NOT NULL AND TRIM(centro) != ''
-            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
-            ORDER BY tasa DESC LIMIT 10
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) > 0
+            ORDER BY ausentes DESC LIMIT 10
           ) sub
         ), '[]'::json),
         'por_usuario_creacion', COALESCE((
@@ -199,8 +199,8 @@ BEGIN
                    ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
             FROM filtered_visitas
             WHERE usuario_creacion IS NOT NULL AND TRIM(usuario_creacion) != ''
-            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
-            ORDER BY tasa DESC LIMIT 10
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) > 0
+            ORDER BY ausentes DESC LIMIT 10
           ) sub
         ), '[]'::json)
       )
