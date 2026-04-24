@@ -20,6 +20,41 @@ function getHeatmapColor(value, max) {
     return '#1d4ed8'
 }
 
+const AusentismoChart = ({ data, title, icon }) => (
+    <div className="card">
+        <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {icon}
+                <h3 style={{ margin: 0 }}>{title}</h3>
+            </div>
+        </div>
+        <div className="card-body">
+            <div className="chart-container" style={{ height: '300px' }}>
+                {data && data.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={true} />
+                            <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 'auto']} unit="%" />
+                            <YAxis dataKey="nombre" type="category" tick={{ fontSize: 11 }} width={140} />
+                            <RechartsTooltip 
+                                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                                formatter={(value, name) => name === 'Tasa Ausentismo' ? `${value}%` : value}
+                            />
+                            <Bar dataKey="tasa" name="Tasa Ausentismo" radius={[0, 4, 4, 0]} animationDuration={600} fill="#ef4444">
+                                {data.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.tasa > 30 ? '#dc2626' : entry.tasa > 15 ? '#ef4444' : '#f87171'} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>Sin datos suficientes (Mín. 10 turnos)</div>
+                )}
+            </div>
+        </div>
+    </div>
+)
+
 export default function TurnosDashboard() {
   const [data, setData] = useState({
       kpis: null,
@@ -31,7 +66,8 @@ export default function TurnosDashboard() {
       agentes: [],
       especialidades: [],
       responsables: [],
-      poblaciones: []
+      poblaciones: [],
+      ausentismoAnalisis: null
   })
   
   const [loading, setLoading] = useState(true)
@@ -137,7 +173,7 @@ export default function TurnosDashboard() {
     )
   }
 
-  const { kpis, heatmap, heatmapBrindados, tendencia, tendenciaBrindados, ausentismoDiaMes, agentes, especialidades, responsables, poblaciones } = data
+  const { kpis, heatmap, heatmapBrindados, tendencia, tendenciaBrindados, ausentismoDiaMes, agentes, especialidades, responsables, poblaciones, ausentismoAnalisis } = data
   const maxHeatmapVal = Math.max(...heatmap.flat(), 1)
   const maxHeatmapBrindadosVal = heatmapBrindados ? Math.max(...heatmapBrindados.flat(), 1) : 1
   
@@ -530,6 +566,32 @@ export default function TurnosDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* ═══ ROW 6: ANALISIS DE AUSENTISMO ═══ */}
+            {ausentismoAnalisis && (
+            <div className="fade-in">
+                <div style={{ padding: '20px 0 15px', borderBottom: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                    <h2 style={{ fontSize: '18px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 5px' }}>
+                        <AlertCircle color="#ef4444" />
+                        Análisis Detallado de Inasistencias (Ausentismo)
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>Análisis porcentual de ausencias injustificadas sobre el total de turnos (mínimo 10 turnos asignados con fecha pasada).</p>
+                </div>
+
+                <div className="grid-2" style={{ marginBottom: '20px' }}>
+                    <AusentismoChart data={ausentismoAnalisis.por_responsable} title="Responsables con más Ausentismo (%)" icon={<UserCheck size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_grupo_agenda} title="Grupo Agenda con más Ausentismo (%)" icon={<Calendar size={16} color="#ef4444"/>} />
+                </div>
+                <div className="grid-2" style={{ marginBottom: '20px' }}>
+                    <AusentismoChart data={ausentismoAnalisis.por_tipo_visita} title="Tipo de Visita con más Ausentismo (%)" icon={<Briefcase size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_obra_social} title="Obras Sociales con más Ausentismo (%)" icon={<Activity size={16} color="#ef4444"/>} />
+                </div>
+                <div className="grid-2" style={{ marginBottom: '30px' }}>
+                    <AusentismoChart data={ausentismoAnalisis.por_centro} title="Centros con más Ausentismo (%)" icon={<MapPin size={16} color="#ef4444"/>} />
+                    <AusentismoChart data={ausentismoAnalisis.por_usuario_creacion} title="Creadores con más Ausentismo (%)" icon={<Users size={16} color="#ef4444"/>} />
+                </div>
+            </div>
+            )}
           </>
       )}
     </div>

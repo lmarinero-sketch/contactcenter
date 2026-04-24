@@ -116,7 +116,89 @@ BEGIN
         WHERE poblacion IS NOT NULL AND poblacion != 'NULL' AND TRIM(poblacion) != ''
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
       ) sub
-    ), '[]'::json)
+    ), '[]'::json),
+    'ausentismo_analisis', (
+      SELECT json_build_object(
+        'por_responsable', COALESCE((
+          SELECT json_agg(json_build_object('nombre', nombre, 'tasa', tasa, 'total', total, 'ausentes', ausentes))
+          FROM (
+            SELECT responsable as nombre, 
+                   COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) as total,
+                   COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) as ausentes,
+                   ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
+            FROM filtered_visitas
+            WHERE responsable IS NOT NULL AND TRIM(responsable) != ''
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
+            ORDER BY tasa DESC LIMIT 10
+          ) sub
+        ), '[]'::json),
+        'por_grupo_agenda', COALESCE((
+          SELECT json_agg(json_build_object('nombre', nombre, 'tasa', tasa, 'total', total, 'ausentes', ausentes))
+          FROM (
+            SELECT grupo_agenda as nombre, 
+                   COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) as total,
+                   COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) as ausentes,
+                   ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
+            FROM filtered_visitas
+            WHERE grupo_agenda IS NOT NULL AND TRIM(grupo_agenda) != '' AND grupo_agenda != 'NULL'
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
+            ORDER BY tasa DESC LIMIT 10
+          ) sub
+        ), '[]'::json),
+        'por_tipo_visita', COALESCE((
+          SELECT json_agg(json_build_object('nombre', nombre, 'tasa', tasa, 'total', total, 'ausentes', ausentes))
+          FROM (
+            SELECT tipo_visita as nombre, 
+                   COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) as total,
+                   COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) as ausentes,
+                   ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
+            FROM filtered_visitas
+            WHERE tipo_visita IS NOT NULL AND TRIM(tipo_visita) != ''
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
+            ORDER BY tasa DESC LIMIT 10
+          ) sub
+        ), '[]'::json),
+        'por_obra_social', COALESCE((
+          SELECT json_agg(json_build_object('nombre', nombre, 'tasa', tasa, 'total', total, 'ausentes', ausentes))
+          FROM (
+            SELECT cliente as nombre, 
+                   COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) as total,
+                   COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) as ausentes,
+                   ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
+            FROM filtered_visitas
+            WHERE cliente IS NOT NULL AND TRIM(cliente) != ''
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
+            ORDER BY tasa DESC LIMIT 10
+          ) sub
+        ), '[]'::json),
+        'por_centro', COALESCE((
+          SELECT json_agg(json_build_object('nombre', nombre, 'tasa', tasa, 'total', total, 'ausentes', ausentes))
+          FROM (
+            SELECT centro as nombre, 
+                   COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) as total,
+                   COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) as ausentes,
+                   ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
+            FROM filtered_visitas
+            WHERE centro IS NOT NULL AND TRIM(centro) != ''
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
+            ORDER BY tasa DESC LIMIT 10
+          ) sub
+        ), '[]'::json),
+        'por_usuario_creacion', COALESCE((
+          SELECT json_agg(json_build_object('nombre', nombre, 'tasa', tasa, 'total', total, 'ausentes', ausentes))
+          FROM (
+            SELECT usuario_creacion as nombre, 
+                   COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) as total,
+                   COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) as ausentes,
+                   ROUND(COUNT(*) FILTER (WHERE asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE) * 100.0 / NULLIF(COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE), 0), 1) as tasa
+            FROM filtered_visitas
+            WHERE usuario_creacion IS NOT NULL AND TRIM(usuario_creacion) != ''
+            GROUP BY 1 HAVING COUNT(*) FILTER (WHERE fecha_visita < CURRENT_DATE) >= 10
+            ORDER BY tasa DESC LIMIT 10
+          ) sub
+        ), '[]'::json)
+      )
+    )
   ) INTO result;
 
   RETURN result;
