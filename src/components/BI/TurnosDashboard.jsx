@@ -29,13 +29,13 @@ const AusentismoChart = ({ data, title, icon }) => (
             </div>
         </div>
         <div className="card-body">
-            <div className="chart-container" style={{ height: '300px' }}>
+            <div className="chart-container" style={{ height: '450px' }}>
                 {data && data.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={true} />
                             <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 'auto']} unit="%" />
-                            <YAxis dataKey="nombre" type="category" tick={{ fontSize: 11 }} width={140} />
+                            <YAxis dataKey="nombre" type="category" tick={{ fontSize: 10 }} width={200} interval={0} />
                             <RechartsTooltip 
                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                                 formatter={(value, name) => name === 'Tasa Ausentismo' ? `${value}%` : value}
