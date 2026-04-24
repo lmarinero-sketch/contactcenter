@@ -80,12 +80,51 @@ export default function TurnosDashboard() {
   // Filtros
   const [dateFrom, setDateFrom] = useState(null)
   const [dateTo, setDateTo] = useState(null)
+  const [aiReport, setAiReport] = useState(null)
+
+  const generateAI = async (currentData) => {
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      if (!apiKey || !currentData || !currentData.kpis) return null;
+      
+      try {
+          const payload = {
+            total_turnos: currentData.kpis.total_turnos,
+            asistidos: currentData.kpis.asistidos,
+            ausentes: currentData.kpis.ausentes,
+            tasa_asistencia: ((currentData.kpis.asistidos / (currentData.kpis.asistidos + currentData.kpis.ausentes + currentData.kpis.ausentes_justificados)) * 100).toFixed(1) + '%',
+            top_especialidades_ausentismo: currentData.ausentismoAnalisis?.por_grupo_agenda?.slice(0,3).map(x => `${x.nombre} (${x.ausentes})`) || [],
+            top_responsables_ausentismo: currentData.ausentismoAnalisis?.por_responsable?.slice(0,3).map(x => `${x.nombre} (${x.ausentes})`) || [],
+          }
+          
+          const prompt = `Actúa como un experto consultor de salud y analista de datos. Redacta un reporte ejecutivo tipo "revista de finanzas y negocios" de 3 párrafos analizando estos datos de presentismo del Sanatorio Argentino: ${JSON.stringify(payload)}. Escribe con estilo sofisticado, muy profesional, periodístico y directivo. Enfócate en el impacto de los ausentes. Usa markdown básico (**negrita**). Devuelve solo el texto del artículo.`;
+
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+              body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7 })
+          });
+          const json = await res.json();
+          return json.choices[0].message.content;
+      } catch (e) {
+          console.error("AI Error:", e);
+          return null;
+      }
+  }
 
   const handleDownloadPdf = async () => {
     const element = printRef.current;
     if (!element) return;
 
     setIsExporting(true);
+    
+    // 1. Generate AI Summary specifically for the PDF
+    const aiText = await generateAI(data);
+    if (aiText) {
+        setAiReport(aiText);
+        // Esperar a que React renderice el texto de IA antes de capturar el canvas
+        await new Promise(r => setTimeout(r, 1500)); 
+    }
+
     try {
         const canvas = await html2canvas(element, {
             scale: 2,
@@ -110,6 +149,7 @@ export default function TurnosDashboard() {
         console.error("Error generando PDF:", error);
         alert("Hubo un error al generar el PDF.");
     } finally {
+        setAiReport(null); // Ocultarlo de la pantalla de nuevo
         setIsExporting(false);
     }
   }
@@ -265,6 +305,22 @@ export default function TurnosDashboard() {
       </div>
 
       <div ref={printRef} style={{ padding: '10px', backgroundColor: '#f8fafc' }}>
+
+      {aiReport && (
+          <div className="card fade-in" style={{ padding: '40px', backgroundColor: '#fff', borderTop: '4px solid #1e293b', marginBottom: '20px', fontFamily: '"Georgia", serif' }}>
+              <div style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '15px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <h1 style={{ fontSize: '32px', color: '#0f172a', margin: 0, fontWeight: 700, letterSpacing: '-0.5px' }}>
+                      Perspectiva Ejecutiva
+                  </h1>
+                  <span style={{ color: '#64748b', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px' }}>Edición Especial</span>
+              </div>
+              <div style={{ columns: '2', columnGap: '50px', fontSize: '15px', lineHeight: '1.8', color: '#334155', textAlign: 'justify' }}>
+                  {aiReport.split('\n\n').map((p, i) => (
+                      <p key={i} style={{ marginBottom: '1.5em', marginTop: i === 0 ? 0 : '1.5em' }} dangerouslySetInnerHTML={{__html: p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></p>
+                  ))}
+              </div>
+          </div>
+      )}
 
       {loading && !kpis ? (
           <div className="loading-spinner"><div className="spinner"></div></div>
