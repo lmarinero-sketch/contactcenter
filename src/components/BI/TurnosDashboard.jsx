@@ -73,10 +73,14 @@ export default function TurnosDashboard() {
             }) : []
 
             // Formatear Ausentismo Dia Mes
-            const ausentismoFormateado = rpcData.ausentismo_dia_mes ? rpcData.ausentismo_dia_mes.map(t => ({
-                dia: t.dia,
-                Ausentes: t.cantidad
-            })) : []
+            const ausentismoFormateado = rpcData.ausentismo_dia_mes ? rpcData.ausentismo_dia_mes.map(t => {
+                const date = new Date(t.dia)
+                return {
+                    diaOriginal: t.dia,
+                    dia: date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' }),
+                    Ausentes: t.cantidad
+                }
+            }) : []
 
             // Formatear Heatmap (Matriz 7x24) - Creados
             const matrix = Array(7).fill(0).map(() => Array(24).fill(0))
@@ -359,7 +363,7 @@ export default function TurnosDashboard() {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis dataKey="dia" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} labelFormatter={(label) => `Día ${label} del mes`} />
+                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} labelFormatter={(label) => label} />
                                     {avgAusentismo > 0 && (
                                         <ReferenceLine y={avgAusentismo} stroke="#f87171" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: `Promedio: ${avgAusentismo}`, fill: '#f87171', fontSize: 11 }} />
                                     )}

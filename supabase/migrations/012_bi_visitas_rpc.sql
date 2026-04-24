@@ -33,8 +33,8 @@ BEGIN
     'heatmap', COALESCE((
       SELECT json_agg(json_build_object('dia_semana', dia_semana, 'hora', hora, 'cantidad', cantidad))
       FROM (
-        SELECT EXTRACT(ISODOW FROM (fecha_hora_creacion - INTERVAL '3 hours') AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires') as dia_semana, 
-               EXTRACT(HOUR FROM (fecha_hora_creacion - INTERVAL '3 hours') AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires') as hora, 
+        SELECT EXTRACT(ISODOW FROM (fecha_hora_creacion - INTERVAL '6 hours') AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires') as dia_semana, 
+               EXTRACT(HOUR FROM (fecha_hora_creacion - INTERVAL '6 hours') AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Buenos_Aires') as hora, 
                COUNT(*) as cantidad
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
@@ -63,14 +63,15 @@ BEGIN
     'ausentismo_dia_mes', COALESCE((
       SELECT json_agg(json_build_object('dia', dia, 'cantidad', cantidad))
       FROM (
-        SELECT EXTRACT(DAY FROM fecha_visita) as dia, COUNT(*) as cantidad
+        SELECT DATE_TRUNC('day', fecha_visita) as dia, COUNT(*) as cantidad
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
           AND fecha_hora_creacion >= '2025-06-01 00:00:00'
           AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND fecha_visita IS NOT NULL
-          AND asistencia LIKE 'Ausencia%'
+          AND fecha_visita >= '2025-06-01'
+          AND asistencia = 'Ausencia injustificada'
         GROUP BY 1 ORDER BY 1
       ) sub
     ), '[]'::json),
