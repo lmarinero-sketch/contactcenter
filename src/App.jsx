@@ -13,6 +13,7 @@ import SimonAnalytics from './components/SimonAnalytics'
 import ShiftCalendar from './components/ShiftCalendar'
 import BitacoraPanel from './components/BitacoraPanel'
 import AgentControlPanel from './components/AgentControlPanel'
+import TurnosDashboard from './components/BI/TurnosDashboard'
 
 const VIEW_TITLES = {
     overview: 'Overview',
@@ -25,6 +26,7 @@ const VIEW_TITLES = {
     'agent-control': 'Control de Agentes',
     shifts: 'Diagrama de Turnos',
     logbook: 'Bitácora',
+    'bi-turnos': 'BI: Turnos Otorgados',
 }
 
 const VIEW_DESCRIPTIONS = {
@@ -38,6 +40,7 @@ const VIEW_DESCRIPTIONS = {
     'agent-control': 'Horarios de entrada/salida, horas trabajadas y mensajes respondidos por agente',
     shifts: 'Calendario mensual de turnos del equipo',
     logbook: 'Registro de novedades, sugerencias, problemas y cambios',
+    'bi-turnos': 'Análisis avanzado y mapa de calor de turnos operativos',
 }
 
 function App() {
@@ -101,6 +104,7 @@ function App() {
             case 'agent-control': return <AgentControlPanel key={refreshKey} />
             case 'shifts': return <ShiftCalendar key={refreshKey} />
             case 'logbook': return <BitacoraPanel key={refreshKey} />
+            case 'bi-turnos': return <TurnosDashboard key={refreshKey} />
             default: return <OverviewPanel key={refreshKey} />
         }
     }

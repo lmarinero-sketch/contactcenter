@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 const NAV_ITEMS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'bi-turnos', label: 'BI Turnos', icon: BarChart3 },
     { id: 'agents', label: 'Agentes', icon: Users },
     { id: 'chatbot', label: 'Chatbot Analytics', icon: Bot },
     { id: 'conversations', label: 'Conversaciones', icon: MessageSquare },
