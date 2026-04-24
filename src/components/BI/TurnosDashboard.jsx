@@ -266,7 +266,7 @@ export default function TurnosDashboard() {
                                                     style={{ background: getHeatmapColor(val, maxHeatmapVal), transition: 'background 0.4s ease' }}
                                                     title={`${DAY_LABELS[dayIdx]} a las ${h}h — ${val} turnos`}
                                                 >
-                                                    {val > 0 && <span className="heatmap-cell-value" style={{ opacity: val / maxHeatmapVal > 0.5 ? 1 : 0, color: val / maxHeatmapVal > 0.6 ? '#fff' : '#1e293b' }}>{val}</span>}
+                                                    {val > 0 && <span className="heatmap-cell-value" style={{ color: val / maxHeatmapVal > 0.4 ? '#fff' : '#334155', fontWeight: 600, fontSize: '11px' }}>{val}</span>}
                                                 </div>
                                             )
                                         })}
@@ -305,7 +305,7 @@ export default function TurnosDashboard() {
                                                 style={{ background: getHeatmapColor(val, maxHeatmapBrindadosVal), transition: 'background 0.4s ease' }}
                                                 title={`${DAY_LABELS[dayIdx]} a las ${h}h — ${val} turnos asignados`}
                                             >
-                                                {val > 0 && <span className="heatmap-cell-value" style={{ opacity: val / maxHeatmapBrindadosVal > 0.5 ? 1 : 0, color: val / maxHeatmapBrindadosVal > 0.6 ? '#fff' : '#1e293b' }}>{val}</span>}
+                                                {val > 0 && <span className="heatmap-cell-value" style={{ color: val / maxHeatmapBrindadosVal > 0.4 ? '#fff' : '#334155', fontWeight: 600, fontSize: '11px' }}>{val}</span>}
                                             </div>
                                         )
                                     })}
