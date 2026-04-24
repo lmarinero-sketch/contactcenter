@@ -27,8 +27,6 @@ BEGIN
       FROM salus_visitas
       WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
         AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-        AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-        AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
     ),
     'heatmap', COALESCE((
       SELECT json_agg(json_build_object('dia_semana', dia_semana, 'hora', hora, 'cantidad', cantidad))
@@ -39,8 +37,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
         GROUP BY 1, 2
       ) sub
     ), '[]'::json),
@@ -53,8 +49,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND fecha_visita IS NOT NULL
           AND hora_inicio ~ '^[0-9]{1,2}:'
         GROUP BY 1, 2
@@ -67,8 +61,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND fecha_visita IS NOT NULL
           AND fecha_visita >= '2025-06-01'
           AND asistencia = 'Ausencia injustificada'
@@ -82,8 +74,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND fecha_visita IS NOT NULL
           AND fecha_visita >= '2025-06-01'
         GROUP BY 1 ORDER BY 1
@@ -96,8 +86,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
         GROUP BY 1 ORDER BY 1
       ) sub
     ), '[]'::json),
@@ -108,8 +96,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
       ) sub
     ), '[]'::json),
@@ -120,8 +106,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND grupo_agenda IS NOT NULL AND grupo_agenda != 'NULL'
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
       ) sub
@@ -133,8 +117,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND responsable IS NOT NULL AND responsable != 'NULL'
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
       ) sub
@@ -146,8 +128,6 @@ BEGIN
         FROM salus_visitas
         WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
           AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-          AND fecha_hora_creacion >= '2025-06-01 00:00:00'
-          AND usuario_creacion IN ('OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA')
           AND poblacion IS NOT NULL AND poblacion != 'NULL' AND TRIM(poblacion) != ''
         GROUP BY 1 ORDER BY 2 DESC LIMIT 10
       ) sub
