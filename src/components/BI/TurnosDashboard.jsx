@@ -175,7 +175,7 @@ export default function TurnosDashboard() {
                 const date = new Date(d.mes)
                 return {
                 ...d,
-                nombreMes: date.toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+                nombreMes: date.toLocaleDateString('es-AR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
                 }
             })
 
@@ -184,7 +184,7 @@ export default function TurnosDashboard() {
                 const date = new Date(d.mes)
                 return {
                 ...d,
-                nombreMes: date.toLocaleDateString('es-AR', { month: 'short', year: 'numeric' })
+                nombreMes: date.toLocaleDateString('es-AR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
                 }
             }) : []
 
