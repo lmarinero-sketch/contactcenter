@@ -8,6 +8,7 @@ import { Calendar, Users, Activity, Clock, TrendingUp, CheckCircle, XCircle, Bri
 import DateFilter from '../DateFilter'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import VisitasUploader from './VisitasUploader'
 
 const COLORS = ['#1a6bb5', '#0d9488', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b', '#ec4899', '#3b82f6', '#f97316']
 const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -60,6 +61,7 @@ const AusentismoChart = ({ data, title, icon }) => (
 export default function TurnosDashboard() {
   const printRef = useRef(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [uploadRefreshKey, setUploadRefreshKey] = useState(0)
   const [data, setData] = useState({
       kpis: null,
       heatmap: [],
@@ -236,7 +238,7 @@ export default function TurnosDashboard() {
     }
 
     fetchBI()
-  }, [dateFrom, dateTo])
+  }, [dateFrom, dateTo, uploadRefreshKey])
 
   if (loadError) {
     return (
@@ -303,6 +305,9 @@ export default function TurnosDashboard() {
               {isExporting ? 'Generando PDF...' : 'Descargar Reporte'}
           </button>
       </div>
+
+      {/* ═══ CARGA DE EXCEL ═══ */}
+      <VisitasUploader onUploadComplete={() => setUploadRefreshKey(k => k + 1)} />
 
       <div ref={printRef} style={{ padding: '10px', backgroundColor: '#f8fafc' }}>
 
