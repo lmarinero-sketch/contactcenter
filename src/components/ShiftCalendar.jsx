@@ -10,7 +10,7 @@ import {
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
-const AGENTS = ['Daniela', 'Sofia', 'Antonella', 'Refuerzo']
+const AGENTS = ['Daniela', 'Sofia', 'Antonella', 'Virginia', 'Refuerzo']
 
 const SHIFT_TYPES = {
     M: { label: 'Mañana', short: 'M', color: '#e8f4fc', textColor: '#1a6bb5', icon: Sun },
@@ -540,7 +540,7 @@ export default function ShiftCalendar() {
                     <div className="shift-ai-body">
                         <textarea
                             className="shift-ai-input"
-                            placeholder={`Ejemplos:\n• Sofia del 1 al 6 turno M, 7 franco\n• Daniela del 10 al 14 tarde\n• Antonella del 1 al 5 mañana. Antonella 6 y 7 franco\n• Refuerzo del 1 al 3 mañana`}
+                            placeholder={`Ejemplos:\n• Sofia del 1 al 6 turno M, 7 franco\n• Daniela del 10 al 14 tarde\n• Antonella del 1 al 5 mañana. Antonella 6 y 7 franco\n• Virginia del 1 al 5 tarde\n• Refuerzo del 1 al 3 mañana`}
                             value={aiInput}
                             onChange={e => { setAiInput(e.target.value); setAiParsed(null) }}
                             rows={3}

@@ -1201,6 +1201,7 @@ const NOMBRE_TO_CC_AGENT = {
     'ACOSTA ESQUIVEL MARIA ANTONELL': 'Antonella',
     'AGUILERA DANIELA ROMINA': 'Daniela',
     'MARINERO LUCAS MAXIMILIANO': 'Lucas',
+    'VIRGINIA': 'Virginia',
 }
 
 function _mapNombreToAgent(nombreCompleto) {
