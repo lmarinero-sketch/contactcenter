@@ -6,42 +6,46 @@
 -- ============================================
 
 -- 1. KPIs Generales
+DROP VIEW IF EXISTS bi_kpis_visitas CASCADE;
 CREATE OR REPLACE VIEW bi_kpis_visitas AS
 SELECT 
   COUNT(*) as total_turnos,
   SUM(CASE WHEN asistencia = 'Presente' THEN 1 ELSE 0 END) as asistidos,
   SUM(CASE WHEN asistencia = 'Ausencia injustificada' THEN 1 ELSE 0 END) as ausentes
-FROM salus_visitas;
+FROM salus_visitas_historico;
 
 -- 2. Heatmap de Creación (Día de la semana vs Hora)
 -- Extrae el día de la semana (1=Lunes, 7=Domingo) y la hora (0-23)
+DROP VIEW IF EXISTS bi_heatmap_creacion CASCADE;
 CREATE OR REPLACE VIEW bi_heatmap_creacion AS
 SELECT 
   EXTRACT(ISODOW FROM fecha_hora_creacion) as dia_semana,
   EXTRACT(HOUR FROM fecha_hora_creacion) as hora,
   COUNT(*) as cantidad
-FROM salus_visitas
+FROM salus_visitas_historico
 WHERE fecha_hora_creacion IS NOT NULL
 GROUP BY 1, 2
 ORDER BY 1, 2;
 
 -- 3. Tendencia Mensual
+DROP VIEW IF EXISTS bi_tendencia_mensual CASCADE;
 CREATE OR REPLACE VIEW bi_tendencia_mensual AS
 SELECT 
   DATE_TRUNC('month', fecha_hora_creacion) as mes,
   COUNT(*) as cantidad,
   SUM(CASE WHEN asistencia = 'Presente' THEN 1 ELSE 0 END) as asistidos
-FROM salus_visitas
+FROM salus_visitas_historico
 WHERE fecha_hora_creacion IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
 
 -- 4. Top Agentes (Usuarios de Creación)
+DROP VIEW IF EXISTS bi_top_agentes CASCADE;
 CREATE OR REPLACE VIEW bi_top_agentes AS
 SELECT 
   usuario_creacion as agente,
   COUNT(*) as cantidad
-FROM salus_visitas
+FROM salus_visitas_historico
 WHERE usuario_creacion IS NOT NULL AND usuario_creacion != 'NULL'
 GROUP BY 1
 ORDER BY 2 DESC

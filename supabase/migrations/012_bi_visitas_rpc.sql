@@ -5,8 +5,8 @@
 -- ============================================
 
 -- 1. Crear índices críticos para evitar Timeout (Seq Scan)
-CREATE INDEX IF NOT EXISTS idx_salus_visitas_creacion ON salus_visitas(fecha_hora_creacion);
-CREATE INDEX IF NOT EXISTS idx_salus_visitas_usuario ON salus_visitas(usuario_creacion);
+CREATE INDEX IF NOT EXISTS idx_salus_visitas_hist_creacion ON salus_visitas_historico(fecha_hora_creacion);
+CREATE INDEX IF NOT EXISTS idx_salus_visitas_hist_usuario ON salus_visitas_historico(usuario_creacion);
 
 -- 2. Crear la función RPC optimizada
 CREATE OR REPLACE FUNCTION bi_visitas_dashboard_data(start_date timestamptz DEFAULT NULL, end_date timestamptz DEFAULT NULL)
@@ -18,7 +18,7 @@ DECLARE
 BEGIN
   WITH filtered_visitas AS MATERIALIZED (
     SELECT *
-    FROM salus_visitas
+    FROM salus_visitas_historico
     WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
       AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
   )

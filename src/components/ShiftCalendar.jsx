@@ -16,6 +16,7 @@ const SHIFT_TYPES = {
     M: { label: 'Mañana', short: 'M', color: '#e8f4fc', textColor: '#1a6bb5', icon: Sun },
     T: { label: 'Tarde', short: 'T', color: '#fef3c7', textColor: '#b45309', icon: Moon },
     I: { label: 'Intermedio', short: 'I', color: '#ede9fe', textColor: '#7c3aed', icon: Clock },
+    C: { label: 'Cortado', short: 'C', color: '#ffedd5', textColor: '#ea580c', icon: Zap },
     V: { label: 'Vacaciones', short: 'V', color: '#d1fae5', textColor: '#059669', icon: Palmtree },
     F: { label: 'Franco', short: 'F', color: '#f1f5f9', textColor: '#64748b', icon: Coffee },
 }
@@ -129,6 +130,7 @@ function parseAICommand(text, year, month) {
         if (/\bma[ñn]ana\b/.test(l) || /\bturno\s*m\b/i.test(l) || /\b(?:^|\s)m(?:\s|$)/i.test(l)) shiftType = 'M'
         else if (/\btarde\b/.test(l) || /\bturno\s*t\b/i.test(l)) shiftType = 'T'
         else if (/\bintermedio\b/.test(l) || /\bturno\s*i\b/i.test(l)) shiftType = 'I'
+        else if (/\bcortado\b/.test(l) || /\bturno\s*c\b/i.test(l)) shiftType = 'C'
         else if (/\bvacacion/i.test(l) || /\bturno\s*v\b/i.test(l)) shiftType = 'V'
         else if (/\bfranco\b/.test(l) || /\bturno\s*f\b/i.test(l) || /\blibre\b/.test(l)) shiftType = 'F'
 
