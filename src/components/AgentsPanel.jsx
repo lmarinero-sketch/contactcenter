@@ -6,13 +6,15 @@ import {
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+    RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+    LineChart, Line
 } from 'recharts'
-import { fetchAgentStats, exportToCSV, fetchAgentProfile } from '../services/dataService'
+import { fetchAgentStats, exportToCSV, fetchAgentProfile, fetchHandoffEvolution } from '../services/dataService'
 import DateFilter from './DateFilter'
 
 export default function AgentsPanel() {
     const [agents, setAgents] = useState([])
+    const [handoffEvolution, setHandoffEvolution] = useState([])
     const [loading, setLoading] = useState(true)
     const [expandedAgent, setExpandedAgent] = useState(null)
     const [excludedAgents, setExcludedAgents] = useState(['Betina'])
@@ -26,8 +28,12 @@ export default function AgentsPanel() {
     async function loadAgents() {
         try {
             setLoading(true)
-            const data = await fetchAgentStats(dateFrom, dateTo)
+            const [data, evolutionData] = await Promise.all([
+                fetchAgentStats(dateFrom, dateTo),
+                fetchHandoffEvolution()
+            ])
             setAgents(data)
+            setHandoffEvolution(evolutionData)
         } catch (err) {
             console.error('Error loading agent stats:', err)
         } finally {
@@ -133,6 +139,31 @@ export default function AgentsPanel() {
     return (
         <div className="fade-in">
             <DateFilter dateFrom={dateFrom} dateTo={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t) }} />
+
+            {/* Evolución Mensual Handoff */}
+            {handoffEvolution.length > 0 && (
+                <div className="card" style={{ marginBottom: '24px' }}>
+                    <div className="card-header">
+                        <div>
+                            <h3>📈 Evolución del Tiempo de Espera (Mensual)</h3>
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Promedio de espera hasta la primera respuesta de un agente humano</span>
+                        </div>
+                    </div>
+                    <div className="card-body" style={{ height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={handoffEvolution} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} />
+                                <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `${val} min`} />
+                                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#64748b' }} />
+                                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }} formatter={(value, name) => [name === 'wait_time_min' ? `${value} min` : value, name === 'wait_time_min' ? 'Tiempo de espera' : 'Chats']} />
+                                <Line yAxisId="left" type="monotone" dataKey="wait_time_min" name="Tiempo de espera" stroke="#1a6bb5" strokeWidth={3} activeDot={{ r: 8 }} />
+                                <Line yAxisId="right" type="monotone" dataKey="chats" name="Chats" stroke="#cbd5e1" strokeDasharray="5 5" strokeWidth={2} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
 
             {/* Agent ranking */}
             <div className="card" style={{ marginBottom: '24px' }}>

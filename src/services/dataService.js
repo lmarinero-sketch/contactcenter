@@ -1418,3 +1418,40 @@ export async function fetchAgentProfile(agentName, dateFrom = null, dateTo = nul
 
     return await response.json()
 }
+
+// ===================== HANDOFF EVOLUTION =====================
+export async function fetchHandoffEvolution() {
+    const data = await fetchAllRows('cc_tickets', 'chat_started_at, bot_handoff_seconds', [
+        { type: 'not', column: 'bot_handoff_seconds', op: 'is', value: null }
+    ])
+
+    const monthlyMap = {}
+    
+    data.forEach(ticket => {
+        if (!ticket.chat_started_at) return
+        const date = new Date(ticket.chat_started_at)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        const monthLabel = date.toLocaleString('es-ES', { month: 'short', year: 'numeric' })
+        
+        if (!monthlyMap[monthKey]) {
+            monthlyMap[monthKey] = {
+                monthKey,
+                monthLabel,
+                totalHandoff: 0,
+                count: 0
+            }
+        }
+        
+        monthlyMap[monthKey].totalHandoff += ticket.bot_handoff_seconds
+        monthlyMap[monthKey].count += 1
+    })
+
+    return Object.values(monthlyMap)
+        .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+        .map(m => ({
+            name: m.monthLabel,
+            wait_time_min: parseFloat((m.totalHandoff / m.count / 60).toFixed(1)), // en minutos
+            chats: m.count
+        }))
+}
+
