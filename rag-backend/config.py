@@ -19,7 +19,7 @@ supabase: Client = create_client(
 # --- Model Config ---
 EMBEDDING_MODEL = "text-embedding-3-large"
 EMBEDDING_DIMENSIONS = 1536
-CHAT_MODEL = "gpt-4o"
+CHAT_MODEL = "gpt-5.1"
 RERANK_MODEL = "gpt-4o-mini"
 
 # --- Chunking Config ---
@@ -28,8 +28,8 @@ CHUNK_OVERLAP = 200
 
 # --- Search Config ---
 MATCH_THRESHOLD = 0.3
-MATCH_COUNT = 15
-RERANK_TOP_K = 6
+MATCH_COUNT = 25
+RERANK_TOP_K = 10
 
 # --- Supported File Extensions ---
 SUPPORTED_EXTENSIONS = {
