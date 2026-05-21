@@ -70,7 +70,12 @@ export default function Sidebar({ activeView, onViewChange, mobileOpen }) {
 
             <nav className="sidebar-nav">
                 {!collapsed && <div className="nav-section-label">Analytics</div>}
-                {NAV_ITEMS.map(item => (
+                {NAV_ITEMS.filter(item => {
+                    if (item.id === 'data-entry') {
+                        return profile?.role === 'coordinador' || profile?.role === 'gerente';
+                    }
+                    return true;
+                }).map(item => (
                     <button
                         key={item.id}
                         className={`nav-item ${activeView === item.id ? 'active' : ''}`}

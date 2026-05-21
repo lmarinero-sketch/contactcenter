@@ -47,7 +47,7 @@ const VIEW_DESCRIPTIONS = {
 }
 
 function App() {
-    const { user, profile, loading } = useAuth()
+    const { user, profile, loading, signOut } = useAuth()
     const [activeView, setActiveView] = useState('overview')
     const [refreshKey, setRefreshKey] = useState(0)
     const [pendingTicketId, setPendingTicketId] = useState(null)
@@ -56,6 +56,12 @@ function App() {
     const [forceRefreshCount, setForceRefreshCount] = useState(0)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [showRefreshDone, setShowRefreshDone] = useState(false)
+
+    // Detect dedicated load mode
+    const isDedicatedCargaMode = 
+        window.location.pathname === '/cargar' || 
+        window.location.search.includes('view=cargar') || 
+        window.location.hash === '#/cargar';
 
     // Loading state
     if (loading) {
@@ -69,7 +75,87 @@ function App() {
 
     // Not authenticated → show login
     if (!user) {
-        return <LoginPage />
+        return <LoginPage isCargaMode={isDedicatedCargaMode} />
+    }
+
+    // Render standalone data entry portal if in dedicated mode
+    if (isDedicatedCargaMode) {
+        const roleLabels = {
+            coordinador: 'Coordinador',
+            gerente: 'Gte. Administrativo',
+            agente: 'Agente',
+            refuerzo: 'Refuerzo',
+        }
+        
+        const roleColors = {
+            coordinador: '#10b981',
+            gerente: '#8b5cf6',
+            agente: '#3b82f6',
+            refuerzo: '#f59e0b',
+        }
+        
+        const userRole = profile?.role || 'operador'
+
+        return (
+            <div className="carga-layout">
+                <header className="carga-header">
+                    <div className="carga-header-left">
+                        <div className="carga-logo">
+                            <img src="/logosanatorio.png" alt="Sanatorio Argentino" />
+                        </div>
+                        <div className="carga-brand-info">
+                            <h1>Portal de Carga — Simon IA</h1>
+                            <span>Carga exclusiva de datos y directivas de entrenamiento</span>
+                        </div>
+                    </div>
+                    <div className="carga-header-right">
+                        {profile && (
+                            <div className="carga-user-info">
+                                <span className="carga-user-name">{profile.full_name}</span>
+                                <span 
+                                    className="carga-user-role"
+                                    style={{
+                                        background: (roleColors[userRole] || '#64748b') + '22',
+                                        color: roleColors[userRole] || '#64748b'
+                                    }}
+                                >
+                                    {roleLabels[userRole] || userRole}
+                                </span>
+                            </div>
+                        )}
+                        <button 
+                            className="btn btn-secondary" 
+                            onClick={async () => {
+                                try {
+                                    await signOut()
+                                } catch (err) {
+                                    console.error('Error signing out:', err)
+                                }
+                            }}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                padding: '10px 16px',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                borderRadius: '10px',
+                                border: '1px solid #d1d5db',
+                                backgroundColor: 'white',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </header>
+                <div className="carga-content">
+                    <DataEntryPanel key={refreshKey} />
+                </div>
+            </div>
+        )
     }
 
     const handleRefresh = () => {

@@ -887,6 +887,6 @@ def _learn_from_conversation(conversation_id: str):
         from services.chat_learning import index_conversation
         result = index_conversation(conversation_id)
         if result.get("indexed", 0) > 0:
-            print(f"📚 Learned {result['indexed']} Q&A pairs from conversation {conversation_id}")
+            print(f"Learned {result['indexed']} Q&A pairs from conversation {conversation_id}")
     except Exception as e:
         print(f"Chat learning error: {e}")

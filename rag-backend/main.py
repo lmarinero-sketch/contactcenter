@@ -2,7 +2,15 @@
 RAG Backend — FastAPI Entry Point
 Sanatorio Argentino - Contact Center
 """
+import sys
+import io
+
+# Redefine standard output streams to use UTF-8 to prevent charmap/encoding exceptions on Windows
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from fastapi import FastAPI
+
 from fastapi.middleware.cors import CORSMiddleware
 from routes.chat import router as chat_router
 from routes.documents import router as documents_router

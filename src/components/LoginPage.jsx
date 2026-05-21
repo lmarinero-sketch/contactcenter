@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react'
 
-export default function LoginPage() {
+export default function LoginPage({ isCargaMode = false }) {
     const { signIn } = useAuth()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -36,8 +36,10 @@ export default function LoginPage() {
                         <div className="login-logo">
                             <img src="/logosanatorio.png" alt="Sanatorio Argentino" />
                         </div>
-                        <h1 className="login-title">Contact Center</h1>
-                        <p className="login-subtitle">Panel de Analytics y Gestión</p>
+                        <h1 className="login-title">{isCargaMode ? 'Portal de Carga' : 'Contact Center'}</h1>
+                        <p className="login-subtitle">
+                            {isCargaMode ? 'Carga exclusiva de datos — Simon IA' : 'Panel de Analytics y Gestión'}
+                        </p>
                     </div>
 
                     <form className="login-form" onSubmit={handleSubmit}>

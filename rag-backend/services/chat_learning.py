@@ -88,16 +88,16 @@ def handle_feedback(conversation_id: str, message_index: int, is_correct: bool) 
                 removed = _deindex_qa_pair(conversation_id, target_msg["content"])
                 result["action"] = "deindexed"
                 result["chunks_removed"] = removed
-                print(f"🗑️ Deindexed {removed} chunks for incorrect response in conv {conversation_id}")
+                print(f"Deindexed {removed} chunks for incorrect response in conv {conversation_id}")
             else:
                 # CORRECT → Mark Q&A chunk as verified
                 verified = _verify_qa_pair(conversation_id, target_msg["content"])
                 result["action"] = "verified"
                 result["chunks_verified"] = verified
-                print(f"✅ Verified {verified} chunks for correct response in conv {conversation_id}")
+                print(f"Verified {verified} chunks for correct response in conv {conversation_id}")
         else:
             result["action"] = "message_not_found"
-            print(f"⚠️ Message index {message_index} not found in conversation {conversation_id}")
+            print(f"Message index {message_index} not found in conversation {conversation_id}")
     
     except Exception as e:
         print(f"Error processing feedback: {e}")
@@ -204,14 +204,27 @@ def index_conversation(conversation_id: str) -> dict:
     Returns stats about what was indexed.
     """
     try:
-        # Load all messages from the conversation
-        result = supabase.table("rag_messages") \
-            .select("role, content, sources, feedback, created_at") \
-            .eq("conversation_id", conversation_id) \
-            .order("created_at") \
-            .execute()
-        
-        messages = result.data or []
+        # Load all messages from the conversation (fallback if feedback column doesn't exist)
+        try:
+            result = supabase.table("rag_messages") \
+                .select("role, content, sources, feedback, created_at") \
+                .eq("conversation_id", conversation_id) \
+                .order("created_at") \
+                .execute()
+            messages = result.data or []
+        except Exception as e:
+            # Check if the error is due to missing feedback column
+            if "feedback" in str(e).lower():
+                result = supabase.table("rag_messages") \
+                    .select("role, content, sources, created_at") \
+                    .eq("conversation_id", conversation_id) \
+                    .order("created_at") \
+                    .execute()
+                messages = result.data or []
+                for msg in messages:
+                    msg["feedback"] = None
+            else:
+                raise e
         
         if len(messages) < MIN_MESSAGES_TO_INDEX:
             return {"indexed": 0, "reason": "Not enough messages"}
