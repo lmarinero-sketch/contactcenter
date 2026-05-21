@@ -7,24 +7,10 @@
  * Todos los sistemas usan RPC porque no tienen sesión
  * autenticada en el Supabase del Hub (RLS bloquea inserts directos).
  */
-import { createClient } from '@supabase/supabase-js'
+import { supabaseHub } from './supabase'
 
-const HUB_SUPABASE_URL = import.meta.env.VITE_HUB_SUPABASE_URL
-const HUB_SUPABASE_ANON_KEY = import.meta.env.VITE_HUB_SUPABASE_ANON_KEY
-
-let hubClient = null
 function getHubClient() {
-  if (!HUB_SUPABASE_URL || !HUB_SUPABASE_ANON_KEY) return null
-  if (!hubClient) {
-    hubClient = createClient(HUB_SUPABASE_URL, HUB_SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false
-      }
-    })
-  }
-  return hubClient
+  return supabaseHub
 }
 
 let initialized = false
