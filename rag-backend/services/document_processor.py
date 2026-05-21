@@ -18,6 +18,10 @@ def extract_text(file_path: str) -> str:
         '.xlsx': _extract_excel,
         '.xls': _extract_excel,
         '.csv': _extract_csv,
+        '.png': _extract_image_vision,
+        '.jpg': _extract_image_vision,
+        '.jpeg': _extract_image_vision,
+        '.webp': _extract_image_vision,
     }
 
     extractor = extractors.get(ext, _extract_text_file)
@@ -361,6 +365,63 @@ def _extract_csv(file_path: str) -> str:
             if cells:
                 parts.append(" | ".join(cells))
     return "\n".join(parts)
+
+
+def _extract_image_vision(file_path: str) -> str:
+    """
+    Extract text from an image using GPT-4o Vision.
+    Encodes the image in base64 and sends it to OpenAI's vision API.
+    """
+    try:
+        import base64
+        from config import openai_client, CHAT_MODEL
+
+        # Read image bytes
+        with open(file_path, "rb") as img_file:
+            img_bytes = img_file.read()
+
+        ext = os.path.splitext(file_path)[1].lower().strip('.')
+        if ext == 'jpg':
+            ext = 'jpeg'
+        # Default to png mime if unrecognized
+        mime_type = f"image/{ext}" if ext in ['png', 'jpeg', 'webp'] else "image/png"
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+        print(f"Vision: Processing single image {file_path}...")
+        response = openai_client.chat.completions.create(
+            model=CHAT_MODEL,
+            max_tokens=2000,
+            timeout=60,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Extraé TODO el texto de esta imagen de documento. "
+                                "Mantené la estructura original (títulos, párrafos, listas, tablas). "
+                                "Respondé SOLO con el texto extraído, sin comentarios."
+                            )
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{img_base64}",
+                                "detail": "high"
+                            }
+                        }
+                    ]
+                }
+            ]
+        )
+        text = response.choices[0].message.content.strip()
+        print(f"Vision: Extracted {len(text)} characters from image {file_path}")
+        return text
+
+    except Exception as e:
+        print(f"Vision image extraction failed: {e}")
+        return ""
 
 
 def _extract_text_file(file_path: str) -> str:

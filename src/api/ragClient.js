@@ -91,7 +91,7 @@ export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = 
     const results = [];
     let processed = 0, failed = 0, skipped = 0;
     let total_chunks = 0;
-    const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm'];
+    const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm', '.png', '.jpg', '.jpeg', '.webp'];
 
     const TIMEOUT_MS = 120000; // 2 min per file
     const MAX_RETRIES = 1;

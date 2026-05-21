@@ -208,7 +208,7 @@ export default function DataEntryPanel() {
                                         <input 
                                             type="file" 
                                             onChange={handleFileChange}
-                                            accept=".csv, .pdf, .docx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                                            accept=".csv, .pdf, .docx, .png, .jpg, .jpeg, .webp, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                                         />
                                         {file ? (
@@ -228,7 +228,7 @@ export default function DataEntryPanel() {
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
                                                     <span style={{ display: 'block', fontWeight: 600, fontSize: '1rem', color: '#334155' }}>Hacé clic o arrastrá un archivo aquí</span>
-                                                    <span style={{ fontSize: '0.85rem', marginTop: '4px', display: 'block' }}>Formatos permitidos: Excel, CSV, PDF, Word</span>
+                                                    <span style={{ fontSize: '0.85rem', marginTop: '4px', display: 'block' }}>Formatos permitidos: Excel, CSV, PDF, Word, Imágenes</span>
                                                 </div>
                                             </div>
                                         )}
@@ -356,11 +356,12 @@ export default function DataEntryPanel() {
                             <FileDigit style={{ color: '#16a34a', flexShrink: 0, marginTop: '2px' }} size={20} />
                             <div>
                                 <h4 style={{ color: '#166534', fontWeight: 600, fontSize: '0.9rem', margin: 0 }}>Formatos Soportados</h4>
-                                <ul style={{ color: '#166534', fontSize: '0.85rem', margin: '6px 0 0 0', paddingLeft: '20px', lineHeight: 1.5, opacity: 0.9 }}>
-                                    <li><strong>.XLSX / .CSV</strong>: Para bases de datos y grillas.</li>
-                                    <li><strong>.PDF / .DOCX</strong>: Para normativas y manuales.</li>
-                                    <li><strong>Texto Libre</strong>: Para órdenes inmediatas.</li>
-                                </ul>
+                                                <ul style={{ color: '#166534', fontSize: '0.85rem', margin: '6px 0 0 0', paddingLeft: '20px', lineHeight: 1.5, opacity: 0.9 }}>
+                                                    <li><strong>.XLSX / .CSV</strong>: Para bases de datos y grillas.</li>
+                                                    <li><strong>.PDF / .DOCX</strong>: Para normativas y manuales.</li>
+                                                    <li><strong>.PNG / .JPG / .JPEG / .WEBP</strong>: Para imágenes y capturas.</li>
+                                                    <li><strong>Texto Libre</strong>: Para órdenes inmediatas.</li>
+                                                </ul>
                             </div>
                         </div>
                     </div>

@@ -34,5 +34,6 @@ RERANK_TOP_K = 10
 # --- Supported File Extensions ---
 SUPPORTED_EXTENSIONS = {
     '.pdf', '.docx', '.xlsx', '.xls', '.csv',
-    '.txt', '.md', '.json', '.xml', '.html', '.htm'
+    '.txt', '.md', '.json', '.xml', '.html', '.htm',
+    '.png', '.jpg', '.jpeg', '.webp'
 }

@@ -262,7 +262,7 @@ export default function RAGPanel() {
     }
 
     // Supported extensions for filtering
-    const SUPPORTED_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm']
+    const SUPPORTED_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm', '.png', '.jpg', '.jpeg', '.webp']
 
     // Handle file selection — show confirmation modal
     function handleFileSelect(event) {
@@ -514,6 +514,7 @@ export default function RAGPanel() {
         '.pdf': '📄', '.docx': '📝', '.xlsx': '📊', '.xls': '📊',
         '.csv': '📋', '.txt': '📃', '.md': '📃', '.json': '🔧',
         '.xml': '🔧', '.html': '🌐', '.htm': '🌐',
+        '.png': '🖼️', '.jpg': '🖼️', '.jpeg': '🖼️', '.webp': '🖼️',
     }
 
     // === WELCOME / BOOT SCREEN ===
@@ -678,7 +679,7 @@ export default function RAGPanel() {
                             {/* Toolbar */}
                             <div className="rag-fm-toolbar">
                                 <input ref={fileInputRef} type="file" onChange={handleFileSelect}
-                                    accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm"
+                                    accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm,.png,.jpg,.jpeg,.webp"
                                     style={{ display: 'none' }} multiple />
                                 <input ref={folderInputRef} type="file" onChange={handleFileSelect}
                                     style={{ display: 'none' }} webkitdirectory="" directory="" multiple />
