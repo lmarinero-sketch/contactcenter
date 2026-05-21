@@ -8,4 +8,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // Secondary client — connects to RRHH/Hub Supabase (fichadas, organigrama, etc.)
 const hubUrl = import.meta.env.VITE_HUB_SUPABASE_URL
 const hubKey = import.meta.env.VITE_HUB_SUPABASE_ANON_KEY
-export const supabaseHub = (hubUrl && hubKey) ? createClient(hubUrl, hubKey) : null
+export const supabaseHub = (hubUrl && hubKey) ? createClient(hubUrl, hubKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  }
+}) : null

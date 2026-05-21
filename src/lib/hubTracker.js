@@ -19,7 +19,13 @@ function getHubClient() {
     return null
   }
   if (!hubClient) {
-    hubClient = createClient(HUB_SUPABASE_URL, HUB_SUPABASE_ANON_KEY)
+    hubClient = createClient(HUB_SUPABASE_URL, HUB_SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    })
   }
   return hubClient
 }
