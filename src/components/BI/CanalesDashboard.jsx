@@ -222,6 +222,18 @@ export default function CanalesDashboard() {
   const topRec = data?.top_responsables_rec || []
   const topOnline = data?.top_responsables_online || []
 
+  // Filtrar y calcular porcentajes de creadores (agentes) del Contact Center
+  const creadoresCC = (data?.top_creadores_por_canal || [])
+    .filter(c => c.canal === 'Contact Center')
+    .map(c => {
+      const denom = (c.asistidos || 0) + (c.ausentes || 0) + (c.ausentes_justificados || 0)
+      const tasa_asistencia = denom > 0 ? ((c.asistidos / denom) * 100).toFixed(1) : '0.0'
+      const tasa_ausentismo = denom > 0 ? ((c.ausentes / denom) * 100).toFixed(1) : '0.0'
+      return { ...c, tasa_asistencia, tasa_ausentismo }
+    })
+  
+  const especialidadesCriticasCC = data?.especialidades_criticas_cc || []
+
   // Pie chart data
   const pieData = kpisPorCanal.map(c => ({
     name: c.canal,
@@ -379,6 +391,95 @@ export default function CanalesDashboard() {
                 globalTotal={kpisGlobal?.total || 0}
               />
             ))}
+          </div>
+
+          {/* ═══ PANEL DE EFICIENCIA DEL CONTACT CENTER ═══ */}
+          <div className="grid-2" style={{ marginBottom: '24px', opacity: loading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+            {/* Agentes CC */}
+            <div className="card">
+              <div className="card-header" style={{ borderLeft: `4px solid ${CANAL_COLORS['Contact Center']}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={16} color={CANAL_COLORS['Contact Center']} />
+                  <h3 style={{ margin: 0 }}>Desempeño de Agentes (Contact Center)</h3>
+                </div>
+              </div>
+              <div className="card-body" style={{ padding: '16px 20px' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>#</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>Agente / Operador</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>Total Citas</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>% Asist.</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>% Ausent.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {creadoresCC.length > 0 ? (
+                        creadoresCC.slice(0, 8).map((c, i) => (
+                          <tr key={i} style={{ transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: CANAL_COLORS['Contact Center'] }}>{i + 1}</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontWeight: 500 }}>{c.nombre}</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 600, color: '#1e293b' }}>{c.total?.toLocaleString('es-AR')}</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{c.tasa_asistencia}%</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{c.tasa_ausentismo}%</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>Sin datos de agentes</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Agendas Críticas CC */}
+            <div className="card">
+              <div className="card-header" style={{ borderLeft: `4px solid #ef4444` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertCircle size={16} color="#ef4444" />
+                  <h3 style={{ margin: 0 }}>Agendas con Mayor Ausentismo (Alertas CC)</h3>
+                </div>
+              </div>
+              <div className="card-body" style={{ padding: '16px 20px' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>#</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>Agenda / Especialidad</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>Total Citas</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 700, fontSize: '11px' }}>% Ausentismo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {especialidadesCriticasCC.length > 0 ? (
+                        especialidadesCriticasCC.slice(0, 8).map((s, i) => (
+                          <tr key={i} style={{ transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#ef4444' }}>{i + 1}</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', color: '#334155', fontWeight: 500 }}>{s.especialidad}</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#64748b' }}>{s.total?.toLocaleString('es-AR')}</td>
+                            <td style={{ padding: '8px 6px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#ef4444', fontWeight: 700 }}>{s.tasa_ausentismo}%</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>Cargue la última versión del RPC para visualizar</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ═══ ROW: DISTRIBUCIÓN PIE + TENDENCIA ═══ */}

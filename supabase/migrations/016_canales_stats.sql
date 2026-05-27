@@ -195,7 +195,9 @@ BEGIN
           usuario_creacion as nombre,
           canal_creacion as canal,
           COUNT(*) as total,
-          SUM(CASE WHEN asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END) as ausentes
+          SUM(CASE WHEN asistencia = 'Presente' THEN 1 ELSE 0 END) as asistidos,
+          SUM(CASE WHEN asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END) as ausentes,
+          SUM(CASE WHEN asistencia = 'Ausencia justificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END) as ausentes_justificados
         FROM fv 
         WHERE usuario_creacion IS NOT NULL AND TRIM(usuario_creacion) != ''
         GROUP BY 1, 2
@@ -231,6 +233,27 @@ BEGIN
         FROM fv
         WHERE fecha_hora_creacion IS NOT NULL
         GROUP BY 1 ORDER BY 1
+      ) sub
+    ), '[]'::json),
+
+    -- Agendas con mayor ausentismo en el Contact Center (Mín. 50 turnos)
+    'especialidades_criticas_cc', COALESCE((
+      SELECT json_agg(row_to_json(sub))
+      FROM (
+        SELECT 
+          grupo_agenda as especialidad,
+          COUNT(*) as total,
+          SUM(CASE WHEN asistencia = 'Presente' THEN 1 ELSE 0 END) as asistidos,
+          SUM(CASE WHEN asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END) as ausentes,
+          ROUND(
+            SUM(CASE WHEN asistencia = 'Ausencia injustificada' AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END) * 100.0 / 
+            NULLIF(SUM(CASE WHEN asistencia IN ('Presente','Ausencia injustificada','Ausencia justificada') AND fecha_visita < CURRENT_DATE THEN 1 ELSE 0 END), 0)
+          , 1) as tasa_ausentismo
+        FROM fv
+        WHERE canal_creacion = 'Contact Center' AND grupo_agenda IS NOT NULL AND TRIM(grupo_agenda) != ''
+        GROUP BY 1
+        HAVING COUNT(*) >= 50
+        ORDER BY tasa_ausentismo DESC LIMIT 10
       ) sub
     ), '[]'::json)
 
