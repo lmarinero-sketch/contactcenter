@@ -145,13 +145,18 @@ async function run() {
 
   console.log(`📊 Filas en Excel: ${rawData.length.toLocaleString('es-AR')}`);
 
+  const EXCLUDED_GROUPS = new Set([
+    'GUARDIAS', 'GUARDIA CLINICA', 'QUIRÓFANOS CENTRALES', 'RADIOLOGIA', 
+    'FERTILIDAD', 'LABORATORIO', 'VACUNATORIO', 'CITOLOGIA', 
+    'HEMODINAMIA', 'CONTROL NEONATAL', 'QUIRÓFANOS HDD', 'CURACIONES', 'FUNDACION'
+  ]);
   const mapped = rawData.map(mapRow).filter(r => {
     if (!r) return false;
     const ga = r.grupo_agenda ? r.grupo_agenda.toUpperCase().trim() : '';
-    if (ga === 'GUARDIAS' || ga === 'GUARDIA CLINICA') return false;
+    if (EXCLUDED_GROUPS.has(ga)) return false;
     return true;
   });
-  console.log(`✅ Filas válidas (excluyendo Guardias): ${mapped.length.toLocaleString('es-AR')}`);
+  console.log(`✅ Filas válidas (excluyendo Guardias y Agendas en verde): ${mapped.length.toLocaleString('es-AR')}`);
 
   // Distribución de canales
   const canalDist = {};

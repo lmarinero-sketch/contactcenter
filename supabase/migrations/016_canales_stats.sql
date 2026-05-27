@@ -78,7 +78,11 @@ BEGIN
     FROM salus_visitas_canales
     WHERE (start_date IS NULL OR fecha_hora_creacion >= start_date)
       AND (end_date IS NULL OR fecha_hora_creacion <= end_date)
-      AND (grupo_agenda IS NULL OR UPPER(TRIM(grupo_agenda)) NOT IN ('GUARDIAS', 'GUARDIA CLINICA'))
+      AND (grupo_agenda IS NULL OR UPPER(TRIM(grupo_agenda)) NOT IN (
+        'GUARDIAS', 'GUARDIA CLINICA', 'QUIRÓFANOS CENTRALES', 'RADIOLOGIA', 
+        'FERTILIDAD', 'LABORATORIO', 'VACUNATORIO', 'CITOLOGIA', 
+        'HEMODINAMIA', 'CONTROL NEONATAL', 'QUIRÓFANOS HDD', 'CURACIONES', 'FUNDACION'
+      ))
   )
   SELECT json_build_object(
 
