@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Users, Bot, MessageSquare,
     ChevronLeft, ChevronRight, Brain,
     Shield, BarChart3, CalendarDays, BookOpen,
-    LogOut, UserCircle, Eye, Upload
+    LogOut, UserCircle, Eye, Upload, GitCompareArrows
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'data-entry', label: 'Carga de Datos', icon: Upload },
     { id: 'bi-turnos', label: 'BI Turnos', icon: BarChart3 },
+    { id: 'bi-canales', label: 'BI Canales', icon: GitCompareArrows },
     { id: 'agents', label: 'Agentes', icon: Users },
     { id: 'chatbot', label: 'Chatbot Analytics', icon: Bot },
     { id: 'conversations', label: 'Conversaciones', icon: MessageSquare },

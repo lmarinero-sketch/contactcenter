@@ -42,3 +42,6 @@ antigravity-awesome-skills/
 
 # Supabase temp
 supabase/.temp/
+
+# Excel temp lockfiles
+~$*

@@ -14,6 +14,7 @@ import ShiftCalendar from './components/ShiftCalendar'
 import BitacoraPanel from './components/BitacoraPanel'
 import AgentControlPanel from './components/AgentControlPanel'
 import TurnosDashboard from './components/BI/TurnosDashboard'
+import CanalesDashboard from './components/BI/CanalesDashboard'
 import DataEntryPanel from './components/DataEntryPanel'
 
 const VIEW_TITLES = {
@@ -28,6 +29,7 @@ const VIEW_TITLES = {
     shifts: 'Diagrama de Turnos',
     logbook: 'Bitácora',
     'bi-turnos': 'BI: Turnos Otorgados',
+    'bi-canales': 'BI: Canales de Creación',
     'data-entry': 'Carga de Información',
 }
 
@@ -43,6 +45,7 @@ const VIEW_DESCRIPTIONS = {
     shifts: 'Calendario mensual de turnos del equipo',
     logbook: 'Registro de novedades, sugerencias, problemas y cambios',
     'bi-turnos': 'Análisis avanzado y mapa de calor de turnos operativos',
+    'bi-canales': 'Comparativa Contact Center vs Recepciones vs Turnos Online — Volumen, ausentismo y eficiencia por canal',
     'data-entry': 'Apartado exclusivo para cargar datos y métricas al sistema',
 }
 
@@ -194,6 +197,7 @@ function App() {
             case 'shifts': return <ShiftCalendar key={refreshKey} />
             case 'logbook': return <BitacoraPanel key={refreshKey} />
             case 'bi-turnos': return <TurnosDashboard key={refreshKey} />
+            case 'bi-canales': return <CanalesDashboard key={refreshKey} />
             case 'data-entry': return <DataEntryPanel key={refreshKey} />
             default: return <OverviewPanel key={refreshKey} />
         }
