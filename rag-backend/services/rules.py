@@ -159,6 +159,66 @@ def delete_rule(rule_id: int) -> bool:
         return False
 
 
+def update_rule(rule_id: int, new_text: str, created_by: str = "admin") -> dict | None:
+    """
+    Update an existing rule: re-enrich with GPT, regenerate embedding, update row.
+    Returns the updated rule dict, or None if not found.
+    """
+    # Verify rule exists
+    existing = supabase.table("rag_documents") \
+        .select("id, metadata") \
+        .eq("id", rule_id) \
+        .eq("metadata->>source", "rule") \
+        .execute()
+
+    if not existing.data:
+        return None
+
+    # Re-enrich with GPT
+    enriched = _enrich_rule(new_text)
+
+    # Build embed text
+    embed_text = (
+        f"REGLA: {enriched['title']}\n"
+        f"Categoría: {enriched['category']}\n"
+        f"{enriched['processed_text']}\n"
+        f"Texto original: {new_text}"
+    )
+
+    # Regenerate embedding
+    embedding = generate_embedding(embed_text)
+
+    now = datetime.utcnow().isoformat()
+    old_meta = existing.data[0].get("metadata", {})
+
+    # Update row
+    supabase.table("rag_documents").update({
+        "content": embed_text,
+        "embedding": embedding,
+        "metadata": {
+            **old_meta,
+            "title": enriched["title"],
+            "category": enriched["category"],
+            "original_text": new_text,
+            "processed_text": enriched["processed_text"],
+            "keywords": enriched.get("keywords", []),
+            "updated_by": created_by,
+            "updated_at": now,
+        }
+    }).eq("id", rule_id).execute()
+
+    return {
+        "id": rule_id,
+        "title": enriched["title"],
+        "category": enriched["category"],
+        "processed_text": enriched["processed_text"],
+        "original_text": new_text,
+        "keywords": enriched.get("keywords", []),
+        "created_at": old_meta.get("created_at", ""),
+        "updated_at": now,
+    }
+
+
 def get_rules_count() -> int:
     """Get total count of rules."""
     result = supabase.table("rag_documents") \
@@ -166,3 +226,4 @@ def get_rules_count() -> int:
         .eq("metadata->>source", "rule") \
         .execute()
     return len(result.data or [])
+

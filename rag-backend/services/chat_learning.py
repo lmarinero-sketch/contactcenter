@@ -430,3 +430,117 @@ def get_learning_stats() -> dict:
     
     except Exception as e:
         return {"error": str(e)}
+
+
+def get_feedback_history(days: int = 30) -> dict:
+    """
+    Get detailed feedback history with question/answer context.
+    Returns items with the original question, the answer given,
+    whether it was correct, and the timestamp.
+    
+    Used by the analytics dashboard to identify weak areas.
+    """
+    from datetime import datetime, timedelta, timezone
+    
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        
+        # Get all feedback entries within the period
+        try:
+            fb_result = supabase.table("rag_feedback") \
+                .select("*") \
+                .gte("created_at", cutoff) \
+                .order("created_at", desc=True) \
+                .limit(200) \
+                .execute()
+        except Exception:
+            # Table may not exist yet
+            return {"items": [], "stats": {"total": 0, "correct": 0, "incorrect": 0, "accuracy": 0}}
+        
+        feedback_entries = fb_result.data or []
+        
+        if not feedback_entries:
+            return {"items": [], "stats": {"total": 0, "correct": 0, "incorrect": 0, "accuracy": 0}}
+        
+        # Enrich each entry with Q&A context
+        items = []
+        total_correct = 0
+        total_incorrect = 0
+        
+        for fb in feedback_entries:
+            conv_id = fb.get("conversation_id")
+            msg_index = fb.get("message_index", 0)
+            is_correct = fb.get("is_correct", True)
+            
+            if is_correct:
+                total_correct += 1
+            else:
+                total_incorrect += 1
+            
+            # Fetch messages for this conversation to get Q&A context
+            question = ""
+            answer = ""
+            try:
+                msgs_result = supabase.table("rag_messages") \
+                    .select("role, content") \
+                    .eq("conversation_id", conv_id) \
+                    .order("created_at") \
+                    .execute()
+                
+                msgs = msgs_result.data or []
+                
+                # Get the assistant message at the given index
+                assistant_msgs = [m for m in msgs if m["role"] == "assistant"]
+                if msg_index < len(assistant_msgs):
+                    answer = assistant_msgs[msg_index].get("content", "")[:300]
+                    
+                    # Find the preceding user message
+                    target_answer = assistant_msgs[msg_index].get("content", "")
+                    for j, m in enumerate(msgs):
+                        if m["role"] == "assistant" and m.get("content") == target_answer:
+                            # Look at the message before this one
+                            if j > 0 and msgs[j - 1]["role"] == "user":
+                                question = msgs[j - 1].get("content", "")[:200]
+                            break
+            except Exception as e:
+                print(f"Error fetching Q&A context for feedback: {e}")
+            
+            # Get conversation title
+            conv_title = ""
+            try:
+                conv_result = supabase.table("rag_conversations") \
+                    .select("title") \
+                    .eq("id", conv_id) \
+                    .single() \
+                    .execute()
+                conv_title = conv_result.data.get("title", "") if conv_result.data else ""
+            except Exception:
+                pass
+            
+            items.append({
+                "id": fb.get("id"),
+                "conversation_id": conv_id,
+                "conversation_title": conv_title,
+                "message_index": msg_index,
+                "is_correct": is_correct,
+                "question": question,
+                "answer_preview": answer,
+                "created_at": fb.get("created_at"),
+            })
+        
+        total = total_correct + total_incorrect
+        accuracy = round(total_correct / total * 100, 1) if total > 0 else 0
+        
+        return {
+            "items": items,
+            "stats": {
+                "total": total,
+                "correct": total_correct,
+                "incorrect": total_incorrect,
+                "accuracy": accuracy,
+            }
+        }
+    
+    except Exception as e:
+        print(f"Error getting feedback history: {e}")
+        return {"items": [], "stats": {"total": 0, "correct": 0, "incorrect": 0, "accuracy": 0}, "error": str(e)}

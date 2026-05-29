@@ -1,12 +1,12 @@
 /**
  * RAGRules — Panel de Reglas y Conocimiento Manual para Simon
- * Permite ingresar reglas por texto o voz que Simon usará en sus respuestas
+ * Permite ingresar, editar y eliminar reglas por texto o voz que Simon usará en sus respuestas
  */
 import { useState, useEffect, useRef } from 'react'
 import {
     Mic, MicOff, Send, Trash2, Loader2, BookOpen,
     Tag, Clock, AlertCircle, CheckCircle, Plus,
-    Shield, Sparkles, Volume2, X
+    Shield, Sparkles, Volume2, X, Pencil, Save, RotateCcw
 } from 'lucide-react'
 
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api'
@@ -29,13 +29,32 @@ export default function RAGRules() {
     const [success, setSuccess] = useState(null)
     const [isLoading, setIsLoading] = useState(true)
 
+    // Edit state
+    const [editingRuleId, setEditingRuleId] = useState(null)
+    const [editText, setEditText] = useState('')
+    const [isSavingEdit, setIsSavingEdit] = useState(false)
+
+    // Delete confirmation
+    const [deletingRuleId, setDeletingRuleId] = useState(null)
+
     const recognitionRef = useRef(null)
     const textareaRef = useRef(null)
+    const editTextareaRef = useRef(null)
 
     // Load rules on mount
     useEffect(() => {
         loadRules()
     }, [])
+
+    // Focus edit textarea when editing starts
+    useEffect(() => {
+        if (editingRuleId && editTextareaRef.current) {
+            editTextareaRef.current.focus()
+            // Move cursor to end
+            const len = editTextareaRef.current.value.length
+            editTextareaRef.current.setSelectionRange(len, len)
+        }
+    }, [editingRuleId])
 
     async function loadRules() {
         setIsLoading(true)
@@ -85,14 +104,61 @@ export default function RAGRules() {
     }
 
     async function handleDeleteRule(ruleId) {
-        if (!confirm('¿Eliminar esta regla?')) return
-
+        setDeletingRuleId(null)
         try {
-            await fetch(`${RAG_API_BASE}/rules/${ruleId}`, { method: 'DELETE' })
+            const resp = await fetch(`${RAG_API_BASE}/rules/${ruleId}`, { method: 'DELETE' })
+            if (resp.ok) {
+                setSuccess('✅ Regla eliminada correctamente')
+                setTimeout(() => setSuccess(null), 3000)
+            }
             loadRules()
         } catch (e) {
             setError('Error al eliminar regla')
         }
+    }
+
+    function startEditing(rule) {
+        setEditingRuleId(rule.id)
+        setEditText(rule.original_text || rule.processed_text || '')
+        setError(null)
+    }
+
+    function cancelEditing() {
+        setEditingRuleId(null)
+        setEditText('')
+    }
+
+    async function handleSaveEdit(ruleId) {
+        if (!editText.trim() || editText.trim().length < 5) {
+            setError('El texto de la regla debe tener al menos 5 caracteres')
+            return
+        }
+
+        setIsSavingEdit(true)
+        setError(null)
+
+        try {
+            const resp = await fetch(`${RAG_API_BASE}/rules/${ruleId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: editText.trim() })
+            })
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}))
+                throw new Error(err.detail || 'Error al actualizar regla')
+            }
+
+            const result = await resp.json()
+            setSuccess(`✅ Regla actualizada: "${result.title}"`)
+            setEditingRuleId(null)
+            setEditText('')
+            loadRules()
+            setTimeout(() => setSuccess(null), 5000)
+        } catch (e) {
+            setError(e.message)
+        }
+        setIsSavingEdit(false)
     }
 
     // Speech-to-text
@@ -164,6 +230,16 @@ export default function RAGRules() {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             handleSubmitRule()
+        }
+    }
+
+    function handleEditKeyPress(e, ruleId) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSaveEdit(ruleId)
+        }
+        if (e.key === 'Escape') {
+            cancelEditing()
         }
     }
 
@@ -267,8 +343,10 @@ export default function RAGRules() {
                 ) : (
                     rules.map(rule => {
                         const catStyle = getCategoryStyle(rule.category)
+                        const isEditing = editingRuleId === rule.id
+                        const isDeleting = deletingRuleId === rule.id
                         return (
-                            <div key={rule.id} className="rag-rule-item">
+                            <div key={rule.id} className={`rag-rule-item ${isEditing ? 'editing' : ''}`}>
                                 <div className="rag-rule-header">
                                     <span
                                         className="rag-rule-category"
@@ -281,30 +359,110 @@ export default function RAGRules() {
                                         {formatDate(rule.created_at)}
                                     </span>
                                 </div>
-                                <div className="rag-rule-title">{rule.title}</div>
-                                <div className="rag-rule-processed">{rule.processed_text}</div>
-                                {rule.original_text !== rule.processed_text && (
-                                    <div className="rag-rule-original">
-                                        <Sparkles size={10} />
-                                        Original: "{rule.original_text}"
+
+                                {isEditing ? (
+                                    /* ── Edit Mode ── */
+                                    <div className="rag-rule-edit-area">
+                                        <textarea
+                                            ref={editTextareaRef}
+                                            className="rag-rule-edit-textarea"
+                                            value={editText}
+                                            onChange={(e) => setEditText(e.target.value)}
+                                            onKeyDown={(e) => handleEditKeyPress(e, rule.id)}
+                                            rows={4}
+                                            disabled={isSavingEdit}
+                                            placeholder="Editá el texto de la regla..."
+                                        />
+                                        <div className="rag-rule-edit-actions">
+                                            <button
+                                                className="rag-rule-edit-save"
+                                                onClick={() => handleSaveEdit(rule.id)}
+                                                disabled={isSavingEdit || !editText.trim()}
+                                                title="Guardar cambios (Enter)"
+                                            >
+                                                {isSavingEdit
+                                                    ? <Loader2 size={13} className="rag-spin" />
+                                                    : <Save size={13} />
+                                                }
+                                                {isSavingEdit ? 'Procesando...' : 'Guardar'}
+                                            </button>
+                                            <button
+                                                className="rag-rule-edit-cancel"
+                                                onClick={cancelEditing}
+                                                disabled={isSavingEdit}
+                                                title="Cancelar (Esc)"
+                                            >
+                                                <RotateCcw size={13} />
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                        <div className="rag-rule-edit-hint">
+                                            💡 Al guardar, Simon re-procesará la regla con IA (categoría, keywords y fechas actualizadas)
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* ── View Mode ── */
+                                    <>
+                                        <div className="rag-rule-title">{rule.title}</div>
+                                        <div className="rag-rule-processed">{rule.processed_text}</div>
+                                        {rule.original_text !== rule.processed_text && (
+                                            <div className="rag-rule-original">
+                                                <Sparkles size={10} />
+                                                Original: "{rule.original_text}"
+                                            </div>
+                                        )}
+                                        {rule.keywords && rule.keywords.length > 0 && (
+                                            <div className="rag-rule-keywords">
+                                                {rule.keywords.map((kw, i) => (
+                                                    <span key={i} className="rag-rule-keyword">
+                                                        <Tag size={9} /> {kw}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* ── Action buttons ── */}
+                                {!isEditing && (
+                                    <div className="rag-rule-actions">
+                                        <button
+                                            className="rag-rule-action-btn edit"
+                                            onClick={() => startEditing(rule)}
+                                            title="Editar regla"
+                                        >
+                                            <Pencil size={12} />
+                                            Editar
+                                        </button>
+
+                                        {isDeleting ? (
+                                            <div className="rag-rule-delete-confirm">
+                                                <span>¿Eliminar?</span>
+                                                <button
+                                                    className="rag-rule-delete-yes"
+                                                    onClick={() => handleDeleteRule(rule.id)}
+                                                >
+                                                    Sí
+                                                </button>
+                                                <button
+                                                    className="rag-rule-delete-no"
+                                                    onClick={() => setDeletingRuleId(null)}
+                                                >
+                                                    No
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                className="rag-rule-action-btn delete"
+                                                onClick={() => setDeletingRuleId(rule.id)}
+                                                title="Eliminar regla"
+                                            >
+                                                <Trash2 size={12} />
+                                                Eliminar
+                                            </button>
+                                        )}
                                     </div>
                                 )}
-                                {rule.keywords && rule.keywords.length > 0 && (
-                                    <div className="rag-rule-keywords">
-                                        {rule.keywords.map((kw, i) => (
-                                            <span key={i} className="rag-rule-keyword">
-                                                <Tag size={9} /> {kw}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                                <button
-                                    className="rag-rule-delete"
-                                    onClick={() => handleDeleteRule(rule.id)}
-                                    title="Eliminar regla"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
                             </div>
                         )
                     })

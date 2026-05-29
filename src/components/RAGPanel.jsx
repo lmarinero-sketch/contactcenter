@@ -6,13 +6,13 @@ import {
     Search, Sparkles, Layers, BarChart3, FolderOpen, Tag,
     Download, FolderPlus, ArrowLeft, Home, Folder,
     Lightbulb, GraduationCap, HelpCircle, Shield, FileWarning,
-    Info
+    Info, ThumbsUp, ThumbsDown
 } from 'lucide-react'
 import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
     deleteRAGConversation, uploadRAGDocument, uploadRAGBatch,
     listRAGFiles, downloadRAGFile, createRAGFolder, deleteRAGFile,
-    deleteRAGFolder, checkRAGHealth, fetchSuggestions
+    deleteRAGFolder, checkRAGHealth, fetchSuggestions, submitFeedback
 } from '../api/ragClient'
 import RAGHelp from './RAGHelp'
 
@@ -66,6 +66,9 @@ export default function RAGPanel() {
     
     // Custom confirm modal state
     const [confirmAction, setConfirmAction] = useState(null)
+
+    // Feedback state: { [msgIndex]: 'correct' | 'incorrect' | 'loading' }
+    const [feedbackState, setFeedbackState] = useState({})
 
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
@@ -480,6 +483,34 @@ export default function RAGPanel() {
                 .catch(e => setError(e.message))
                 .finally(() => setIsLoading(false))
         }, 50)
+    }
+
+    // Feedback handler
+    async function handleFeedback(assistantMsgIndex, isCorrect) {
+        if (!activeConversation) return
+        const key = `${activeConversation}-${assistantMsgIndex}`
+        
+        // Optimistic UI
+        setFeedbackState(prev => ({
+            ...prev,
+            [key]: 'loading'
+        }))
+        
+        try {
+            await submitFeedback(activeConversation, assistantMsgIndex, isCorrect)
+            setFeedbackState(prev => ({
+                ...prev,
+                [key]: isCorrect ? 'correct' : 'incorrect'
+            }))
+        } catch (e) {
+            console.error('Feedback error:', e)
+            setFeedbackState(prev => {
+                const next = { ...prev }
+                delete next[key]
+                return next
+            })
+            setError('Error al enviar feedback')
+        }
     }
 
     // Key press handler
@@ -1016,6 +1047,59 @@ export default function RAGPanel() {
                                             )}
                                         </div>
                                     )}
+                                    {/* Feedback buttons for assistant messages */}
+                                    {msg.role === 'assistant' && msg.type !== 'clarification' && (() => {
+                                        // Calculate the assistant-only index for this message
+                                        const assistantIndex = messages
+                                            .slice(0, i + 1)
+                                            .filter(m => m.role === 'assistant' && m.type !== 'clarification')
+                                            .length - 1
+                                        const fbKey = `${activeConversation}-${assistantIndex}`
+                                        const fbState = feedbackState[fbKey]
+                                        const fbFromMsg = msg.feedback // from DB if loaded
+                                        const resolved = fbState || fbFromMsg
+                                        
+                                        return (
+                                            <div className={`rag-feedback-bar ${resolved ? 'resolved' : ''}`}>
+                                                {resolved === 'loading' ? (
+                                                    <span className="rag-feedback-loading">
+                                                        <Loader2 size={12} className="rag-spin" />
+                                                        Guardando...
+                                                    </span>
+                                                ) : resolved === 'correct' ? (
+                                                    <span className="rag-feedback-result correct">
+                                                        <ThumbsUp size={12} />
+                                                        Marcada como correcta
+                                                    </span>
+                                                ) : resolved === 'incorrect' ? (
+                                                    <span className="rag-feedback-result incorrect">
+                                                        <ThumbsDown size={12} />
+                                                        Marcada como incorrecta
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <span className="rag-feedback-label">¿Fue útil esta respuesta?</span>
+                                                        <div className="rag-feedback-buttons">
+                                                            <button
+                                                                className="rag-feedback-btn correct"
+                                                                onClick={() => handleFeedback(assistantIndex, true)}
+                                                                title="Respuesta correcta"
+                                                            >
+                                                                <ThumbsUp size={13} />
+                                                            </button>
+                                                            <button
+                                                                className="rag-feedback-btn incorrect"
+                                                                onClick={() => handleFeedback(assistantIndex, false)}
+                                                                title="Respuesta incorrecta"
+                                                            >
+                                                                <ThumbsDown size={13} />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         ))

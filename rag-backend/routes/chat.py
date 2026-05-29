@@ -162,3 +162,21 @@ async def learning_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ============================================================
+# Feedback History Endpoint (for Analytics)
+# ============================================================
+
+@router.get("/feedback/history")
+async def feedback_history(days: int = 30):
+    """
+    Get detailed feedback history with question/answer context.
+    Used by the analytics dashboard to show which responses were
+    rated as incorrect so the team knows where to improve.
+    """
+    try:
+        from services.chat_learning import get_feedback_history
+        result = await asyncio.to_thread(get_feedback_history, days)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

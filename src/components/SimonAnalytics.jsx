@@ -12,8 +12,10 @@ import {
     TrendingUp, MessageSquare, CheckCircle, AlertCircle,
     FileText, Brain, Clock, Loader2, RefreshCw, BarChart3,
     Search, Sparkles, HelpCircle, BookOpen, Shield, Zap,
-    Target, Activity
+    Target, Activity, ThumbsUp, ThumbsDown, AlertTriangle
 } from 'lucide-react'
+
+import { getFeedbackHistory } from '../api/ragClient'
 
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api'
 
@@ -30,6 +32,8 @@ export default function SimonAnalytics() {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState(null)
     const [period, setPeriod] = useState(30)
+    const [feedbackData, setFeedbackData] = useState(null)
+    const [showOnlyIncorrect, setShowOnlyIncorrect] = useState(true)
 
     useEffect(() => {
         loadAnalytics()
@@ -39,10 +43,14 @@ export default function SimonAnalytics() {
         setIsLoading(true)
         setError(null)
         try {
-            const resp = await fetch(`${RAG_API_BASE}/analytics?days=${period}`)
+            const [resp, fbResp] = await Promise.all([
+                fetch(`${RAG_API_BASE}/analytics?days=${period}`),
+                getFeedbackHistory(period),
+            ])
             if (!resp.ok) throw new Error('Error al cargar analytics')
             const result = await resp.json()
             setData(result)
+            setFeedbackData(fbResp)
         } catch (e) {
             setError(e.message)
         }
@@ -446,6 +454,223 @@ export default function SimonAnalytics() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ===== FEEDBACK METRICS SECTION ===== */}
+            {feedbackData && (
+                <>
+                    <div className="sa-section-divider">
+                        <ThumbsUp size={16} />
+                        <span>Feedback de Usuarios</span>
+                    </div>
+
+                    {/* Feedback KPIs */}
+                    <div className="sa-kpi-grid">
+                        <div className="sa-kpi-card">
+                            <div className="sa-kpi-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
+                                <ThumbsUp size={18} />
+                            </div>
+                            <div className="sa-kpi-value">
+                                {feedbackData.stats?.accuracy || 0}%
+                            </div>
+                            <div className="sa-kpi-label">Precisión</div>
+                        </div>
+                        <div className="sa-kpi-card">
+                            <div className="sa-kpi-icon" style={{ background: '#eff6ff', color: '#3b82f6' }}>
+                                <Target size={18} />
+                            </div>
+                            <div className="sa-kpi-value">
+                                {feedbackData.stats?.total || 0}
+                            </div>
+                            <div className="sa-kpi-label">Total Calificadas</div>
+                        </div>
+                        <div className="sa-kpi-card">
+                            <div className="sa-kpi-icon" style={{ background: '#f0fdf4', color: '#22c55e' }}>
+                                <CheckCircle size={18} />
+                            </div>
+                            <div className="sa-kpi-value" style={{ color: '#10b981' }}>
+                                {feedbackData.stats?.correct || 0}
+                            </div>
+                            <div className="sa-kpi-label">Correctas</div>
+                        </div>
+                        <div className="sa-kpi-card">
+                            <div className="sa-kpi-icon" style={{ background: '#fef2f2', color: '#ef4444' }}>
+                                <ThumbsDown size={18} />
+                            </div>
+                            <div className="sa-kpi-value" style={{ color: '#ef4444' }}>
+                                {feedbackData.stats?.incorrect || 0}
+                            </div>
+                            <div className="sa-kpi-label">Incorrectas</div>
+                        </div>
+                    </div>
+
+                    {/* Feedback Quality Chart + Incorrect Responses Table */}
+                    <div className="sa-charts-row">
+                        {/* Accuracy Pie */}
+                        <div className="sa-chart-card">
+                            <div className="sa-chart-title">
+                                <Target size={14} />
+                                Distribución de Feedback
+                            </div>
+                            <div className="sa-chart-body">
+                                {feedbackData.stats?.total > 0 ? (
+                                    <div className="sa-quality-section">
+                                        <ResponsiveContainer width="100%" height={140}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={[
+                                                        { name: 'Correctas', value: feedbackData.stats.correct, color: '#10b981' },
+                                                        { name: 'Incorrectas', value: feedbackData.stats.incorrect, color: '#ef4444' },
+                                                    ].filter(d => d.value > 0)}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={35}
+                                                    outerRadius={60}
+                                                    paddingAngle={3}
+                                                    dataKey="value"
+                                                >
+                                                    {[
+                                                        { name: 'Correctas', value: feedbackData.stats.correct, color: '#10b981' },
+                                                        { name: 'Incorrectas', value: feedbackData.stats.incorrect, color: '#ef4444' },
+                                                    ].filter(d => d.value > 0).map((entry, i) => (
+                                                        <Cell key={i} fill={entry.color} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="sa-quality-legend">
+                                            <div className="sa-quality-item">
+                                                <span className="sa-quality-dot" style={{ background: '#10b981' }} />
+                                                <span>Correctas</span>
+                                                <strong>{feedbackData.stats.correct}</strong>
+                                            </div>
+                                            <div className="sa-quality-item">
+                                                <span className="sa-quality-dot" style={{ background: '#ef4444' }} />
+                                                <span>Incorrectas</span>
+                                                <strong>{feedbackData.stats.incorrect}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="sa-chart-empty">Sin calificaciones aún</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Accuracy Indicator */}
+                        <div className="sa-chart-card">
+                            <div className="sa-chart-title">
+                                <Zap size={14} />
+                                Indicador de Precisión
+                            </div>
+                            <div className="sa-chart-body">
+                                <div className="sa-accuracy-gauge">
+                                    <div className="sa-accuracy-ring">
+                                        <svg viewBox="0 0 100 100" width="120" height="120">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="#f1f5f9" strokeWidth="8" />
+                                            <circle
+                                                cx="50" cy="50" r="42" fill="none"
+                                                stroke={feedbackData.stats?.accuracy >= 80 ? '#10b981' : feedbackData.stats?.accuracy >= 50 ? '#f59e0b' : '#ef4444'}
+                                                strokeWidth="8"
+                                                strokeLinecap="round"
+                                                strokeDasharray={`${(feedbackData.stats?.accuracy || 0) * 2.64} 264`}
+                                                transform="rotate(-90 50 50)"
+                                                style={{ transition: 'stroke-dasharray 0.8s ease' }}
+                                            />
+                                        </svg>
+                                        <div className="sa-accuracy-value">
+                                            <strong>{feedbackData.stats?.accuracy || 0}%</strong>
+                                            <span>Precisión</span>
+                                        </div>
+                                    </div>
+                                    <div className={`sa-disambig-badge ${feedbackData.stats?.accuracy >= 80 ? 'good' : feedbackData.stats?.accuracy >= 50 ? 'warn' : 'bad'}`}>
+                                        {feedbackData.stats?.accuracy >= 80
+                                            ? 'Excelente rendimiento'
+                                            : feedbackData.stats?.accuracy >= 50
+                                            ? 'Necesita mejoras'
+                                            : 'Requiere atención urgente'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Incorrect Responses Table */}
+                    {feedbackData.items?.length > 0 && (
+                        <div className="sa-chart-card sa-full-width">
+                            <div className="sa-chart-title" style={{ justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <AlertTriangle size={14} />
+                                    Historial de Calificaciones
+                                </div>
+                                <label className="sa-toggle-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={showOnlyIncorrect}
+                                        onChange={e => setShowOnlyIncorrect(e.target.checked)}
+                                    />
+                                    Solo incorrectas
+                                </label>
+                            </div>
+                            <div className="sa-chart-body">
+                                <div className="sa-feedback-table">
+                                    <div className="sa-feedback-table-header">
+                                        <span className="sa-fb-col-status">Estado</span>
+                                        <span className="sa-fb-col-question">Pregunta</span>
+                                        <span className="sa-fb-col-answer">Respuesta de Simon</span>
+                                        <span className="sa-fb-col-date">Fecha</span>
+                                    </div>
+                                    {feedbackData.items
+                                        .filter(item => !showOnlyIncorrect || !item.is_correct)
+                                        .slice(0, 20)
+                                        .map((item, i) => (
+                                            <div
+                                                key={item.id || i}
+                                                className={`sa-feedback-row ${item.is_correct ? 'correct' : 'incorrect'}`}
+                                            >
+                                                <span className="sa-fb-col-status">
+                                                    {item.is_correct ? (
+                                                        <span className="sa-fb-badge correct">
+                                                            <ThumbsUp size={10} /> OK
+                                                        </span>
+                                                    ) : (
+                                                        <span className="sa-fb-badge incorrect">
+                                                            <ThumbsDown size={10} /> Mal
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="sa-fb-col-question" title={item.question}>
+                                                    {item.question || '—'}
+                                                </span>
+                                                <span className="sa-fb-col-answer" title={item.answer_preview}>
+                                                    {item.answer_preview
+                                                        ? (item.answer_preview.length > 120
+                                                            ? item.answer_preview.slice(0, 120) + '...'
+                                                            : item.answer_preview)
+                                                        : '—'}
+                                                </span>
+                                                <span className="sa-fb-col-date">
+                                                    {item.created_at
+                                                        ? new Date(item.created_at).toLocaleDateString('es-AR', {
+                                                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                                                        })
+                                                        : '—'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    {feedbackData.items.filter(item => !showOnlyIncorrect || !item.is_correct).length === 0 && (
+                                        <div className="sa-chart-empty" style={{ padding: '20px 0' }}>
+                                            {showOnlyIncorrect
+                                                ? '🎉 No hay respuestas marcadas como incorrectas'
+                                                : 'Sin calificaciones en este período'}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )

@@ -216,6 +216,41 @@ export async function deleteRAGFolder(path) {
     return response.json();
 }
 
+// === Feedback ===
+
+/**
+ * Submit feedback (correct/incorrect) for a specific assistant message
+ */
+export async function submitFeedback(conversationId, messageIndex, isCorrect) {
+    const response = await fetch(`${RAG_API_BASE}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            conversation_id: conversationId,
+            message_index: messageIndex,
+            is_correct: isCorrect,
+        }),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Error al enviar feedback' }));
+        throw new Error(error.detail || 'Error al enviar feedback');
+    }
+    return response.json();
+}
+
+/**
+ * Get feedback history with question/answer details for analytics
+ */
+export async function getFeedbackHistory(days = 30) {
+    try {
+        const response = await fetch(`${RAG_API_BASE}/feedback/history?days=${days}`);
+        if (!response.ok) return { items: [], stats: {} };
+        return await response.json();
+    } catch {
+        return { items: [], stats: {} };
+    }
+}
+
 // === Legacy ===
 
 export async function listRAGDocuments(tag = '') {

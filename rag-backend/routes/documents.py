@@ -466,6 +466,28 @@ async def delete_rule_endpoint(rule_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class RuleUpdateInput(BaseModel):
+    text: str
+    created_by: str = "admin"
+
+@router.put("/rules/{rule_id}")
+async def update_rule_endpoint(rule_id: int, payload: RuleUpdateInput):
+    """Update an existing rule (re-processes with GPT and regenerates embedding)."""
+    if not payload.text or len(payload.text.strip()) < 5:
+        raise HTTPException(status_code=400, detail="El texto de la regla es muy corto")
+
+    try:
+        from services.rules import update_rule
+        result = update_rule(rule_id, payload.text.strip(), payload.created_by)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Regla no encontrada")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/rules/count")
 async def rules_count_endpoint():
     """Get total count of rules."""
