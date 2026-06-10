@@ -173,7 +173,7 @@ def _extract_topic_entities(question: str) -> dict:
         strict = result.get("strict", False)
         
         if entities:
-            print(f"🎯 Entities extracted: {entities} (strict={strict}, topic={topic})")
+            print(f"[Entity] Entities extracted: {entities} (strict={strict}, topic={topic})")
         
         return {"entities": entities, "topic": topic, "strict": strict}
     
@@ -240,19 +240,19 @@ def _filter_by_entity(documents: list[dict], entity_info: dict,
     
     # Strict mode: only keep entity-matching docs (if enough remain)
     if strict and len(with_entity) >= min_results:
-        print(f"🎯 Strict entity filter: kept {len(with_entity)}/{len(documents)} docs for {entities}")
+        print(f"[Entity] Strict entity filter: kept {len(with_entity)}/{len(documents)} docs for {entities}")
         stats["filtered_out"] = len(without_entity)
         return with_entity, stats
     
     # Soft mode: prioritize entity-matching docs, then fill with others
     if with_entity:
         result = with_entity + without_entity
-        print(f"🎯 Soft entity filter: prioritized {len(with_entity)} entity docs + {len(without_entity)} others for {entities}")
+        print(f"[Entity] Soft entity filter: prioritized {len(with_entity)} entity docs + {len(without_entity)} others for {entities}")
         stats["reordered"] = True
         return result, stats
     
     # No matches at all — return original order
-    print(f"🎯 Entity filter: no docs matched {entities}, keeping all")
+    print(f"[Entity] Entity filter: no docs matched {entities}, keeping all")
     stats["entity_filter"] = "no_match"
     return documents, stats
 
@@ -369,6 +369,16 @@ def _rerank_single_document(question: str, doc: dict,
                 f"a menos que contenga información comparativa relevante."
             )
         
+        # Special hint for manually loaded rules to prevent filtering out older/similar ones
+        rule_hint = ""
+        if source_type == "rule":
+            rule_hint = (
+                " Este fragmento es una REGLA (manual override). Si trata sobre el mismo tema, servicio o entidad "
+                "de la pregunta, dale un score de relevancia alto (mínimo 5/10) incluso si es una regla antigua o "
+                "parece entrar en conflicto con otra, ya que es fundamental conservar todas las reglas similares "
+                "o históricas para que el generador las analice y compare."
+            )
+        
         response = openai_client.chat.completions.create(
             model=RERANK_MODEL,
             temperature=0,
@@ -387,7 +397,8 @@ def _rerank_single_document(question: str, doc: dict,
                         "los documentos más recientes (cercanos a hoy) son MÁS relevantes. "
                         "Si dos fragmentos contienen info similar, el más reciente debería tener mayor score."
                         f"{extra_hint}"
-                        f"{entity_hint} "
+                        f"{entity_hint}"
+                        f"{rule_hint} "
                         "Respondé SOLO con JSON: {\"score\": 0-10, \"reason\": \"explicación breve\"}"
                     )
                 },
@@ -430,7 +441,12 @@ def _rerank_documents(question: str, documents: list[dict],
     Uses ThreadPoolExecutor for concurrent API calls.
     Entity info is passed to each re-ranker for topic-aware scoring.
     """
-    candidates = documents[:12]  # Only re-rank top 12 candidates
+    # Separate rules and other documents to ensure we always evaluate rules
+    rules = [d for d in documents if d.get("metadata", {}).get("source") == "rule"]
+    other_docs = [d for d in documents if d.get("metadata", {}).get("source") != "rule"]
+    
+    # Prioritize up to 8 rules and up to 12 other docs as candidates for re-ranking
+    candidates = rules[:8] + other_docs[:12]
     reranked = []
 
     # Submit all re-ranking calls in parallel (with entity info)
@@ -529,7 +545,12 @@ DIRECTRICES CORE (Cumplimiento Estricto):
 5. NO HAY CALLEJONES SIN SALIDA: Si encontrás datos parciales, entregalos y aclará qué parte falta. Solo respondé "No tengo información" si el contexto es 100% irrelevante.
 6. CITAS OBLIGATORIAS: Siempre referenciá el origen de los datos usando el formato: **(Fuente: nombre_archivo)** o **(Regla: título)** al final del párrafo correspondiente.
 7. RESTRICCIÓN TEMÁTICA (ENTITY ISOLATION): Si la pregunta especifica una entidad (ej. OSDE, Quirófano), FILTRÁ mentalmente y respondé SOLO sobre esa entidad, ignorando el resto del contexto que no aplique.
-8. SESGO DE RECENCIA: Ante conflictos de información, la fecha más cercana a {today_str} es la correcta.
+8. COMPULSA DE REGLAS SIMILARES Y SESGO DE RECENCIA:
+   - Si detectás múltiples reglas o informaciones muy similares o relacionadas (por ejemplo, varias reglas sobre la misma obra social, arancel o servicio con diferentes fechas o condiciones):
+     a) Indica explícitamente al inicio de tu respuesta (como una nota o aviso en negrita) que se encontraron múltiples reglas o informaciones similares/históricas sobre el tema.
+     b) Determina cuál es la **última información disponible** (la regla o documento con la fecha más reciente cercana a {today_str}) y presentala de manera prominente como la información vigente y principal.
+     c) Muestra y resume claramente las **otras reglas parecidas o anteriores** bajo una sección clara titulada 'Otras reglas relacionadas / Historial', indicando sus respectivas fechas y en qué se diferencian (por ejemplo, si antes se recibía la obra social y ahora no, o si cambió el monto del coseguro), para darle al usuario todo el contexto y la trazabilidad del cambio.
+   - Ante cualquier otro conflicto de información, la fecha de vigencia o creación más cercana a {today_str} es la correcta y debe primar.
 9. TONO Y ESTILO: Profesional, empático, resolutivo y clínico. Evitá frases robóticas.
 10. FOLLOW-UP INTELIGENTE: Al final, sugerí SIEMPRE 2-3 preguntas que el usuario lógicamente haría a continuación, usando este formato exacto:
 

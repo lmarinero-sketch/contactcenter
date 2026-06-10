@@ -2498,45 +2498,114 @@ body {
 }
 
 .rag-message-avatar {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
   flex-shrink: 0;
-  background: var(--gray-100);
+  background: transparent;
 }
 
-.rag-message.user .rag-message-avatar {
-  background: var(--blue-50);
+.rag-avatar-user-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(26, 107, 181, 0.2);
+  border: 2px solid white;
+}
+
+.rag-avatar-simon-container {
+  position: relative;
+  width: 38px;
+  height: 38px;
+}
+
+.rag-avatar-simon-img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.rag-avatar-simon-img:hover {
+  transform: scale(1.1);
+}
+
+.rag-avatar-simon-img.pulsing {
+  animation: simon-avatar-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes simon-avatar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+}
+
+.rag-avatar-simon-status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.rag-avatar-simon-status.calculating {
+  background: #3b82f6;
+  animation: simon-status-pulse 1s infinite;
+}
+
+@keyframes simon-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .rag-message-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-width: calc(100% - 50px);
 }
 
 .rag-message-text {
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 13.5px;
   line-height: 1.6;
-  color: var(--gray-700);
+  color: var(--gray-800);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .rag-message.user .rag-message-text {
-  background: var(--blue-600);
+  background: linear-gradient(135deg, var(--blue-600) 0%, var(--blue-700) 100%);
   color: white;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 2px;
+  box-shadow: 0 3px 10px rgba(26, 107, 181, 0.15);
 }
 
 .rag-message.assistant .rag-message-text {
-  background: var(--gray-50);
+  background: white;
   border: 1px solid var(--gray-200);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 /* Sources */
@@ -7912,4 +7981,284 @@ body {
   .carga-content {
     padding: 16px;
   }
+}
+
+/* ============================================================
+   SIMON CHAT - PREMIUM OVERRIDES (Grow Labs QOAG Aesthetics)
+   ============================================================ */
+
+/* Custom Scrollbars */
+.rag-messages::-webkit-scrollbar,
+.rag-conv-list::-webkit-scrollbar,
+.rag-doc-list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.rag-messages::-webkit-scrollbar-track,
+.rag-conv-list::-webkit-scrollbar-track,
+.rag-doc-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rag-messages::-webkit-scrollbar-thumb,
+.rag-conv-list::-webkit-scrollbar-thumb,
+.rag-doc-list::-webkit-scrollbar-thumb {
+  background: rgba(26, 107, 181, 0.15);
+  border-radius: 100px;
+}
+
+.rag-messages::-webkit-scrollbar-thumb:hover,
+.rag-conv-list::-webkit-scrollbar-thumb:hover,
+.rag-doc-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 107, 181, 0.35);
+}
+
+/* Enhanced Markdown Render Styles */
+.markdown-hr {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(26, 107, 181, 0.15), rgba(0, 0, 0, 0));
+  margin: 20px 0;
+}
+
+/* Clinical Alert Boxes */
+.markdown-alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 12px 0;
+  border-left: 4px solid;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.markdown-alert-note {
+  background: #f0f7ff;
+  border-color: #3b82f6;
+  color: #1e3a8a;
+}
+
+.markdown-alert-tip {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.markdown-alert-important {
+  background: #f5f3ff;
+  border-color: #8b5cf6;
+  color: #4c1d95;
+}
+
+.markdown-alert-warning {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #78350f;
+}
+
+.markdown-alert-caution {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #7f1d1d;
+}
+
+.markdown-blockquote {
+  border-left: 3px solid var(--gray-300);
+  padding-left: 14px;
+  margin: 10px 0;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+/* Clinical Styled Tables */
+.markdown-table-wrapper {
+  overflow-x: auto;
+  margin: 16px 0;
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  background: white;
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.markdown-table th {
+  background: var(--blue-50);
+  color: var(--blue-900);
+  font-weight: 700;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--blue-100);
+}
+
+.markdown-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gray-150, #f1f5f9);
+  color: var(--gray-700);
+}
+
+.markdown-table tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown-table tr:nth-child(even) {
+  background: var(--gray-50);
+}
+
+.markdown-table tr:hover {
+  background: #f0f7ff;
+}
+
+/* Bullet and Numbered Lists */
+.markdown-list {
+  padding-left: 20px;
+  margin: 10px 0;
+  list-style-type: disc;
+}
+
+.markdown-list li {
+  margin-bottom: 5px;
+  color: var(--gray-700);
+}
+
+.markdown-num-list {
+  padding-left: 20px;
+  margin: 10px 0;
+  list-style: none;
+  counter-reset: num-counter;
+}
+
+.markdown-num-list li {
+  position: relative;
+  padding-left: 8px;
+  margin-bottom: 6px;
+  color: var(--gray-700);
+  counter-increment: num-counter;
+}
+
+.markdown-num-list li::before {
+  content: counter(num-counter) ".";
+  position: absolute;
+  left: -16px;
+  color: var(--blue-600);
+  font-weight: 700;
+}
+
+/* Glowing Thinking Skeleton */
+.rag-thinking-skeleton {
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-bottom-left-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rag-thinking-pulse-line {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading-pulse 1.5s infinite linear;
+}
+
+.rag-thinking-pulse-line.header {
+  width: 60%;
+  height: 10px;
+}
+
+.rag-thinking-pulse-line.body-1 {
+  width: 90%;
+}
+
+.rag-thinking-pulse-line.body-2 {
+  width: 75%;
+}
+
+@keyframes skeleton-loading-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.rag-thinking-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--blue-600);
+}
+
+.rag-sparkle-spin {
+  animation: sparkle-rotate-pulse 2.5s infinite linear;
+  color: var(--blue-500);
+}
+
+@keyframes sparkle-rotate-pulse {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* Simon Status indicators and avatars */
+.simon-avatar-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.simon-avatar {
+  border: 3px solid white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.simon-avatar-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-400), var(--blue-600));
+  z-index: -1;
+  opacity: 0.6;
+  filter: blur(8px);
+  animation: simon-ring-pulse 3s infinite ease-in-out;
+}
+
+@keyframes simon-ring-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+.rag-status-bar {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.rag-welcome-icon img {
+  box-shadow: 0 4px 12px rgba(26, 107, 181, 0.2);
+  border: 2px solid white;
 }

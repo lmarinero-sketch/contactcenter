@@ -17,14 +17,82 @@ import {
 import RAGHelp from './RAGHelp'
 
 // Simple markdown-ish renderer (bold, lists, sources)
+// Simple markdown-ish renderer (bold, lists, tables, alerts, sources)
 function renderMarkdown(text) {
     if (!text) return ''
-    return text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        .replace(/^- (.*)/gm, '• $1')
-        .replace(/^(\d+)\. (.*)/gm, '$1. $2')
-        .replace(/\n/g, '<br/>')
+    
+    let html = text;
+    
+    // 1. Clean HTML entities
+    html = html
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    
+    // 2. Parse horizontal lines (---)
+    html = html.replace(/^---$/gm, '<hr class="markdown-hr" />');
+    
+    // 3. Parse blockquotes / alerts (e.g. > [!NOTE], > text)
+    html = html.replace(/^&gt;\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*\n([\s\S]*?)(?=\n\n|\n&gt;|\n\n|$)/gm, (match, type, content) => {
+        return `<div class="markdown-alert markdown-alert-${type.toLowerCase()}"><strong>${type}</strong>:<br/>${content.trim()}</div>`;
+    });
+    html = html.replace(/^&gt;\s*(.*)/gm, '<blockquote class="markdown-blockquote">$1</blockquote>');
+    
+    // 4. Parse Tables
+    // A simple regex to detect tables: lines starting with |
+    const tableRegex = /((?:^\|.+\|(?:\r?\n|$))+)/gm;
+    html = html.replace(tableRegex, (match) => {
+        const rows = match.trim().split('\n');
+        if (rows.length < 2) return match;
+        
+        // Parse rows
+        let tableHtml = '<div class="markdown-table-wrapper"><table class="markdown-table">';
+        
+        rows.forEach((row, rowIndex) => {
+            // Check if it's a separator line like |---|---|
+            if (row.includes('---') && (rowIndex === 1)) return;
+            
+            const cols = row.split('|').map(c => c.trim()).filter((c, i, arr) => i > 0 && i < arr.length - 1);
+            
+            tableHtml += '<tr>';
+            cols.forEach(col => {
+                const tag = rowIndex === 0 ? 'th' : 'td';
+                tableHtml += `<${tag}>${col}</${tag}>`;
+            });
+            tableHtml += '</tr>';
+        });
+        
+        tableHtml += '</table></div>';
+        return tableHtml;
+    });
+    
+    // 5. Parse bold and italics (safely restoring tags)
+    html = html
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    
+    // 6. Parse bulleted lists
+    html = html.replace(/^\s*-\s+(.*)/gm, '<li>$1</li>');
+    // Wrap lists in ul
+    html = html.replace(/((?:<li>.*<\/li>(?:\r?\n|$))+)/g, '<ul class="markdown-list">$1</ul>');
+    
+    // 7. Parse numbered lists
+    html = html.replace(/^\s*(\d+)\.\s+(.*)/gm, '<li class="num-li" data-num="$1">$2</li>');
+    html = html.replace(/((?:<li class="num-li".*<\/li>(?:\r?\n|$))+)/g, '<ol class="markdown-num-list">$1</ol>');
+    
+    // 8. Replace line breaks (except inside table wrappers or list wrappers to avoid spacing bugs)
+    html = html.replace(/\n/g, '<br/>');
+    
+    // Restore clean tags without duplicate brs
+    html = html
+        .replace(/<\/tr><br\/>/g, '</tr>')
+        .replace(/<\/table><br\/>/g, '</table>')
+        .replace(/<\/div><br\/>/g, '</div>')
+        .replace(/<\/ul><br\/>/g, '</ul>')
+        .replace(/<\/ol><br\/>/g, '</ol>')
+        .replace(/<li>(.*?)<\/li><br\/>/g, '<li>$1</li>');
+        
+    return html;
 }
 
 export default function RAGPanel() {
@@ -926,7 +994,14 @@ export default function RAGPanel() {
                         messages.map((msg, i) => (
                             <div key={i} className={`rag-message ${msg.role}`}>
                                 <div className="rag-message-avatar">
-                                    {msg.role === 'user' ? '👤' : '🧠'}
+                                    {msg.role === 'user' ? (
+                                        <div className="rag-avatar-user-badge">U</div>
+                                    ) : (
+                                        <div className="rag-avatar-simon-container">
+                                            <img src="/simonminutes.webp" alt="Simon" className="rag-avatar-simon-img" />
+                                            <div className="rag-avatar-simon-status" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="rag-message-content">
                                     {(() => {
@@ -1108,11 +1183,21 @@ export default function RAGPanel() {
                     {/* Loading state */}
                     {isLoading && (
                         <div className="rag-message assistant">
-                            <div className="rag-message-avatar">🧠</div>
+                            <div className="rag-message-avatar">
+                                <div className="rag-avatar-simon-container">
+                                    <img src="/simonminutes.webp" alt="Simon" className="rag-avatar-simon-img pulsing" />
+                                    <div className="rag-avatar-simon-status calculating" />
+                                </div>
+                            </div>
                             <div className="rag-message-content">
-                                <div className="rag-thinking">
-                                    <Loader2 size={16} className="rag-spin" />
-                                    <span>Analizando documentos...</span>
+                                <div className="rag-thinking-skeleton">
+                                    <div className="rag-thinking-pulse-line header" />
+                                    <div className="rag-thinking-pulse-line body-1" />
+                                    <div className="rag-thinking-pulse-line body-2" />
+                                    <div className="rag-thinking-status">
+                                        <Sparkles size={13} className="rag-sparkle-spin" />
+                                        <span>Simon está procesando y comparando las reglas del Sanatorio...</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
