@@ -11,10 +11,9 @@ export function AuthProvider({ children }) {
 
     const fetchProfile = useCallback(async (userId) => {
         try {
-            // Race fetchProfile against a 15s timeout to prevent hanging
             const result = await Promise.race([
                 supabase.from('cc_profiles').select('*').eq('id', userId).single(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 15000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 60000))
             ])
             if (result.error) {
                 console.error('Error fetching profile:', result.error)
@@ -33,10 +32,10 @@ export function AuthProvider({ children }) {
         // Get initial session with resilient error handling
         const initAuth = async () => {
             try {
-                // Race getSession against a 15s timeout
+                // Race getSession against a 60s timeout
                 const sessionResult = await Promise.race([
                     supabase.auth.getSession(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 15000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 60000))
                 ])
 
                 if (!mounted) return
@@ -110,13 +109,13 @@ export function AuthProvider({ children }) {
             }
         )
 
-        // Safety timeout — NEVER stay loading more than 15s
+        // Safety timeout — NEVER stay loading more than 60s
         const timeout = setTimeout(() => {
             if (mounted && loading) {
                 console.warn('Auth loading timeout — forcing login screen')
                 setLoading(false)
             }
-        }, 15000)
+        }, 60000)
 
         return () => {
             mounted = false
