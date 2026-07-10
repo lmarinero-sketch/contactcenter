@@ -43,7 +43,7 @@ export default function OverviewPanel({ onNavigateToChat, forceRefresh = false }
     const [dateFrom, setDateFrom] = useState(() => {
         const d = new Date()
         d.setHours(0, 0, 0, 0)
-        d.setDate(d.getDate() - 30)
+        d.setDate(d.getDate() - 7)
         return d.toISOString()
     })
     const [dateTo, setDateTo] = useState(() => new Date().toISOString())

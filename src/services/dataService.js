@@ -10,12 +10,17 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
     if (largeInFilter) {
         const allValues = largeInFilter.value
         const otherFilters = filters.filter(f => f !== largeInFilter)
+        // Run in batches of 5 concurrent requests to avoid rate limits while massively speeding up
         let combinedData = []
-        for (let i = 0; i < allValues.length; i += IN_BATCH_SIZE) {
-            const batch = allValues.slice(i, i + IN_BATCH_SIZE)
-            const batchFilters = [...otherFilters, { type: 'in', column: largeInFilter.column, value: batch }]
-            const batchData = await fetchAllRows(tableName, selectColumns, batchFilters)
-            combinedData = combinedData.concat(batchData)
+        for (let i = 0; i < allValues.length; i += IN_BATCH_SIZE * 5) {
+            const batchPromises = []
+            for (let j = 0; j < 5 && (i + j * IN_BATCH_SIZE) < allValues.length; j++) {
+                const batch = allValues.slice(i + j * IN_BATCH_SIZE, i + (j + 1) * IN_BATCH_SIZE)
+                const batchFilters = [...otherFilters, { type: 'in', column: largeInFilter.column, value: batch }]
+                batchPromises.push(fetchAllRows(tableName, selectColumns, batchFilters))
+            }
+            const results = await Promise.all(batchPromises)
+            for (const r of results) combinedData = combinedData.concat(r)
         }
         return combinedData
     }
