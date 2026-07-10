@@ -23,9 +23,10 @@ async function fetchAllRows(tableName, selectColumns, filters = []) {
     let allData = []
     let offset = 0
     let hasMore = true
-    const maxRows = 50000 // Safety cap — cc_tickets already has 10k+ rows
+    const maxRows = 250000 // Safety cap — cc_tickets has 53k+ rows
     const startTime = Date.now()
-    const TIMEOUT_MS = 60000 // 60s max for any fetchAllRows call (dataset is 10k+ rows)
+    const TIMEOUT_MS = 120000 // 120s max for any fetchAllRows call
+
 
     while (hasMore && allData.length < maxRows) {
         // Timeout guard
@@ -127,11 +128,17 @@ export async function fetchTicketDetail(ticketId) {
 // In-memory cache to avoid redundant full re-fetches (invalidated on force refresh)
 let _overviewCache = null
 let _overviewCacheTime = 0
+let _overviewCacheDates = { dateFrom: null, dateTo: null }
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 min cache unless force-refreshed
 
 // 1️⃣  Fetch raw data — uses cache unless forceRefresh=true or cache is stale
-export async function fetchOverviewRawData(forceRefresh = false) {
+export async function fetchOverviewRawData(dateFrom, dateTo, forceRefresh = false) {
     const now = Date.now()
+    
+    if (_overviewCacheDates.dateFrom !== dateFrom || _overviewCacheDates.dateTo !== dateTo) {
+        forceRefresh = true
+    }
+
     if (!forceRefresh && _overviewCache && (now - _overviewCacheTime) < CACHE_TTL_MS) {
         console.log('[dataService] Returning cached overview data (age:', Math.round((now - _overviewCacheTime) / 1000), 's)')
         return _overviewCache
@@ -139,21 +146,42 @@ export async function fetchOverviewRawData(forceRefresh = false) {
 
     console.log('[dataService] Fetching fresh overview data...' + (forceRefresh ? ' (FORCE REFRESH)' : ''))
 
-    // Race loading against a 45s timeout to prevent infinite loading
-    const dataPromise = Promise.all([
-        fetchAllRows('cc_tickets', 'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name, customer_phone'),
-        fetchAllRows('cc_analysis', 'ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds'),
-    ])
-
     const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Data loading timeout (45s) — intentá nuevamente')), 45000)
+        setTimeout(() => reject(new Error('Data loading timeout (110s) — intentá nuevamente')), 110000)
     )
+
+    const dataPromise = (async () => {
+        const ticketFilters = []
+        if (dateFrom) ticketFilters.push({ type: 'gte', column: 'received_at', value: dateFrom })
+        if (dateTo) ticketFilters.push({ type: 'lte', column: 'received_at', value: dateTo })
+        
+        const allTickets = await fetchAllRows(
+            'cc_tickets', 
+            'ticket_id, chat_started_at, received_at, agent_name, transferred_to_agent, bot_handoff_seconds, customer_name, customer_phone',
+            ticketFilters
+        )
+
+        const ticketIds = allTickets.map(t => t.ticket_id)
+        let allAnalyses = []
+        
+        if (ticketIds.length > 0) {
+            allAnalyses = await fetchAllRows(
+                'cc_analysis', 
+                'ticket_id, overall_sentiment, sentiment_score, detected_intent, intent_confidence, category, subcategory, customer_keywords, agent_keywords, bot_resolution, bot_first_choice, bot_second_choice, bot_third_choice, conversation_summary, improvement_suggestions, analyzed_at, agent_tone, agent_greeting, agent_farewell, agent_response_quality, message_count, first_response_time_seconds, total_resolution_time_seconds',
+                [{ type: 'in', column: 'ticket_id', value: ticketIds }]
+            )
+        }
+        
+        return [allTickets, allAnalyses]
+    })()
+
 
     const [allTickets, allAnalyses] = await Promise.race([dataPromise, timeoutPromise])
 
     const result = { allTickets, allAnalyses }
     _overviewCache = result
     _overviewCacheTime = Date.now()
+    _overviewCacheDates = { dateFrom, dateTo }
     console.log(`[dataService] Loaded ${allTickets.length} tickets, ${allAnalyses.length} analyses`)
 
     return result
@@ -163,6 +191,7 @@ export async function fetchOverviewRawData(forceRefresh = false) {
 export function invalidateOverviewCache() {
     _overviewCache = null
     _overviewCacheTime = 0
+    _overviewCacheDates = { dateFrom: null, dateTo: null }
     console.log('[dataService] Overview cache invalidated')
 }
 
@@ -315,20 +344,20 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
 
     // ─── WEEKLY TREND (respects date filters) ───
     // Count unique phones per week (1 phone = 1 chat regardless of ticket count)
-    const now = new Date()
+    const anchorDate = dateTo ? new Date(dateTo) : new Date()
 
     // Determine how many weeks to show based on filter range
     let trendWeeks = 8 // default
     if (dateFrom) {
         const fromDate = new Date(dateFrom)
-        const diffDays = Math.ceil((now - fromDate) / (1000 * 60 * 60 * 24))
+        const diffDays = Math.ceil((anchorDate - fromDate) / (1000 * 60 * 60 * 24))
         trendWeeks = Math.max(1, Math.ceil(diffDays / 7))
     }
 
     const weeklyTrend = []
     for (let w = trendWeeks - 1; w >= 0; w--) {
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - (w * 7) - now.getDay() + 1)
+        const weekStart = new Date(anchorDate)
+        weekStart.setDate(anchorDate.getDate() - (w * 7) - anchorDate.getDay() + 1)
         weekStart.setHours(0, 0, 0, 0)
         const weekEnd = new Date(weekStart)
         weekEnd.setDate(weekStart.getDate() + 6)
@@ -357,8 +386,8 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     const allTicketsMap = new Map(allTickets.map(t => [t.ticket_id, t]))
     const filteredTicketsMap = new Map(tickets.map(t => [t.ticket_id, t]))
     for (let w = trendWeeks - 1; w >= 0; w--) {
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - (w * 7) - now.getDay() + 1)
+        const weekStart = new Date(anchorDate)
+        weekStart.setDate(anchorDate.getDate() - (w * 7) - anchorDate.getDay() + 1)
         weekStart.setHours(0, 0, 0, 0)
         const weekEnd = new Date(weekStart)
         weekEnd.setDate(weekStart.getDate() + 6)
@@ -395,8 +424,8 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     const forecast = []
     const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
     for (let d = 1; d <= 7; d++) {
-        const targetDate = new Date(now)
-        targetDate.setDate(now.getDate() + d)
+        const targetDate = new Date(anchorDate)
+        targetDate.setDate(anchorDate.getDate() + d)
         const dayOfWeek = targetDate.getDay()
 
         const historicalCounts = []
@@ -440,7 +469,7 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
     // ─── SMART ALERTS ───
     const alerts = []
 
-    const todayStart = new Date(now)
+    const todayStart = new Date(anchorDate)
     todayStart.setHours(0, 0, 0, 0)
     const todayTickets = allTickets.filter(t => {
         if (!t.chat_started_at) return false
@@ -464,10 +493,10 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
         }
     })
 
-    const sevenDaysAgo = new Date(now)
-    sevenDaysAgo.setDate(now.getDate() - 7)
-    const fourteenDaysAgo = new Date(now)
-    fourteenDaysAgo.setDate(now.getDate() - 14)
+    const sevenDaysAgo = new Date(anchorDate)
+    sevenDaysAgo.setDate(anchorDate.getDate() - 7)
+    const fourteenDaysAgo = new Date(anchorDate)
+    fourteenDaysAgo.setDate(anchorDate.getDate() - 14)
 
     const recentKeywords = {}
     const previousKeywords = {}

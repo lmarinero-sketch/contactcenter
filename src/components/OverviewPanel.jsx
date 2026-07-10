@@ -39,9 +39,14 @@ export default function OverviewPanel({ onNavigateToChat, forceRefresh = false }
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState(null)
 
-    // Filter state — changes trigger instant recalc, no fetch
-    const [dateFrom, setDateFrom] = useState(null)
-    const [dateTo, setDateTo] = useState(null)
+    // Filter state — changes trigger data fetch
+    const [dateFrom, setDateFrom] = useState(() => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() - 30)
+        return d.toISOString()
+    })
+    const [dateTo, setDateTo] = useState(() => new Date().toISOString())
     const [selectedAgent, setSelectedAgent] = useState(null)
 
     // Report modal
@@ -72,21 +77,21 @@ export default function OverviewPanel({ onNavigateToChat, forceRefresh = false }
                 }
                 setLoadError(null)
 
-                // Safety timeout — 50s max for data loading
+                // Safety timeout — 115s max for data loading
                 timeoutId = setTimeout(() => {
                     if (mounted) {
                         setLoadError('La carga de datos tardó demasiado. Intentá nuevamente.')
                         setLoading(false)
                         setIsRefreshing(false)
                     }
-                }, 50000)
+                }, 115000)
 
                 // Force refresh invalidates the cache first
                 if (isForced) {
                     invalidateOverviewCache()
                 }
 
-                const data = await fetchOverviewRawData(isForced)
+                const data = await fetchOverviewRawData(dateFrom, dateTo, isForced)
                 if (mounted) {
                     setRawData(data)
                     setLoadError(null)
@@ -111,7 +116,7 @@ export default function OverviewPanel({ onNavigateToChat, forceRefresh = false }
             mounted = false
             if (timeoutId) clearTimeout(timeoutId)
         }
-    }, [forceRefresh, refreshCount])
+    }, [forceRefresh, refreshCount, dateFrom, dateTo])
 
     // Auto-refresh every 5 min
     useEffect(() => {
