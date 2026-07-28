@@ -25,7 +25,7 @@ function renderMarkdown(text) {
     
     // 0. Extract Mermaid blocks before HTML escaping
     const mermaidBlocks = [];
-    html = html.replace(/```mermaid\n([\s\S]*?)\n```/g, (match, code) => {
+    html = html.replace(/```mermaid[ \t]*\r?\n([\s\S]*?)\r?\n```/gi, (match, code) => {
         mermaidBlocks.push(code);
         return `__MERMAID_BLOCK_${mermaidBlocks.length - 1}__`;
     });
@@ -1243,7 +1243,7 @@ export default function RAGPanel() {
                     <div className="rag-quick-actions" style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
                         <button 
                             className="rag-quick-action-btn"
-                            onClick={() => setInputValue('Genera un mapa conceptual en formato Mermaid (```mermaid) sobre las reglas de este documento.')}
+                            onClick={() => setInputValue('Genera un mapa conceptual sobre las reglas de este documento. IMPORTANTE: Envuelve el código del diagrama EXCLUSIVAMENTE dentro de un bloque markdown tipo mermaid (empezando con ```mermaid y terminando con ```). Usa saltos de línea para cada nodo.')}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                             📊 Mapa Conceptual
