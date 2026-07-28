@@ -5281,11 +5281,54 @@ body {
 }
 
 .sa-feedback-row.incorrect {
-  background: #fef2f208;
+  background-color: #fef2f2;
 }
 
 .sa-feedback-row.incorrect:hover {
-  background: #fef2f2;
+  background-color: #fee2e2;
+}
+
+.sa-feedback-row.expanded {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.sa-feedback-row-container {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sa-feedback-row-container:last-child {
+  border-bottom: none;
+}
+
+.sa-feedback-expanded-details {
+  padding: 16px 20px;
+  background-color: #f8fafc;
+  border-top: 1px dashed #cbd5e1;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.sa-fb-detail-group h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sa-fb-detail-group p {
+  margin: 0;
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.mt-3 {
+  margin-top: 16px;
 }
 
 .sa-fb-col-question,

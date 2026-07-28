@@ -66,6 +66,12 @@ function App() {
         window.location.search.includes('view=cargar') || 
         window.location.hash === '#/cargar';
 
+    // Detect dedicated Simon mode
+    const isDedicatedSimonMode = 
+        window.location.pathname === '/simon' || 
+        window.location.search.includes('view=simon') || 
+        window.location.hash === '#/simon';
+
     // Loading state
     if (loading) {
         return (
@@ -78,7 +84,7 @@ function App() {
 
     // Not authenticated → show login
     if (!user) {
-        return <LoginPage isCargaMode={isDedicatedCargaMode} />
+        return <LoginPage isCargaMode={isDedicatedCargaMode} isSimonMode={isDedicatedSimonMode} />
     }
 
     // Render standalone data entry portal if in dedicated mode
@@ -156,6 +162,86 @@ function App() {
                 </header>
                 <div className="carga-content">
                     <DataEntryPanel key={refreshKey} />
+                </div>
+            </div>
+        )
+    }
+
+    // Render standalone Simon portal if in dedicated mode
+    if (isDedicatedSimonMode) {
+        const roleLabels = {
+            coordinador: 'Coordinador',
+            gerente: 'Gte. Administrativo',
+            agente: 'Agente',
+            refuerzo: 'Refuerzo',
+        }
+        
+        const roleColors = {
+            coordinador: '#10b981',
+            gerente: '#8b5cf6',
+            agente: '#3b82f6',
+            refuerzo: '#f59e0b',
+        }
+        
+        const userRole = profile?.role || 'operador'
+
+        return (
+            <div className="carga-layout">
+                <header className="carga-header" style={{ borderBottom: '1px solid #e2e8f0', background: 'white' }}>
+                    <div className="carga-header-left">
+                        <div className="carga-logo">
+                            <img src="/logosanatorio.png" alt="Sanatorio Argentino" />
+                        </div>
+                        <div className="carga-brand-info">
+                            <h1>Asistente Documental — Simon IA</h1>
+                            <span>Sanatorio Argentino</span>
+                        </div>
+                    </div>
+                    <div className="carga-header-right">
+                        {profile && (
+                            <div className="carga-user-info">
+                                <span className="carga-user-name">{profile.full_name}</span>
+                                <span 
+                                    className="carga-user-role"
+                                    style={{
+                                        background: (roleColors[userRole] || '#64748b') + '22',
+                                        color: roleColors[userRole] || '#64748b'
+                                    }}
+                                >
+                                    {roleLabels[userRole] || userRole}
+                                </span>
+                            </div>
+                        )}
+                        <button 
+                            className="btn btn-secondary" 
+                            onClick={async () => {
+                                try {
+                                    await signOut()
+                                } catch (err) {
+                                    console.error('Error signing out:', err)
+                                }
+                            }}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                padding: '10px 16px',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                borderRadius: '10px',
+                                border: '1px solid #d1d5db',
+                                backgroundColor: 'white',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </header>
+                <div className="carga-content" style={{ padding: 0, height: 'calc(100vh - 73px)' }}>
+                    <RAGPanel key={refreshKey} />
                 </div>
             </div>
         )

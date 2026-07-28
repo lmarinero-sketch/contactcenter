@@ -34,6 +34,7 @@ export default function SimonAnalytics() {
     const [period, setPeriod] = useState(30)
     const [feedbackData, setFeedbackData] = useState(null)
     const [showOnlyIncorrect, setShowOnlyIncorrect] = useState(true)
+    const [expandedFeedbackId, setExpandedFeedbackId] = useState(null)
 
     useEffect(() => {
         loadAnalytics()
@@ -624,41 +625,62 @@ export default function SimonAnalytics() {
                                     {feedbackData.items
                                         .filter(item => !showOnlyIncorrect || !item.is_correct)
                                         .slice(0, 20)
-                                        .map((item, i) => (
-                                            <div
-                                                key={item.id || i}
-                                                className={`sa-feedback-row ${item.is_correct ? 'correct' : 'incorrect'}`}
-                                            >
-                                                <span className="sa-fb-col-status">
-                                                    {item.is_correct ? (
-                                                        <span className="sa-fb-badge correct">
-                                                            <ThumbsUp size={10} /> OK
+                                        .map((item, i) => {
+                                            const itemId = item.id || i
+                                            const isExpanded = expandedFeedbackId === itemId
+                                            
+                                            return (
+                                                <div key={itemId} className="sa-feedback-row-container">
+                                                    <div
+                                                        className={`sa-feedback-row ${item.is_correct ? 'correct' : 'incorrect'} ${isExpanded ? 'expanded' : ''}`}
+                                                        onClick={() => setExpandedFeedbackId(isExpanded ? null : itemId)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        <span className="sa-fb-col-status">
+                                                            {item.is_correct ? (
+                                                                <span className="sa-fb-badge correct">
+                                                                    <ThumbsUp size={10} /> OK
+                                                                </span>
+                                                            ) : (
+                                                                <span className="sa-fb-badge incorrect">
+                                                                    <ThumbsDown size={10} /> Mal
+                                                                </span>
+                                                            )}
                                                         </span>
-                                                    ) : (
-                                                        <span className="sa-fb-badge incorrect">
-                                                            <ThumbsDown size={10} /> Mal
+                                                        <span className="sa-fb-col-question" title={item.question}>
+                                                            {item.question || '—'}
                                                         </span>
+                                                        <span className="sa-fb-col-answer" title={item.answer_preview}>
+                                                            {isExpanded ? (item.answer_preview || '—') : (item.answer_preview
+                                                                ? (item.answer_preview.length > 120
+                                                                    ? item.answer_preview.slice(0, 120) + '...'
+                                                                    : item.answer_preview)
+                                                                : '—')}
+                                                        </span>
+                                                        <span className="sa-fb-col-date">
+                                                            {item.created_at
+                                                                ? new Date(item.created_at).toLocaleDateString('es-AR', {
+                                                                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                                                                })
+                                                                : '—'}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {isExpanded && (
+                                                        <div className="sa-feedback-expanded-details">
+                                                            <div className="sa-fb-detail-group">
+                                                                <h4>Pregunta del Usuario:</h4>
+                                                                <p>{item.question || 'Sin pregunta registrada'}</p>
+                                                            </div>
+                                                            <div className="sa-fb-detail-group mt-3">
+                                                                <h4>Respuesta de Simon:</h4>
+                                                                <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{item.answer_preview || 'Sin respuesta registrada'}</p>
+                                                            </div>
+                                                        </div>
                                                     )}
-                                                </span>
-                                                <span className="sa-fb-col-question" title={item.question}>
-                                                    {item.question || '—'}
-                                                </span>
-                                                <span className="sa-fb-col-answer" title={item.answer_preview}>
-                                                    {item.answer_preview
-                                                        ? (item.answer_preview.length > 120
-                                                            ? item.answer_preview.slice(0, 120) + '...'
-                                                            : item.answer_preview)
-                                                        : '—'}
-                                                </span>
-                                                <span className="sa-fb-col-date">
-                                                    {item.created_at
-                                                        ? new Date(item.created_at).toLocaleDateString('es-AR', {
-                                                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                                                        })
-                                                        : '—'}
-                                                </span>
-                                            </div>
-                                        ))}
+                                                </div>
+                                            )
+                                        })}
                                     {feedbackData.items.filter(item => !showOnlyIncorrect || !item.is_correct).length === 0 && (
                                         <div className="sa-chart-empty" style={{ padding: '20px 0' }}>
                                             {showOnlyIncorrect

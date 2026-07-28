@@ -23,6 +23,13 @@ function renderMarkdown(text) {
     
     let html = text;
     
+    // 0. Extract Mermaid blocks before HTML escaping
+    const mermaidBlocks = [];
+    html = html.replace(/```mermaid\n([\s\S]*?)\n```/g, (match, code) => {
+        mermaidBlocks.push(code);
+        return `__MERMAID_BLOCK_${mermaidBlocks.length - 1}__`;
+    });
+    
     // 1. Clean HTML entities
     html = html
         .replace(/&/g, '&amp;')
@@ -91,6 +98,11 @@ function renderMarkdown(text) {
         .replace(/<\/ul><br\/>/g, '</ul>')
         .replace(/<\/ol><br\/>/g, '</ol>')
         .replace(/<li>(.*?)<\/li><br\/>/g, '<li>$1</li>');
+        
+    // 9. Restore Mermaid blocks
+    html = html.replace(/__MERMAID_BLOCK_(\d+)__/g, (match, index) => {
+        return `<div class="mermaid">${mermaidBlocks[index]}</div>`;
+    });
         
     return html;
 }
@@ -208,9 +220,19 @@ export default function RAGPanel() {
         }
     }
 
-    // Scroll to bottom on new messages
+    // Scroll to bottom on new messages and render mermaid diagrams
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+        
+        if (window.mermaid && messages.length > 0) {
+            setTimeout(() => {
+                try {
+                    window.mermaid.init(undefined, document.querySelectorAll('.mermaid'));
+                } catch (e) {
+                    console.error('Mermaid render error', e);
+                }
+            }, 100);
+        }
     }, [messages])
 
     // Load suggestions for Smart Guidance Layer
@@ -1217,6 +1239,24 @@ export default function RAGPanel() {
 
                 {/* Input with Autocomplete */}
                 <div className="rag-input-area">
+                    {/* Quick Actions / Smart Prompts */}
+                    <div className="rag-quick-actions" style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+                        <button 
+                            className="rag-quick-action-btn"
+                            onClick={() => setInputValue('Genera un mapa conceptual en formato Mermaid (```mermaid) sobre las reglas de este documento.')}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                            📊 Mapa Conceptual
+                        </button>
+                        <button 
+                            className="rag-quick-action-btn"
+                            onClick={() => setInputValue('Escribe un resumen estructurado con viñetas sobre los puntos más importantes.')}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                            📝 Resumen Estructurado
+                        </button>
+                    </div>
+
                     <div className="rag-input-wrapper" style={{ position: 'relative' }}>
                         <textarea
                             className="rag-input"

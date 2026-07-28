@@ -4,17 +4,19 @@ import { Upload, FileText, AlertCircle, Save, Brain, Info, CheckCircle2, BookOpe
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api'
 
 export default function DataEntryPanel() {
-    const [file, setFile] = useState(null)
+    const [files, setFiles] = useState([])
     const [dataType, setDataType] = useState('visitas')
     const [entryMode, setEntryMode] = useState('file') // 'file' or 'text'
     const [textEntry, setTextEntry] = useState('')
     const [isDragging, setIsDragging] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
     const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
+    const [uploadLogs, setUploadLogs] = useState([])
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files.length > 0) {
-            setFile(e.target.files[0])
+            setFiles(Array.from(e.target.files))
+            setUploadLogs([])
         }
     }
 
@@ -32,8 +34,9 @@ export default function DataEntryPanel() {
         e.preventDefault()
         setIsDragging(false)
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            setFile(e.dataTransfer.files[0])
+            setFiles(Array.from(e.dataTransfer.files))
             setStatusMessage({ type: '', text: '' })
+            setUploadLogs([])
         }
     }
 
@@ -44,23 +47,47 @@ export default function DataEntryPanel() {
 
         try {
             if (entryMode === 'file') {
-                const formData = new FormData()
-                formData.append('file', file)
-                formData.append('folder', dataType)
-                formData.append('tag', dataType)
+                const logs = []
+                let successCount = 0
+                
+                for (const file of files) {
+                    const formData = new FormData()
+                    formData.append('file', file)
+                    formData.append('folder', dataType)
+                    formData.append('tag', dataType)
 
-                const res = await fetch(`${RAG_API_BASE}/upload`, {
-                    method: 'POST',
-                    body: formData,
-                })
+                    try {
+                        const res = await fetch(`${RAG_API_BASE}/upload`, {
+                            method: 'POST',
+                            body: formData,
+                        })
 
-                if (!res.ok) {
-                    const errData = await res.json()
-                    throw new Error(errData.detail || 'Error al subir el documento')
+                        if (!res.ok) {
+                            const errData = await res.json()
+                            throw new Error(errData.detail || 'Error al subir el documento')
+                        }
+                        
+                        logs.push({ name: file.name, status: 'success', message: 'OK' })
+                        successCount++
+                    } catch (err) {
+                        let errMsg = err.message;
+                        if (errMsg && (errMsg.toLowerCase().includes('failed to fetch') || errMsg.toLowerCase().includes('networkerror'))) {
+                            errMsg = 'Error de conexión: Servidor no responde. Informar al responsable.';
+                        }
+                        logs.push({ name: file.name, status: 'error', message: errMsg })
+                    }
                 }
+                
+                setUploadLogs(logs)
 
-                setStatusMessage({ type: 'success', text: `¡Documento vectorizado exitosamente! Simon ya puede consultarlo.` })
-                setFile(null)
+                if (successCount === files.length) {
+                    setStatusMessage({ type: 'success', text: `¡Todos los documentos vectorizados exitosamente!` })
+                    setFiles([])
+                } else if (successCount > 0) {
+                    setStatusMessage({ type: 'warning', text: `Se subieron ${successCount} documentos, pero hubo errores.` })
+                } else {
+                    setStatusMessage({ type: 'error', text: `Ningún documento pudo ser vectorizado.` })
+                }
             } else {
                 const res = await fetch(`${RAG_API_BASE}/rules`, {
                     method: 'POST',
@@ -78,13 +105,17 @@ export default function DataEntryPanel() {
             }
         } catch (error) {
             console.error('Upload Error:', error)
-            setStatusMessage({ type: 'error', text: error.message || 'Error de conexión con el backend.' })
+            let errMsg = error.message;
+            if (errMsg && (errMsg.toLowerCase().includes('failed to fetch') || errMsg.toLowerCase().includes('networkerror'))) {
+                errMsg = 'Error de conexión: Servidor no responde. Informar al responsable.';
+            }
+            setStatusMessage({ type: 'error', text: errMsg || 'Error de conexión con el backend.' })
         } finally {
             setIsUploading(false)
         }
     }
 
-    const isSubmitDisabled = isUploading || (entryMode === 'file' ? !file : textEntry.trim().length === 0);
+    const isSubmitDisabled = isUploading || (entryMode === 'file' ? files.length === 0 : textEntry.trim().length === 0);
 
     return (
         <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -207,18 +238,23 @@ export default function DataEntryPanel() {
                                     >
                                         <input 
                                             type="file" 
+                                            multiple
                                             onChange={handleFileChange}
                                             accept=".csv, .pdf, .docx, .png, .jpg, .jpeg, .webp, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                                         />
-                                        {file ? (
+                                        {files.length > 0 ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: '#2563eb' }}>
                                                 <div style={{ backgroundColor: '#dbeafe', padding: '16px', borderRadius: '50%' }}>
                                                     <CheckCircle2 size={36} />
                                                 </div>
                                                 <div style={{ textAlign: 'center' }}>
-                                                    <span style={{ display: 'block', fontWeight: 600, fontSize: '1rem', color: '#1e40af' }}>{file.name}</span>
-                                                    <span style={{ fontSize: '0.85rem', color: '#3b82f6' }}>{(file.size / 1024).toFixed(1)} KB - Listo para procesar</span>
+                                                    <span style={{ display: 'block', fontWeight: 600, fontSize: '1rem', color: '#1e40af' }}>{files.length} archivo(s) seleccionado(s)</span>
+                                                    <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', fontSize: '0.85rem', color: '#3b82f6', maxHeight: '100px', overflowY: 'auto' }}>
+                                                        {files.map((f, i) => (
+                                                            <li key={i}>{f.name} ({(f.size / 1024).toFixed(1)} KB)</li>
+                                                        ))}
+                                                    </ul>
                                                 </div>
                                             </div>
                                         ) : (
@@ -261,20 +297,32 @@ export default function DataEntryPanel() {
 
                             {/* Mensajes de Estado */}
                             {statusMessage.text && (
-                                <div style={{ 
-                                    padding: '16px', 
-                                    borderRadius: '12px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '8px',
-                                    backgroundColor: statusMessage.type === 'success' ? '#f0fdf4' : '#fef2f2',
-                                    border: statusMessage.type === 'success' ? '1px solid #bbf7d0' : '1px solid #fecaca',
-                                    color: statusMessage.type === 'success' ? '#166534' : '#991b1b',
-                                    fontWeight: 500,
-                                    fontSize: '0.9rem'
+                                <div style={{
+                                    marginTop: '16px', padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px',
+                                    backgroundColor: statusMessage.type === 'error' ? '#fef2f2' : (statusMessage.type === 'warning' ? '#fffbeb' : '#f0fdf4'),
+                                    color: statusMessage.type === 'error' ? '#991b1b' : (statusMessage.type === 'warning' ? '#b45309' : '#166534'),
+                                    border: `1px solid ${statusMessage.type === 'error' ? '#fca5a5' : (statusMessage.type === 'warning' ? '#fcd34d' : '#bbf7d0')}`
                                 }}>
-                                    {statusMessage.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-                                    {statusMessage.text}
+                                    <AlertCircle size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <span>{statusMessage.text}</span>
+                                </div>
+                            )}
+
+                            {uploadLogs.length > 0 && (
+                                <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                    <h4 style={{ margin: '0 0 12px 0', fontSize: '0.875rem', color: '#475569' }}>Detalle de Subida</h4>
+                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.875rem' }}>
+                                        {uploadLogs.map((log, idx) => (
+                                            <li key={idx} style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ fontWeight: 500, color: '#334155' }}>{log.name}</span>
+                                                {log.status === 'success' ? (
+                                                    <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={14}/> OK</span>
+                                                ) : (
+                                                    <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}><AlertCircle size={14}/> Error: {log.message}</span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
                             )}
 

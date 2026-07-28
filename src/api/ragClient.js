@@ -6,10 +6,21 @@
 
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api';
 
+async function safeFetch(url, options) {
+    try {
+        return await fetch(url, options);
+    } catch (error) {
+        if (error.message && (error.message.toLowerCase().includes('failed to fetch') || error.message.toLowerCase().includes('networkerror'))) {
+            throw new Error('Error de conexión: El servidor no responde o está apagado. Por favor, informe al responsable técnico.');
+        }
+        throw error;
+    }
+}
+
 // === Chat ===
 
 export async function sendRAGMessage(question, conversationId = null) {
-    const response = await fetch(`${RAG_API_BASE}/chat`, {
+    const response = await safeFetch(`${RAG_API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, conversation_id: conversationId }),
@@ -24,19 +35,19 @@ export async function sendRAGMessage(question, conversationId = null) {
 // === Conversations ===
 
 export async function listRAGConversations() {
-    const response = await fetch(`${RAG_API_BASE}/conversations`);
+    const response = await safeFetch(`${RAG_API_BASE}/conversations`);
     if (!response.ok) throw new Error('Error al cargar conversaciones');
     return response.json();
 }
 
 export async function getRAGConversationMessages(conversationId) {
-    const response = await fetch(`${RAG_API_BASE}/conversations/${conversationId}/messages`);
+    const response = await safeFetch(`${RAG_API_BASE}/conversations/${conversationId}/messages`);
     if (!response.ok) throw new Error('Error al cargar mensajes');
     return response.json();
 }
 
 export async function deleteRAGConversation(conversationId) {
-    const response = await fetch(`${RAG_API_BASE}/conversations/${conversationId}`, {
+    const response = await safeFetch(`${RAG_API_BASE}/conversations/${conversationId}`, {
         method: 'DELETE',
     });
     if (!response.ok) throw new Error('Error al eliminar conversación');
@@ -58,7 +69,7 @@ export async function uploadRAGDocument(file, folder = '', tag = '', timeoutMs =
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-        const response = await fetch(`${RAG_API_BASE}/upload`, {
+        const response = await safeFetch(`${RAG_API_BASE}/upload`, {
             method: 'POST',
             body: formData,
             signal: controller.signal,
@@ -162,7 +173,7 @@ export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = 
  */
 export async function listRAGFiles(folder = '') {
     const params = folder ? `?folder=${encodeURIComponent(folder)}` : '';
-    const response = await fetch(`${RAG_API_BASE}/files${params}`);
+    const response = await safeFetch(`${RAG_API_BASE}/files${params}`);
     if (!response.ok) throw new Error('Error al cargar archivos');
     return response.json();
 }
@@ -171,7 +182,7 @@ export async function listRAGFiles(folder = '') {
  * Get download URL for a file
  */
 export async function downloadRAGFile(path) {
-    const response = await fetch(`${RAG_API_BASE}/files/download?path=${encodeURIComponent(path)}`);
+    const response = await safeFetch(`${RAG_API_BASE}/files/download?path=${encodeURIComponent(path)}`);
     if (!response.ok) throw new Error('Error al descargar archivo');
     const data = await response.json();
     // Open download URL in new tab
@@ -187,7 +198,7 @@ export async function downloadRAGFile(path) {
 export async function createRAGFolder(name, parent = '') {
     const params = new URLSearchParams({ name });
     if (parent) params.append('parent', parent);
-    const response = await fetch(`${RAG_API_BASE}/folders?${params}`, {
+    const response = await safeFetch(`${RAG_API_BASE}/folders?${params}`, {
         method: 'POST',
     });
     if (!response.ok) throw new Error('Error al crear carpeta');
@@ -198,7 +209,7 @@ export async function createRAGFolder(name, parent = '') {
  * Delete a file
  */
 export async function deleteRAGFile(path) {
-    const response = await fetch(`${RAG_API_BASE}/files?path=${encodeURIComponent(path)}`, {
+    const response = await safeFetch(`${RAG_API_BASE}/files?path=${encodeURIComponent(path)}`, {
         method: 'DELETE',
     });
     if (!response.ok) throw new Error('Error al eliminar archivo');
@@ -209,7 +220,7 @@ export async function deleteRAGFile(path) {
  * Delete a folder and all contents
  */
 export async function deleteRAGFolder(path) {
-    const response = await fetch(`${RAG_API_BASE}/folders?path=${encodeURIComponent(path)}`, {
+    const response = await safeFetch(`${RAG_API_BASE}/folders?path=${encodeURIComponent(path)}`, {
         method: 'DELETE',
     });
     if (!response.ok) throw new Error('Error al eliminar carpeta');
@@ -222,7 +233,7 @@ export async function deleteRAGFolder(path) {
  * Submit feedback (correct/incorrect) for a specific assistant message
  */
 export async function submitFeedback(conversationId, messageIndex, isCorrect) {
-    const response = await fetch(`${RAG_API_BASE}/feedback`, {
+    const response = await safeFetch(`${RAG_API_BASE}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -243,7 +254,7 @@ export async function submitFeedback(conversationId, messageIndex, isCorrect) {
  */
 export async function getFeedbackHistory(days = 30) {
     try {
-        const response = await fetch(`${RAG_API_BASE}/feedback/history?days=${days}`);
+        const response = await safeFetch(`${RAG_API_BASE}/feedback/history?days=${days}`);
         if (!response.ok) return { items: [], stats: {} };
         return await response.json();
     } catch {
@@ -255,13 +266,13 @@ export async function getFeedbackHistory(days = 30) {
 
 export async function listRAGDocuments(tag = '') {
     const params = tag ? `?tag=${encodeURIComponent(tag)}` : '';
-    const response = await fetch(`${RAG_API_BASE}/documents${params}`);
+    const response = await safeFetch(`${RAG_API_BASE}/documents${params}`);
     if (!response.ok) throw new Error('Error al cargar documentos');
     return response.json();
 }
 
 export async function deleteRAGDocument(filename) {
-    const response = await fetch(`${RAG_API_BASE}/documents?filename=${encodeURIComponent(filename)}`, {
+    const response = await safeFetch(`${RAG_API_BASE}/documents?filename=${encodeURIComponent(filename)}`, {
         method: 'DELETE',
     });
     if (!response.ok) throw new Error('Error al eliminar documento');
@@ -272,7 +283,7 @@ export async function deleteRAGDocument(filename) {
 
 export async function checkRAGHealth() {
     try {
-        const response = await fetch(`${RAG_API_BASE}/health`);
+        const response = await safeFetch(`${RAG_API_BASE}/health`);
         return response.ok;
     } catch {
         return false;
@@ -283,7 +294,7 @@ export async function checkRAGHealth() {
 
 export async function fetchSuggestions() {
     try {
-        const response = await fetch(`${RAG_API_BASE}/suggestions`);
+        const response = await safeFetch(`${RAG_API_BASE}/suggestions`);
         if (!response.ok) return { categories: [], top_queries: [] };
         return await response.json();
     } catch {

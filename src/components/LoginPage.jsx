@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react'
 
-export default function LoginPage({ isCargaMode = false }) {
+export default function LoginPage({ isCargaMode = false, isSimonMode = false }) {
     const { signIn } = useAuth()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -36,9 +36,9 @@ export default function LoginPage({ isCargaMode = false }) {
                         <div className="login-logo">
                             <img src="/logosanatorio.png" alt="Sanatorio Argentino" />
                         </div>
-                        <h1 className="login-title">{isCargaMode ? 'Portal de Carga' : 'Contact Center'}</h1>
+                        <h1 className="login-title">{isSimonMode ? 'Asistente Documental' : (isCargaMode ? 'Portal de Carga' : 'Contact Center')}</h1>
                         <p className="login-subtitle">
-                            {isCargaMode ? 'Carga exclusiva de datos — Simon IA' : 'Panel de Analytics y Gestión'}
+                            {isSimonMode ? 'Consultas a Simon IA' : (isCargaMode ? 'Carga exclusiva de datos — Simon IA' : 'Panel de Analytics y Gestión')}
                         </p>
                     </div>
 
