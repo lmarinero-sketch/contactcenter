@@ -6,12 +6,12 @@ import {
     Search, Sparkles, Layers, BarChart3, FolderOpen, Tag,
     Download, FolderPlus, ArrowLeft, Home, Folder,
     Lightbulb, GraduationCap, HelpCircle, Shield, FileWarning,
-    Info, ThumbsUp, ThumbsDown
+    Info, ThumbsUp, ThumbsDown, Eye, Calendar, ExternalLink
 } from 'lucide-react'
 import {
     sendRAGMessage, listRAGConversations, getRAGConversationMessages,
     deleteRAGConversation, uploadRAGDocument, uploadRAGBatch,
-    listRAGFiles, downloadRAGFile, createRAGFolder, deleteRAGFile,
+    listRAGFiles, downloadRAGFile, previewRAGFile, createRAGFolder, deleteRAGFile,
     deleteRAGFolder, checkRAGHealth, fetchSuggestions, submitFeedback
 } from '../api/ragClient'
 import RAGHelp from './RAGHelp'
@@ -149,6 +149,13 @@ export default function RAGPanel() {
 
     // Feedback state: { [msgIndex]: 'correct' | 'incorrect' | 'loading' }
     const [feedbackState, setFeedbackState] = useState({})
+
+    // Document Previewer state
+    const [previewItem, setPreviewItem] = useState(null)
+    const [previewData, setPreviewData] = useState(null)
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+    const [previewTab, setPreviewTab] = useState('visual') // 'visual' | 'chunks'
+    const [chunkSearchQuery, setChunkSearchQuery] = useState('')
 
     const messagesEndRef = useRef(null)
     const fileInputRef = useRef(null)
@@ -510,10 +517,29 @@ export default function RAGPanel() {
     // Download file
     async function handleDownload(item) {
         try {
-            const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
+            const path = item.storage_path || `${item.folder}/${item.name || item.filename}`.replace(/^\//, '')
             await downloadRAGFile(path)
         } catch (e) {
             setError(e.message)
+        }
+    }
+
+    // Open document previewer (inline without downloading)
+    async function handleOpenPreview(item) {
+        const path = item.storage_path || `${item.folder || ''}/${item.name || item.filename}`.replace(/^\//, '')
+        setPreviewItem(item)
+        setPreviewData(null)
+        setIsPreviewLoading(true)
+        setPreviewTab('visual')
+        setChunkSearchQuery('')
+        try {
+            const data = await previewRAGFile(path)
+            setPreviewData(data)
+        } catch (e) {
+            setError('No se pudo cargar la vista previa: ' + e.message)
+            setPreviewItem(null)
+        } finally {
+            setIsPreviewLoading(false)
         }
     }
 
@@ -629,6 +655,20 @@ export default function RAGPanel() {
         if (diff < 3600000) return `${Math.floor(diff / 60000)}m`
         if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`
         return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
+    }
+
+    // Format full date with time
+    function formatFullDate(dateStr) {
+        if (!dateStr) return ''
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return ''
+        return d.toLocaleDateString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
     }
 
     const FILE_ICONS = {
@@ -885,20 +925,28 @@ export default function RAGPanel() {
                                         </div>
                                     ) : (
                                         <div key={item.name} className="rag-doc-item">
-                                            <div className="rag-doc-icon">{FILE_ICONS[item.file_type] || '📄'}</div>
-                                            <div className="rag-doc-info">
-                                                <span className="rag-doc-name">{item.name}</span>
-                                                <span className="rag-doc-meta">
-                                                    {item.total_chunks} chunks · {formatFileSize(item.file_size)}
-                                                    {item.tag && <span className="rag-doc-tag">{item.tag}</span>}
-                                                </span>
-                                            </div>
-                                            <button className="rag-doc-action" onClick={() => handleDownload(item)} title="Descargar">
-                                                <Download size={12} />
-                                            </button>
-                                            <button className="rag-doc-delete" onClick={() => handleDeleteFile(item)} title="Eliminar">
-                                                <Trash2 size={12} />
-                                            </button>
+                                             <div className="rag-doc-icon" onClick={() => handleOpenPreview(item)} style={{ cursor: 'pointer' }}>
+                                                 {FILE_ICONS[item.file_type] || '📄'}
+                                             </div>
+                                             <div className="rag-doc-info" onClick={() => handleOpenPreview(item)} style={{ cursor: 'pointer' }} title={item.name}>
+                                                 <span className="rag-doc-name" title={item.name}>{item.name}</span>
+                                                 <span className="rag-doc-meta">
+                                                     {item.total_chunks} chunks · {formatFileSize(item.file_size)}
+                                                     {item.created_at && (
+                                                         <> · <Calendar size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />{formatFullDate(item.created_at)}</>
+                                                     )}
+                                                     {item.tag && <span className="rag-doc-tag">{item.tag}</span>}
+                                                 </span>
+                                             </div>
+                                             <button className="rag-doc-action" onClick={() => handleOpenPreview(item)} title="Visualizar sin descargar">
+                                                 <Eye size={13} />
+                                             </button>
+                                             <button className="rag-doc-action" onClick={() => handleDownload(item)} title="Descargar original">
+                                                 <Download size={13} />
+                                             </button>
+                                             <button className="rag-doc-delete" onClick={() => handleDeleteFile(item)} title="Eliminar">
+                                                 <Trash2 size={12} />
+                                             </button>
                                         </div>
                                     )
                                 ))
@@ -1109,13 +1157,22 @@ export default function RAGPanel() {
                                                         </span>
                                                     )}
                                                     {src.source_type !== 'chat_history' && src.storage_path && (
-                                                        <button
-                                                            className="rag-source-download"
-                                                            onClick={() => downloadRAGFile(src.storage_path)}
-                                                            title={`Descargar ${src.filename}`}
-                                                        >
-                                                            <Download size={11} />
-                                                        </button>
+                                                        <div style={{ display: 'flex', gap: 2 }}>
+                                                            <button
+                                                                className="rag-source-download"
+                                                                onClick={() => handleOpenPreview({ storage_path: src.storage_path, name: src.filename, file_type: src.file_type || ('.' + src.filename.split('.').pop()) })}
+                                                                title={`Visualizar ${src.filename}`}
+                                                            >
+                                                                <Eye size={11} />
+                                                            </button>
+                                                            <button
+                                                                className="rag-source-download"
+                                                                onClick={() => downloadRAGFile(src.storage_path)}
+                                                                title={`Descargar ${src.filename}`}
+                                                            >
+                                                                <Download size={11} />
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             ))}
@@ -1439,6 +1496,166 @@ export default function RAGPanel() {
                             }}>
                                 <Trash2 size={14} /> Confirmar
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Document Preview Modal */}
+            {previewItem && (
+                <div className="rag-modal-overlay" onClick={() => setPreviewItem(null)}>
+                    <div className="rag-preview-modal" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="rag-preview-header">
+                            <div className="rag-preview-title-block">
+                                <span className="rag-preview-icon">
+                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || '📄'}
+                                </span>
+                                <div style={{ minWidth: 0 }}>
+                                    <h3 className="rag-preview-filename" title={previewItem.name || previewItem.filename}>
+                                        {previewItem.name || previewItem.filename}
+                                    </h3>
+                                    <div className="rag-preview-submeta">
+                                        {previewItem.folder && <span className="badge neutral"><Folder size={10} /> {previewItem.folder}</span>}
+                                        <span className="badge info">{previewData?.total_chunks ?? previewItem.total_chunks ?? 0} chunks</span>
+                                        {previewItem.file_size > 0 && <span className="badge neutral">{formatFileSize(previewItem.file_size)}</span>}
+                                        {previewItem.created_at && (
+                                            <span className="badge neutral">
+                                                <Calendar size={10} style={{ marginRight: 2 }} /> {formatFullDate(previewItem.created_at)}
+                                            </span>
+                                        )}
+                                        {previewItem.tag && <span className="rag-doc-tag">{previewItem.tag}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="rag-preview-header-actions">
+                                <button
+                                    className="rag-modal-btn cancel"
+                                    onClick={() => handleDownload(previewItem)}
+                                    title="Descargar archivo original"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+                                >
+                                    <Download size={13} /> Descargar
+                                </button>
+                                <button className="rag-modal-close" onClick={() => setPreviewItem(null)} title="Cerrar vista previa">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* View Switcher Tabs */}
+                        <div className="rag-preview-tabs">
+                            <button
+                                className={`rag-preview-tab ${previewTab === 'visual' ? 'active' : ''}`}
+                                onClick={() => setPreviewTab('visual')}
+                            >
+                                <Eye size={13} /> Documento Original
+                            </button>
+                            <button
+                                className={`rag-preview-tab ${previewTab === 'chunks' ? 'active' : ''}`}
+                                onClick={() => setPreviewTab('chunks')}
+                            >
+                                <FileText size={13} /> Texto Extraído / Chunks IA ({previewData?.chunks?.length || 0})
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="rag-preview-body">
+                            {isPreviewLoading ? (
+                                <div className="rag-preview-loading">
+                                    <Loader2 size={28} className="rag-spin" style={{ color: '#3b82f6' }} />
+                                    <span>Cargando vista previa...</span>
+                                </div>
+                            ) : previewTab === 'visual' ? (
+                                previewData?.download_url ? (
+                                    (() => {
+                                        const fname = previewItem.name || previewItem.filename || '';
+                                        const ext = previewItem.file_type || ('.' + fname.split('.').pop().toLowerCase());
+                                        const url = previewData.download_url;
+
+                                        if (['.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif'].includes(ext)) {
+                                            return (
+                                                <div className="rag-preview-image-container">
+                                                    <img src={url} alt={fname} className="rag-preview-image" />
+                                                </div>
+                                            );
+                                        }
+
+                                        if (['.pdf', '.txt', '.md', '.html', '.htm', '.json', '.xml', '.csv'].includes(ext)) {
+                                            return (
+                                                <iframe
+                                                    src={url}
+                                                    title={fname}
+                                                    className="rag-preview-iframe"
+                                                />
+                                            );
+                                        }
+
+                                        // Office documents or other formats (e.g. docx, xlsx)
+                                        const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+                                        return (
+                                            <iframe
+                                                src={googleViewerUrl}
+                                                title={fname}
+                                                className="rag-preview-iframe"
+                                            />
+                                        );
+                                    })()
+                                ) : (
+                                    <div className="rag-preview-empty">
+                                        <AlertCircle size={28} color="#f59e0b" />
+                                        <p>No se pudo generar la URL directa de vista previa.</p>
+                                        <button className="btn btn-primary" onClick={() => setPreviewTab('chunks')}>
+                                            Ver texto extraído por la IA
+                                        </button>
+                                    </div>
+                                )
+                            ) : (
+                                /* Chunks Tab */
+                                <div className="rag-chunks-view">
+                                    <div className="rag-chunks-search">
+                                        <Search size={14} color="#94a3b8" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar texto en fragmentos..."
+                                            value={chunkSearchQuery}
+                                            onChange={(e) => setChunkSearchQuery(e.target.value)}
+                                            className="rag-chunks-search-input"
+                                        />
+                                        {chunkSearchQuery && (
+                                            <button className="rag-fm-btn-sm" onClick={() => setChunkSearchQuery('')}>
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="rag-chunks-list">
+                                        {(() => {
+                                            const filtered = (previewData?.chunks || []).filter(c =>
+                                                !chunkSearchQuery || c.content.toLowerCase().includes(chunkSearchQuery.toLowerCase())
+                                            );
+                                            if (filtered.length === 0) {
+                                                return (
+                                                    <div className="rag-empty-state">
+                                                        <FileText size={28} />
+                                                        <p>No se encontraron fragmentos de texto</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return filtered.map((chunk, idx) => (
+                                                <div key={idx} className="rag-chunk-card">
+                                                    <div className="rag-chunk-header">
+                                                        <span className="badge info">Fragmento #{chunk.chunk_index}</span>
+                                                        {chunk.metadata?.page && <span className="badge neutral">Pág. {chunk.metadata.page}</span>}
+                                                    </div>
+                                                    <div className="rag-chunk-content">
+                                                        {chunk.content}
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -252,6 +252,47 @@ async def download_file(path: str = Query(...)):
     return {"download_url": url, "path": path}
 
 
+@router.get("/files/preview")
+async def preview_file(path: str = Query(...)):
+    """Get preview details for a file: signed URL + extracted RAG text chunks."""
+    clean_path = path.strip("/")
+    url = get_download_url(clean_path)
+
+    parts = clean_path.rsplit("/", 1)
+    filename = parts[-1]
+    folder = parts[0] if len(parts) > 1 else ""
+
+    # Fetch chunks from vector DB
+    chunks = []
+    try:
+        chunks_res = supabase.table("rag_documents") \
+            .select("content, metadata, created_at") \
+            .eq("metadata->>filename", filename) \
+            .eq("metadata->>folder", folder) \
+            .order("id") \
+            .execute()
+
+        if chunks_res.data:
+            for idx, row in enumerate(chunks_res.data):
+                chunks.append({
+                    "chunk_index": idx + 1,
+                    "content": row.get("content", ""),
+                    "metadata": row.get("metadata", {}),
+                })
+    except Exception as e:
+        print(f"Error fetching chunks for preview: {e}")
+
+    return {
+        "filename": filename,
+        "folder": folder,
+        "storage_path": clean_path,
+        "download_url": url,
+        "chunks": chunks,
+        "total_chunks": len(chunks),
+    }
+
+
+
 @router.post("/folders")
 async def create_folder(name: str = Query(...), parent: Optional[str] = Query(default="")):
     """

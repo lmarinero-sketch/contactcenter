@@ -193,6 +193,16 @@ export async function downloadRAGFile(path) {
 }
 
 /**
+ * Get preview details (signed URL + extracted chunks) for inline viewer without auto-downloading
+ */
+export async function previewRAGFile(path) {
+    const response = await fetch(`${RAG_API_BASE}/files/preview?path=${encodeURIComponent(path)}`);
+    if (!response.ok) throw new Error('Error al obtener vista previa del archivo');
+    return response.json();
+}
+
+
+/**
  * Create a folder
  */
 export async function createRAGFolder(name, parent = '') {
