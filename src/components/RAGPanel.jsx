@@ -1258,10 +1258,11 @@ export default function RAGPanel() {
                         Respuestas basadas exclusivamente en documentos cargados Â· Enter para enviar
                     </div>
                 </div>
-                {/* End of rag-chat-area */}
+            </div>
+            {/* End of rag-chat-area */}
 
-                {/* Documents Area */}
-                <div className="rag-documents-area" style={{ display: activeTab === 'documents' ? 'flex' : 'none', flex: 1, flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
+            {/* Documents Area */}
+            <div className="rag-documents-area" style={{ display: activeTab === 'documents' ? 'flex' : 'none', flex: 1, flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
                     <div className="rag-doc-header" style={{ padding: '24px 32px 16px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>GestiÃ³n de Archivos</h2>
