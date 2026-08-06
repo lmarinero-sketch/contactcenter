@@ -59,7 +59,7 @@ export async function deleteRAGConversation(conversationId) {
 /**
  * Upload a single document to a folder — with timeout and abort support
  */
-export async function uploadRAGDocument(file, folder = '', tag = '', timeoutMs = 120000) {
+export async function uploadRAGDocument(file, folder = '', tag = '', timeoutMs = 600000) {
     const formData = new FormData();
     formData.append('file', file);
     if (folder) formData.append('folder', folder);
@@ -104,7 +104,7 @@ export async function uploadRAGBatch(files, folder = '', tag = '', onProgress = 
     let total_chunks = 0;
     const supportedExts = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm', '.png', '.jpg', '.jpeg', '.webp'];
 
-    const TIMEOUT_MS = 120000; // 2 min per file
+    const TIMEOUT_MS = 600000; // 10 min per file
     const MAX_RETRIES = 1;
 
     for (let i = 0; i < files.length; i++) {

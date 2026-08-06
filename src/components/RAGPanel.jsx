@@ -127,7 +127,7 @@ export default function RAGPanel() {
     const [suggestions, setSuggestions] = useState({ categories: [], top_queries: [] })
     const [showAutocomplete, setShowAutocomplete] = useState(false)
 
-    // Session state — Simon boot sequence
+    // Session state â€” Simon boot sequence
     const [sessionStarted, setSessionStarted] = useState(false)
     const [bootPhase, setBootPhase] = useState('idle') // idle | waking | connecting | loading | ready | error
     const [bootTimer, setBootTimer] = useState(0)
@@ -364,7 +364,7 @@ export default function RAGPanel() {
     // Supported extensions for filtering
     const SUPPORTED_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm', '.png', '.jpg', '.jpeg', '.webp']
 
-    // Handle file selection — show confirmation modal
+    // Handle file selection â€” show confirmation modal
     function handleFileSelect(event) {
         const files = Array.from(event.target.files || [])
         if (!files.length) return
@@ -427,7 +427,7 @@ export default function RAGPanel() {
             try {
                 const result = await uploadRAGDocument(supportedFiles[0], currentFolder, uploadTag)
                 loadFiles()
-                setUploadProgress(`✅ "${supportedFiles[0].name}" — ${result.total_chunks} chunks`)
+                setUploadProgress(`âœ… "${supportedFiles[0].name}" â€” ${result.total_chunks} chunks`)
                 setTimeout(() => setUploadProgress(''), 4000)
             } catch (e) {
                 setError(e.message || 'Error al subir documento')
@@ -436,17 +436,17 @@ export default function RAGPanel() {
         } else {
             try {
                 const result = await uploadRAGBatch(supportedFiles, currentFolder, uploadTag, (p) => {
-                    const retryLabel = p.retrying ? ' 🔄 Reintentando...' : ''
+                    const retryLabel = p.retrying ? ' ðŸ”„ Reintentando...' : ''
                     const statusParts = [`Subiendo ${p.current}/${p.total}: "${p.filename}"${retryLabel}`]
-                    if (p.processed > 0) statusParts.push(`✅ ${p.processed}`)
-                    if (p.failed > 0) statusParts.push(`❌ ${p.failed}`)
-                    setUploadProgress(statusParts.join(' · '))
+                    if (p.processed > 0) statusParts.push(`âœ… ${p.processed}`)
+                    if (p.failed > 0) statusParts.push(`âŒ ${p.failed}`)
+                    setUploadProgress(statusParts.join(' Â· '))
                 })
                 loadFiles()
-                const parts = [`✅ ${result.processed} procesados`, `${result.total_chunks} chunks`]
-                if (result.failed > 0) parts.push(`❌ ${result.failed} fallidos`)
-                if (result.skipped > 0) parts.push(`⏭ ${result.skipped} omitidos`)
-                setUploadProgress(parts.join(' · '))
+                const parts = [`âœ… ${result.processed} procesados`, `${result.total_chunks} chunks`]
+                if (result.failed > 0) parts.push(`âŒ ${result.failed} fallidos`)
+                if (result.skipped > 0) parts.push(`â­ ${result.skipped} omitidos`)
+                setUploadProgress(parts.join(' Â· '))
                 setTimeout(() => setUploadProgress(''), 8000)
             } catch (e) {
                 setError(e.message || 'Error al subir archivos')
@@ -472,7 +472,7 @@ export default function RAGPanel() {
     async function handleDeleteFile(item) {
         setConfirmAction({
             title: 'Eliminar Archivo',
-            message: `¿Estás seguro de que deseás eliminar "${item.name}"?`,
+            message: `Â¿EstÃ¡s seguro de que deseÃ¡s eliminar "${item.name}"?`,
             onConfirm: async () => {
                 const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
                 try {
@@ -489,7 +489,7 @@ export default function RAGPanel() {
     async function handleDeleteFolder(item) {
         setConfirmAction({
             title: 'Eliminar Carpeta',
-            message: `¿Eliminar la carpeta "${item.name}" y todo su contenido? Esta acción no se puede deshacer.`,
+            message: `Â¿Eliminar la carpeta "${item.name}" y todo su contenido? Esta acciÃ³n no se puede deshacer.`,
             onConfirm: async () => {
                 try {
                     await deleteRAGFolder(item.path)
@@ -547,8 +547,8 @@ export default function RAGPanel() {
     async function handleDeleteConversation(convId, e) {
         e.stopPropagation()
         setConfirmAction({
-            title: 'Eliminar Conversación',
-            message: '¿Estás seguro de que querés eliminar esta conversación del historial?',
+            title: 'Eliminar ConversaciÃ³n',
+            message: 'Â¿EstÃ¡s seguro de que querÃ©s eliminar esta conversaciÃ³n del historial?',
             onConfirm: async () => {
                 try {
                     await deleteRAGConversation(convId)
@@ -639,7 +639,7 @@ export default function RAGPanel() {
 
     // Format file size
     function formatFileSize(bytes) {
-        if (!bytes) return '—'
+        if (!bytes) return 'â€”'
         if (bytes < 1024) return `${bytes} B`
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -672,10 +672,10 @@ export default function RAGPanel() {
     }
 
     const FILE_ICONS = {
-        '.pdf': '📄', '.docx': '📝', '.xlsx': '📊', '.xls': '📊',
-        '.csv': '📋', '.txt': '📃', '.md': '📃', '.json': '🔧',
-        '.xml': '🔧', '.html': '🌐', '.htm': '🌐',
-        '.png': '🖼️', '.jpg': '🖼️', '.jpeg': '🖼️', '.webp': '🖼️',
+        '.pdf': 'ðŸ“„', '.docx': 'ðŸ“', '.xlsx': 'ðŸ“Š', '.xls': 'ðŸ“Š',
+        '.csv': 'ðŸ“‹', '.txt': 'ðŸ“ƒ', '.md': 'ðŸ“ƒ', '.json': 'ðŸ”§',
+        '.xml': 'ðŸ”§', '.html': 'ðŸŒ', '.htm': 'ðŸŒ',
+        '.png': 'ðŸ–¼ï¸', '.jpg': 'ðŸ–¼ï¸', '.jpeg': 'ðŸ–¼ï¸', '.webp': 'ðŸ–¼ï¸',
     }
 
     // === WELCOME / BOOT SCREEN ===
@@ -690,8 +690,8 @@ export default function RAGPanel() {
                     <h1 className="simon-name">Simon</h1>
                     <p className="simon-subtitle">Asistente IA Documental</p>
                     <p className="simon-desc">
-                        Consultá documentos del Sanatorio Argentino con inteligencia artificial.
-                        Respuestas precisas con citación de fuentes.
+                        ConsultÃ¡ documentos del Sanatorio Argentino con inteligencia artificial.
+                        Respuestas precisas con citaciÃ³n de fuentes.
                     </p>
 
                     {/* Pre-boot state */}
@@ -705,7 +705,7 @@ export default function RAGPanel() {
                                 <Clock size={13} />
                                 <span>
                                     Simon se apaga tras <strong>15 min</strong> de inactividad y
-                                    demora entre <strong>30–60 seg</strong> en volver a encenderse
+                                    demora entre <strong>30â€“60 seg</strong> en volver a encenderse
                                 </span>
                             </div>
                         </>
@@ -735,7 +735,7 @@ export default function RAGPanel() {
                                 </div>
                                 <div className={`simon-boot-phase ${bootPhase === 'ready' ? 'active done' : ''}`}>
                                     <div className="simon-boot-dot" />
-                                    <span>¡Simon está listo!</span>
+                                    <span>Â¡Simon estÃ¡ listo!</span>
                                     {bootPhase === 'ready' && <Sparkles size={12} />}
                                 </div>
                             </div>
@@ -752,7 +752,7 @@ export default function RAGPanel() {
                             <AlertCircle size={18} />
                             <div>
                                 <strong>No se pudo conectar con Simon</strong>
-                                <p>El servidor puede estar en mantenimiento. Intentá de nuevo en unos minutos.</p>
+                                <p>El servidor puede estar en mantenimiento. IntentÃ¡ de nuevo en unos minutos.</p>
                             </div>
                             <button className="simon-retry-btn" onClick={() => { setBootPhase('idle'); setSessionStarted(false); }}>
                                 Reintentar
@@ -762,7 +762,7 @@ export default function RAGPanel() {
                 </div>
 
                 <div className="simon-welcome-footer">
-                    Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.2
+                    Sanatorio Argentino Â· Powered by GPT-4o + RAG Pipeline V3.2
                 </div>
             </div>
         )
@@ -804,8 +804,8 @@ export default function RAGPanel() {
                             {conversations.length === 0 ? (
                                 <div className="rag-empty-state">
                                     <Brain size={32} />
-                                    <p>No hay conversaciones aún</p>
-                                    <span>Hacé una pregunta para comenzar</span>
+                                    <p>No hay conversaciones aÃºn</p>
+                                    <span>HacÃ© una pregunta para comenzar</span>
                                 </div>
                             ) : (
                                 conversations.map(conv => (
@@ -815,7 +815,7 @@ export default function RAGPanel() {
                                         onClick={() => selectConversation(conv)}
                                     >
                                         <div className="rag-conv-item-content">
-                                            <span className="rag-conv-title">{conv.title || 'Sin título'}</span>
+                                            <span className="rag-conv-title">{conv.title || 'Sin tÃ­tulo'}</span>
                                             <span className="rag-conv-time">
                                                 <Clock size={10} />
                                                 {formatTime(conv.updated_at)}
@@ -824,7 +824,7 @@ export default function RAGPanel() {
                                         <button
                                             className="rag-conv-delete"
                                             onClick={(e) => handleDeleteConversation(conv.id, e)}
-                                            title="Eliminar conversación"
+                                            title="Eliminar conversaciÃ³n"
                                         >
                                             <Trash2 size={12} />
                                         </button>
@@ -834,130 +834,19 @@ export default function RAGPanel() {
                         </div>
                     )}
 
-                    {/* File Manager */}
+                    {/* File Manager placeholder in sidebar */}
                     {activeTab === 'documents' && (
-                        <div className="rag-doc-list">
-                            {/* Toolbar */}
-                            <div className="rag-fm-toolbar">
-                                <input ref={fileInputRef} type="file" onChange={handleFileSelect}
-                                    accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm,.png,.jpg,.jpeg,.webp"
-                                    style={{ display: 'none' }} multiple />
-                                <input ref={folderInputRef} type="file" onChange={handleFileSelect}
-                                    style={{ display: 'none' }} webkitdirectory="" directory="" multiple />
-                                <div className="rag-fm-actions">
-                                    <button className="rag-fm-btn" onClick={() => fileInputRef.current?.click()}
-                                        title="Subir archivos">
-                                        <Upload size={13} />
-                                    </button>
-                                    <button className="rag-fm-btn" onClick={() => folderInputRef.current?.click()}
-                                        title="Subir carpeta">
-                                        <FolderOpen size={13} />
-                                    </button>
-                                    <button className="rag-fm-btn" onClick={() => setShowNewFolder(!showNewFolder)} title="Nueva carpeta">
-                                        <FolderPlus size={13} />
-                                    </button>
-                                </div>
-                                <div className="rag-tag-input">
-                                    <Tag size={11} />
-                                    <input type="text" placeholder="Tag" value={uploadTag}
-                                        onChange={(e) => setUploadTag(e.target.value)}
-                                        className="rag-tag-field" />
-                                </div>
-                            </div>
-
-                            {/* New folder form */}
-                            {showNewFolder && (
-                                <div className="rag-fm-newfolder">
-                                    <input type="text" placeholder="Nombre de carpeta"
-                                        value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-                                        className="rag-fm-newfolder-input" autoFocus />
-                                    <button className="rag-fm-btn-sm" onClick={handleCreateFolder}><CheckCircle size={12} /></button>
-                                    <button className="rag-fm-btn-sm" onClick={() => { setShowNewFolder(false); setNewFolderName('') }}><X size={12} /></button>
-                                </div>
-                            )}
-
-                            {(isUploading || uploadProgress) && (
-                                <div className="rag-upload-status" style={{ padding: '8px 12px', background: '#eff6ff', color: '#1e40af', borderRadius: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', border: '1px solid #bfdbfe' }}>
-                                    <Loader2 size={14} className="rag-spin" />
-                                    <span>{uploadProgress || 'Preparando y subiendo en segundo plano...'}</span>
-                                </div>
-                            )}
-
-                            {/* Breadcrumbs */}
-                            <div className="rag-fm-breadcrumbs">
-                                <button className="rag-fm-crumb" onClick={() => navigateToFolder('')}>
-                                    <Home size={12} />
-                                </button>
-                                {getBreadcrumbs().map((part, i) => {
-                                    const path = getBreadcrumbs().slice(0, i + 1).join('/')
-                                    return (
-                                        <span key={path} className="rag-fm-crumb-item">
-                                            <ChevronRight size={10} />
-                                            <button className="rag-fm-crumb" onClick={() => navigateToFolder(path)}>
-                                                {part}
-                                            </button>
-                                        </span>
-                                    )
-                                })}
-                            </div>
-
-                            {/* File list */}
-                            {fileItems.length === 0 ? (
-                                <div className="rag-empty-state">
-                                    <BookOpen size={32} />
-                                    <p>{currentFolder ? 'Carpeta vacía' : 'No hay archivos'}</p>
-                                    <span>Subí archivos para que la IA pueda consultarlos</span>
-                                </div>
-                            ) : (
-                                fileItems.map(item => (
-                                    item.type === 'folder' ? (
-                                        <div key={item.path} className="rag-doc-item rag-folder-item"
-                                            onClick={() => navigateToFolder(item.path)} style={{ cursor: 'pointer' }}>
-                                            <div className="rag-doc-icon"><Folder size={18} color="#3b82f6" /></div>
-                                            <div className="rag-doc-info">
-                                                <span className="rag-doc-name">{item.name}</span>
-                                                <span className="rag-doc-meta">Carpeta</span>
-                                            </div>
-                                            <button className="rag-doc-delete" onClick={(e) => { e.stopPropagation(); handleDeleteFolder(item) }} title="Eliminar carpeta">
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div key={item.name} className="rag-doc-item">
-                                             <div className="rag-doc-icon" onClick={() => handleOpenPreview(item)} style={{ cursor: 'pointer' }}>
-                                                 {FILE_ICONS[item.file_type] || '📄'}
-                                             </div>
-                                             <div className="rag-doc-info" onClick={() => handleOpenPreview(item)} style={{ cursor: 'pointer' }} title={item.name}>
-                                                 <span className="rag-doc-name" title={item.name}>{item.name}</span>
-                                                 <span className="rag-doc-meta">
-                                                     {item.total_chunks} chunks · {formatFileSize(item.file_size)}
-                                                     {item.created_at && (
-                                                         <> · <Calendar size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />{formatFullDate(item.created_at)}</>
-                                                     )}
-                                                     {item.tag && <span className="rag-doc-tag">{item.tag}</span>}
-                                                 </span>
-                                             </div>
-                                             <button className="rag-doc-action" onClick={() => handleOpenPreview(item)} title="Visualizar sin descargar">
-                                                 <Eye size={13} />
-                                             </button>
-                                             <button className="rag-doc-action" onClick={() => handleDownload(item)} title="Descargar original">
-                                                 <Download size={13} />
-                                             </button>
-                                             <button className="rag-doc-delete" onClick={() => handleDeleteFile(item)} title="Eliminar">
-                                                 <Trash2 size={12} />
-                                             </button>
-                                        </div>
-                                    )
-                                ))
-                            )}
+                        <div className="rag-empty-state" style={{ margin: '16px', padding: '24px', background: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                            <FolderOpen size={24} style={{ color: '#94a3b8', marginBottom: '8px' }} />
+                            <p style={{ fontSize: '13px', color: '#64748b' }}>GestiÃ³n de documentos abierta en el panel principal.</p>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Right: Chat Area */}
-            <div className="rag-chat-area">
+            {/* Right: Main Area */}
+            <div className="rag-main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                <div className="rag-chat-area" style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
                 {/* Status bar */}
                 <div className="rag-status-bar">
                     <button
@@ -988,7 +877,7 @@ export default function RAGPanel() {
                         <button
                             className="rag-help-trigger"
                             onClick={() => setShowHelp(true)}
-                            title="¿Cómo funciona?"
+                            title="Â¿CÃ³mo funciona?"
                         >
                             <HelpCircle size={15} />
                         </button>
@@ -1003,11 +892,11 @@ export default function RAGPanel() {
                                 <img src="/simonminutes.webp" alt="Simon" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
                             </div>
                             <h3>Simon</h3>
-                            <p>Preguntá lo que necesites sobre los documentos cargados. Las respuestas incluyen citación de fuentes.</p>
+                            <p>PreguntÃ¡ lo que necesites sobre los documentos cargados. Las respuestas incluyen citaciÃ³n de fuentes.</p>
                             <div className="rag-welcome-features">
                                 <div className="rag-feature">
                                     <Search size={18} />
-                                    <span>Búsqueda Híbrida</span>
+                                    <span>BÃºsqueda HÃ­brida</span>
                                 </div>
                                 <div className="rag-feature">
                                     <Sparkles size={18} />
@@ -1019,7 +908,7 @@ export default function RAGPanel() {
                                 </div>
                                 <div className="rag-feature">
                                     <BookOpen size={18} />
-                                    <span>Citación Obligatoria</span>
+                                    <span>CitaciÃ³n Obligatoria</span>
                                 </div>
                             </div>
 
@@ -1032,7 +921,7 @@ export default function RAGPanel() {
                                             <div className="sg-chips">
                                                 {suggestions.categories.slice(0, 8).map((cat, i) => (
                                                     <button key={i} className="sg-chip category"
-                                                        onClick={() => { setInputValue(`¿Qué información hay sobre ${cat.name}?`); }}
+                                                        onClick={() => { setInputValue(`Â¿QuÃ© informaciÃ³n hay sobre ${cat.name}?`); }}
                                                     >
                                                         <FolderOpen size={12} />
                                                         {cat.name}
@@ -1076,12 +965,12 @@ export default function RAGPanel() {
                                 <div className="rag-message-content">
                                     {(() => {
                                         // Parse related questions from Simon's response
-                                        const parts = (msg.content || '').split(/---\s*\n💡/);
+                                        const parts = (msg.content || '').split(/---\s*\nðŸ’¡/);
                                         const mainContent = parts[0];
                                         let relatedQuestions = [];
                                         if (msg.role === 'assistant' && parts.length > 1) {
                                             const rqSection = parts[1];
-                                            const matches = rqSection.match(/- ¿([^?]+)\?/g) || [];
+                                            const matches = rqSection.match(/- Â¿([^?]+)\?/g) || [];
                                             relatedQuestions = matches.map(m => m.replace(/^- /, '').trim());
                                         }
                                         return (
@@ -1094,7 +983,7 @@ export default function RAGPanel() {
                                                     <div className="sg-related">
                                                         <div className="sg-related-title">
                                                             <Lightbulb size={13} />
-                                                            También podrías preguntar:
+                                                            TambiÃ©n podrÃ­as preguntar:
                                                         </div>
                                                         <div className="sg-related-chips">
                                                             {relatedQuestions.map((rq, ri) => (
@@ -1142,7 +1031,7 @@ export default function RAGPanel() {
                                             {msg.sources.map((src, j) => (
                                                 <div key={j} className="rag-source-item">
                                                     <span className="rag-source-icon">
-                                                        {src.source_type === 'chat_history' ? '🧠' : (FILE_ICONS[src.file_type] || '📄')}
+                                                        {src.source_type === 'chat_history' ? 'ðŸ§ ' : (FILE_ICONS[src.file_type] || 'ðŸ“„')}
                                                     </span>
                                                     <span className="rag-source-name">
                                                         {src.source_type === 'chat_history' ? 'Aprendido de chat previo' : src.filename}
@@ -1183,21 +1072,21 @@ export default function RAGPanel() {
                                         <div className="rag-pipeline-info">
                                             <BarChart3 size={11} />
                                             {msg.pipeline_info.disambiguation_triggered && (
-                                                <span style={{ color: '#f59e0b' }}>🤔 Desambiguación</span>
+                                                <span style={{ color: '#f59e0b' }}>ðŸ¤” DesambiguaciÃ³n</span>
                                             )}
-                                            <span>HyDE: {msg.pipeline_info.hyde_generated ? '✓' : '✗'}</span>
+                                            <span>HyDE: {msg.pipeline_info.hyde_generated ? 'âœ“' : 'âœ—'}</span>
                                             <span>Queries: {(msg.pipeline_info.multi_queries || 0) + 1}</span>
                                             <span>Buscados: {msg.pipeline_info.total_searched}</span>
-                                            <span>Únicos: {msg.pipeline_info.unique_results}</span>
+                                            <span>Ãšnicos: {msg.pipeline_info.unique_results}</span>
                                             {msg.pipeline_info.entity_detected && msg.pipeline_info.entity_detected.length > 0 && (
                                                 <span style={{ color: '#3b82f6' }}>
-                                                    🎯 {msg.pipeline_info.entity_detected.join(', ')}
+                                                    ðŸŽ¯ {msg.pipeline_info.entity_detected.join(', ')}
                                                     {msg.pipeline_info.entity_filter === 'strict' ? ' (estricto)' : ''}
                                                 </span>
                                             )}
                                             <span>Usados: {msg.pipeline_info.reranked_kept}</span>
                                             {msg.pipeline_info.chat_learning && (
-                                                <span style={{ color: '#7c3aed' }}>📚 Aprendido</span>
+                                                <span style={{ color: '#7c3aed' }}>ðŸ“š Aprendido</span>
                                             )}
                                         </div>
                                     )}
@@ -1232,7 +1121,7 @@ export default function RAGPanel() {
                                                     </span>
                                                 ) : (
                                                     <>
-                                                        <span className="rag-feedback-label">¿Fue útil esta respuesta?</span>
+                                                        <span className="rag-feedback-label">Â¿Fue Ãºtil esta respuesta?</span>
                                                         <div className="rag-feedback-buttons">
                                                             <button
                                                                 className="rag-feedback-btn correct"
@@ -1275,7 +1164,7 @@ export default function RAGPanel() {
                                     <div className="rag-thinking-pulse-line body-2" />
                                     <div className="rag-thinking-status">
                                         <Sparkles size={13} className="rag-sparkle-spin" />
-                                        <span>Simon está procesando y comparando las reglas del Sanatorio...</span>
+                                        <span>Simon estÃ¡ procesando y comparando las reglas del Sanatorio...</span>
                                     </div>
                                 </div>
                             </div>
@@ -1300,17 +1189,17 @@ export default function RAGPanel() {
                     <div className="rag-quick-actions" style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
                         <button 
                             className="rag-quick-action-btn"
-                            onClick={() => setInputValue('Genera un mapa conceptual sobre las reglas de este documento. IMPORTANTE: Envuelve el código del diagrama EXCLUSIVAMENTE dentro de un bloque markdown tipo mermaid (empezando con ```mermaid y terminando con ```). Usa saltos de línea para cada nodo.')}
+                            onClick={() => setInputValue('Genera un mapa conceptual sobre las reglas de este documento. IMPORTANTE: Envuelve el cÃ³digo del diagrama EXCLUSIVAMENTE dentro de un bloque markdown tipo mermaid (empezando con ```mermaid y terminando con ```). Usa saltos de lÃ­nea para cada nodo.')}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
-                            📊 Mapa Conceptual
+                            ðŸ“Š Mapa Conceptual
                         </button>
                         <button 
                             className="rag-quick-action-btn"
-                            onClick={() => setInputValue('Escribe un resumen estructurado con viñetas sobre los puntos más importantes.')}
+                            onClick={() => setInputValue('Escribe un resumen estructurado con viÃ±etas sobre los puntos mÃ¡s importantes.')}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
-                            📝 Resumen Estructurado
+                            ðŸ“ Resumen Estructurado
                         </button>
                     </div>
 
@@ -1328,7 +1217,7 @@ export default function RAGPanel() {
                             }}
                             onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
                             onFocus={() => { if (inputValue.trim().length >= 2) setShowAutocomplete(true); }}
-                            placeholder="Escribí tu pregunta sobre los documentos..."
+                            placeholder="EscribÃ­ tu pregunta sobre los documentos..."
                             rows={1}
                             disabled={isLoading || !backendOnline}
                         />
@@ -1366,7 +1255,144 @@ export default function RAGPanel() {
                         })()}
                     </div>
                     <div className="rag-input-hint">
-                        Respuestas basadas exclusivamente en documentos cargados · Enter para enviar
+                        Respuestas basadas exclusivamente en documentos cargados Â· Enter para enviar
+                    </div>
+                </div>
+                {/* End of rag-chat-area */}
+
+                {/* Documents Area */}
+                <div className="rag-documents-area" style={{ display: activeTab === 'documents' ? 'flex' : 'none', flex: 1, flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
+                    <div className="rag-doc-header" style={{ padding: '24px 32px 16px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>GestiÃ³n de Archivos</h2>
+                            <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0' }}>AdministrÃ¡ los documentos disponibles para Simon IA</p>
+                        </div>
+                        <div className="rag-fm-toolbar" style={{ borderBottom: 'none', padding: 0 }}>
+                            <input ref={fileInputRef} type="file" onChange={handleFileSelect}
+                                accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.htm,.png,.jpg,.jpeg,.webp"
+                                style={{ display: 'none' }} multiple />
+                            <input ref={folderInputRef} type="file" onChange={handleFileSelect}
+                                style={{ display: 'none' }} webkitdirectory="" directory="" multiple />
+                            <div className="rag-tag-input" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0 8px' }}>
+                                <Tag size={14} color="#94a3b8" />
+                                <input type="text" placeholder="Tag" value={uploadTag}
+                                    onChange={(e) => setUploadTag(e.target.value)}
+                                    className="rag-tag-field" style={{ border: 'none', outline: 'none', padding: '8px', fontSize: '13px', width: '100px' }} />
+                            </div>
+                            <div className="rag-fm-actions" style={{ display: 'flex', gap: '8px' }}>
+                                <button className="btn btn-secondary" onClick={() => setShowNewFolder(!showNewFolder)} style={{ gap: '6px', display: 'flex', alignItems: 'center', background: 'white', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#475569' }}>
+                                    <FolderPlus size={14} /> Nueva Carpeta
+                                </button>
+                                <button className="btn btn-secondary" onClick={() => folderInputRef.current?.click()} style={{ gap: '6px', display: 'flex', alignItems: 'center', background: 'white', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#475569' }}>
+                                    <FolderOpen size={14} /> Subir Carpeta
+                                </button>
+                                <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()} style={{ gap: '6px', display: 'flex', alignItems: 'center', background: '#3b82f6', border: 'none', color: 'white', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
+                                    <Upload size={14} /> Subir Archivos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {showNewFolder && (
+                        <div className="rag-fm-newfolder" style={{ padding: '12px 32px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input type="text" placeholder="Nombre de carpeta"
+                                value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                                className="rag-fm-newfolder-input" autoFocus style={{ padding: '6px 12px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px', width: '250px' }} />
+                            <button onClick={handleCreateFolder} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}><CheckCircle size={14} /> Crear</button>
+                            <button onClick={() => { setShowNewFolder(false); setNewFolderName('') }} style={{ background: 'white', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}><X size={14} /> Cancelar</button>
+                        </div>
+                    )}
+
+                    <div className="rag-doc-list-container" style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+                        {(isUploading || uploadProgress) && (
+                            <div className="rag-upload-status" style={{ padding: '12px 16px', background: '#eff6ff', color: '#1e40af', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', border: '1px solid #bfdbfe' }}>
+                                <Loader2 size={16} className="rag-spin" />
+                                <span>{uploadProgress || 'Preparando y subiendo en segundo plano...'}</span>
+                            </div>
+                        )}
+
+                        {/* Breadcrumbs */}
+                        <div className="rag-fm-breadcrumbs" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#475569' }}>
+                            <button className="rag-fm-crumb" onClick={() => navigateToFolder('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#3b82f6', padding: 0 }}>
+                                <Home size={14} style={{ marginRight: '4px' }} /> Inicio
+                            </button>
+                            {getBreadcrumbs().map((part, i) => {
+                                const path = getBreadcrumbs().slice(0, i + 1).join('/')
+                                return (
+                                    <span key={path} className="rag-fm-crumb-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <ChevronRight size={14} style={{ color: '#cbd5e1' }} />
+                                        <button className="rag-fm-crumb" onClick={() => navigateToFolder(path)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', padding: 0, fontWeight: 500 }}>
+                                            {part}
+                                        </button>
+                                    </span>
+                                )
+                            })}
+                        </div>
+
+                        {/* Table */}
+                        {fileItems.length === 0 ? (
+                            <div className="rag-empty-state" style={{ background: 'white', borderRadius: '12px', padding: '48px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                                <BookOpen size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
+                                <p style={{ fontSize: '16px', fontWeight: 500, color: '#334155', margin: '0 0 8px 0' }}>{currentFolder ? 'Carpeta vacÃ­a' : 'No hay archivos'}</p>
+                                <span style={{ fontSize: '14px' }}>SubÃ­ archivos para que la IA pueda consultarlos</span>
+                            </div>
+                        ) : (
+                            <div className="rag-doc-table-container" style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                                <table className="rag-doc-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600 }}>Nombre</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>TamaÃ±o</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '100px' }}>Chunks</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>Tag</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '100px', textAlign: 'right' }}>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {fileItems.map(item => (
+                                            item.type === 'folder' ? (
+                                                <tr key={item.path} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'white'} onClick={() => navigateToFolder(item.path)}>
+                                                    <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontWeight: 500 }}>
+                                                        <Folder size={18} color="#3b82f6" /> {item.name}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>â€”</td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>â€”</td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>â€”</td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(item) }} title="Eliminar carpeta" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px', borderRadius: '4px', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                <tr key={item.name} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'white'}>
+                                                    <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontWeight: 500 }}>
+                                                        <span style={{ fontSize: '18px' }}>{FILE_ICONS[item.file_type] || 'ðŸ“„'}</span> {item.name}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: '#64748b' }}>{formatFileSize(item.file_size)}</td>
+                                                    <td style={{ padding: '12px 16px', color: '#64748b' }}>{item.total_chunks}</td>
+                                                    <td style={{ padding: '12px 16px' }}>
+                                                        {item.tag && <span style={{ background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 500 }}>{item.tag}</span>}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                                                        <button onClick={() => handleOpenPreview(item)} title="Visualizar sin descargar" style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '6px', borderRadius: '4px', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#e0e7ff'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
+                                                            <Eye size={14} />
+                                                        </button>
+                                                        <button onClick={() => handleDownload(item)} title="Descargar" style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: '6px', borderRadius: '4px', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#eff6ff'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
+                                                            <Download size={14} />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteFile(item)} title="Eliminar" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px', borderRadius: '4px', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1413,7 +1439,7 @@ export default function RAGPanel() {
                                                     ? `${(summary.totalSize / 1024).toFixed(1)} KB`
                                                     : `${(summary.totalSize / (1024 * 1024)).toFixed(1)} MB`}
                                             </span>
-                                            <span className="rag-modal-stat-label">tamaño total</span>
+                                            <span className="rag-modal-stat-label">tamaÃ±o total</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1424,7 +1450,7 @@ export default function RAGPanel() {
                                     <div className="rag-modal-type-chips">
                                         {Object.entries(summary.typeCounts).map(([ext, count]) => (
                                             <span key={ext} className="rag-modal-type-chip">
-                                                {FILE_ICONS[ext] || '📄'} {ext} ({count})
+                                                {FILE_ICONS[ext] || 'ðŸ“„'} {ext} ({count})
                                             </span>
                                         ))}
                                     </div>
@@ -1435,7 +1461,7 @@ export default function RAGPanel() {
                                     <div className="rag-modal-warning">
                                         <FileWarning size={14} />
                                         <span>
-                                            <strong>{summary.unsupported.length}</strong> archivo(s) no soportado(s) serán omitidos
+                                            <strong>{summary.unsupported.length}</strong> archivo(s) no soportado(s) serÃ¡n omitidos
                                             {summary.unsupported.length <= 5 && (
                                                 <span className="rag-modal-warning-files">
                                                     : {summary.unsupported.map(f => f.name).join(', ')}
@@ -1449,8 +1475,8 @@ export default function RAGPanel() {
                                 <div className="rag-modal-destination">
                                     <Info size={13} />
                                     <span>
-                                        Destino: <strong>{currentFolder || 'Raíz'}</strong>
-                                        {uploadTag && <> · Tag: <strong>{uploadTag}</strong></>}
+                                        Destino: <strong>{currentFolder || 'RaÃ­z'}</strong>
+                                        {uploadTag && <> Â· Tag: <strong>{uploadTag}</strong></>}
                                     </span>
                                 </div>
                             </div>
@@ -1508,7 +1534,7 @@ export default function RAGPanel() {
                         <div className="rag-preview-header">
                             <div className="rag-preview-title-block">
                                 <span className="rag-preview-icon">
-                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || '📄'}
+                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || 'ðŸ“„'}
                                 </span>
                                 <div style={{ minWidth: 0 }}>
                                     <h3 className="rag-preview-filename" title={previewItem.name || previewItem.filename}>
@@ -1554,7 +1580,7 @@ export default function RAGPanel() {
                                 className={`rag-preview-tab ${previewTab === 'chunks' ? 'active' : ''}`}
                                 onClick={() => setPreviewTab('chunks')}
                             >
-                                <FileText size={13} /> Texto Extraído / Chunks IA ({previewData?.chunks?.length || 0})
+                                <FileText size={13} /> Texto ExtraÃ­do / Chunks IA ({previewData?.chunks?.length || 0})
                             </button>
                         </div>
 
@@ -1605,7 +1631,7 @@ export default function RAGPanel() {
                                         <AlertCircle size={28} color="#f59e0b" />
                                         <p>No se pudo generar la URL directa de vista previa.</p>
                                         <button className="btn btn-primary" onClick={() => setPreviewTab('chunks')}>
-                                            Ver texto extraído por la IA
+                                            Ver texto extraÃ­do por la IA
                                         </button>
                                     </div>
                                 )
@@ -1645,7 +1671,7 @@ export default function RAGPanel() {
                                                 <div key={idx} className="rag-chunk-card">
                                                     <div className="rag-chunk-header">
                                                         <span className="badge info">Fragmento #{chunk.chunk_index}</span>
-                                                        {chunk.metadata?.page && <span className="badge neutral">Pág. {chunk.metadata.page}</span>}
+                                                        {chunk.metadata?.page && <span className="badge neutral">PÃ¡g. {chunk.metadata.page}</span>}
                                                     </div>
                                                     <div className="rag-chunk-content">
                                                         {chunk.content}
@@ -1665,3 +1691,4 @@ export default function RAGPanel() {
         </div>
     )
 }
+
