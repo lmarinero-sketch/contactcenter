@@ -1072,21 +1072,21 @@ export default function RAGPanel() {
                                         <div className="rag-pipeline-info">
                                             <BarChart3 size={11} />
                                             {msg.pipeline_info.disambiguation_triggered && (
-                                                <span style={{ color: '#f59e0b' }}>�x� Desambiguación</span>
+                                                <span style={{ color: '#f59e0b' }}>⚠️ Desambiguación</span>
                                             )}
-                                            <span>HyDE: {msg.pipeline_info.hyde_generated ? '�S' : '�S'}</span>
+                                            <span>HyDE: {msg.pipeline_info.hyde_generated ? 'Sí' : 'No'}</span>
                                             <span>Queries: {(msg.pipeline_info.multi_queries || 0) + 1}</span>
                                             <span>Buscados: {msg.pipeline_info.total_searched}</span>
-                                            <span>�anicos: {msg.pipeline_info.unique_results}</span>
+                                            <span>Únicos: {msg.pipeline_info.unique_results}</span>
                                             {msg.pipeline_info.entity_detected && msg.pipeline_info.entity_detected.length > 0 && (
                                                 <span style={{ color: '#3b82f6' }}>
-                                                    �x}� {msg.pipeline_info.entity_detected.join(', ')}
+                                                    🔍 {msg.pipeline_info.entity_detected.join(', ')}
                                                     {msg.pipeline_info.entity_filter === 'strict' ? ' (estricto)' : ''}
                                                 </span>
                                             )}
                                             <span>Usados: {msg.pipeline_info.reranked_kept}</span>
                                             {msg.pipeline_info.chat_learning && (
-                                                <span style={{ color: '#7c3aed' }}>�xa Aprendido</span>
+                                                <span style={{ color: '#7c3aed' }}>🧠 Aprendido</span>
                                             )}
                                         </div>
                                     )}

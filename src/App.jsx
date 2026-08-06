@@ -16,6 +16,7 @@ import AgentControlPanel from './components/AgentControlPanel'
 import TurnosDashboard from './components/BI/TurnosDashboard'
 import CanalesDashboard from './components/BI/CanalesDashboard'
 import DataEntryPanel from './components/DataEntryPanel'
+import PublicSimonChat from './components/PublicSimonChat'
 
 const VIEW_TITLES = {
     overview: 'Overview',
@@ -72,6 +73,12 @@ function App() {
         window.location.search.includes('view=simon') || 
         window.location.hash === '#/simon';
 
+    // Detect public Simon mode (no auth required)
+    const isPublicSimonMode = 
+        window.location.pathname === '/simon-public' || 
+        window.location.search.includes('view=simon-public') || 
+        window.location.hash === '#/simon-public';
+
     // Loading state
     if (loading) {
         return (
@@ -80,6 +87,11 @@ function App() {
                 <span>Cargando...</span>
             </div>
         )
+    }
+
+    // Render public Simon portal before auth check
+    if (isPublicSimonMode) {
+        return <PublicSimonChat key={refreshKey} />
     }
 
     // Not authenticated → show login
