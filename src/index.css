@@ -8059,6 +8059,16 @@ body {
 }
 
 /* Enhanced Markdown Render Styles */
+.markdown-h1, .markdown-h2, .markdown-h3 {
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.markdown-h1 { font-size: 1.25em; }
+.markdown-h2 { font-size: 1.15em; }
+.markdown-h3 { font-size: 1.05em; }
+
 .markdown-hr {
   border: 0;
   height: 1px;
