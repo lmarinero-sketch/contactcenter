@@ -45,6 +45,11 @@ function renderMarkdown(text) {
     });
     html = html.replace(/^&gt;\s*(.*)/gm, '<blockquote class="markdown-blockquote">$1</blockquote>');
     
+    // 3.5. Parse Headers
+    html = html.replace(/^### (.*$)/gm, '<h3 class="markdown-h3">$1</h3>');
+    html = html.replace(/^## (.*$)/gm, '<h2 class="markdown-h2">$1</h2>');
+    html = html.replace(/^# (.*$)/gm, '<h1 class="markdown-h1">$1</h1>');
+    
     // 4. Parse Tables
     // A simple regex to detect tables: lines starting with |
     const tableRegex = /((?:^\|.+\|(?:\r?\n|$))+)/gm;

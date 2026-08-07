@@ -35,6 +35,11 @@ function renderMarkdown(text) {
     });
     html = html.replace(/^&gt;\s*(.*)/gm, '<blockquote class="markdown-blockquote">$1</blockquote>');
     
+    // 3.5. Parse Headers
+    html = html.replace(/^### (.*$)/gm, '<h3 class="markdown-h3">$1</h3>');
+    html = html.replace(/^## (.*$)/gm, '<h2 class="markdown-h2">$1</h2>');
+    html = html.replace(/^# (.*$)/gm, '<h1 class="markdown-h1">$1</h1>');
+    
     // 4. Parse Tables
     const tableRegex = /((?:^\|.+\|(?:\r?\n|$))+)/gm;
     html = html.replace(tableRegex, (match) => {
@@ -506,7 +511,11 @@ export default function PublicSimonChat() {
                         <form onSubmit={handleSend} className="simon-floating-input">
                             <textarea
                                 value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
+                                onChange={(e) => {
+                                    setInputValue(e.target.value);
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = (e.target.scrollHeight) + 'px';
+                                }}
                                 placeholder="Consultá a Simon..."
                                 className="simon-input-textarea"
                                 onKeyDown={(e) => {
