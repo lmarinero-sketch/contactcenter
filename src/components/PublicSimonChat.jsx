@@ -105,10 +105,17 @@ export default function PublicSimonChat() {
     // Smart Guidance Layer
     const [suggestions, setSuggestions] = useState({ categories: [], top_queries: [] })
     
-    // Session state
-    const [sessionStarted, setSessionStarted] = useState(false)
-    const [bootPhase, setBootPhase] = useState('idle')
-    const [bootTimer, setBootTimer] = useState(0)
+    // Session state (simplified)
+    useEffect(() => {
+        // Initialize public conversation ID on mount
+        if (!activeConversation) {
+            const tempId = 'pub_' + Date.now().toString(36) + Math.random().toString(36).substr(2)
+            setActiveConversation(tempId)
+        }
+        
+        // Silently check health to wake up backend if asleep
+        checkRAGHealth().then(online => setBackendOnline(online)).catch(() => setBackendOnline(false))
+    }, [])
 
     // Feedback state
     const [feedbackState, setFeedbackState] = useState({})
@@ -126,49 +133,6 @@ export default function PublicSimonChat() {
     }, [isDarkMode]);
 
     const messagesEndRef = useRef(null)
-    const bootTimerRef = useRef(null)
-
-    // Start Simon boot sequence
-    async function startSimon() {
-        setSessionStarted(true)
-        setBootPhase('waking')
-        setBootTimer(0)
-
-        const startTime = Date.now()
-        bootTimerRef.current = setInterval(() => {
-            setBootTimer(Math.floor((Date.now() - startTime) / 1000))
-        }, 1000)
-
-        let online = false
-        for (let i = 0; i < 15; i++) {
-            online = await checkRAGHealth()
-            if (online) break
-            await new Promise(r => setTimeout(r, 2000))
-        }
-
-        if (!online) {
-            setBootPhase('error')
-            setBackendOnline(false)
-            clearInterval(bootTimerRef.current)
-            return
-        }
-
-        setBackendOnline(true)
-        setBootPhase('connecting')
-        await new Promise(r => setTimeout(r, 800))
-
-        setBootPhase('loading')
-        
-        // For public, just create a unique ID to identify the session
-        const tempId = 'pub_' + Date.now().toString(36) + Math.random().toString(36).substr(2)
-        setActiveConversation(tempId)
-
-        setBootPhase('ready')
-        clearInterval(bootTimerRef.current)
-
-        await new Promise(r => setTimeout(r, 1200))
-        setBootPhase('done')
-    }
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -274,80 +238,7 @@ export default function PublicSimonChat() {
         }
     }
 
-    // Initial Splash Screen
-    if (!sessionStarted || bootPhase !== 'done') {
-        return (
-            <div className="simon-welcome">
-                <div className="simon-welcome-header">
-                    <button className="simon-theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>
-                        {isDarkMode ? '☀️' : '🌙'}
-                    </button>
-                </div>
-                <div className="simon-welcome-content">
-                    <div className="simon-welcome-icon">
-                        <Brain size={64} />
-                    </div>
-                    <h1 className="simon-name">Simon</h1>
-                    <p className="simon-subtitle">Asistente Virtual Público</p>
-                    <p className="simon-desc">
-                        Bienvenido al chat inteligente del Sanatorio Argentino. Resolvé tus dudas sobre servicios, turnos y políticas de atención.
-                    </p>
-                    
-                    {bootPhase === 'idle' && (
-                        <>
-                            <button className="simon-start-btn" onClick={startSimon}>
-                                <Brain size={18} />
-                                Iniciar Consulta
-                            </button>
-                        </>
-                    )}
 
-                    {bootPhase !== 'idle' && bootPhase !== 'error' && (
-                        <div className="simon-boot">
-                            <div className="simon-boot-phases">
-                                <div className={`simon-boot-phase ${bootPhase === 'waking' ? 'active' : (bootPhase !== 'waking' ? 'done' : '')}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>Verificando conexión neuronal...</span>
-                                </div>
-                                <div className={`simon-boot-phase ${bootPhase === 'connecting' ? 'active' : (['loading', 'ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>Sincronizando base de conocimiento...</span>
-                                </div>
-                                <div className={`simon-boot-phase ${bootPhase === 'loading' ? 'active' : (['ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>Alineando protocolo de atención...</span>
-                                </div>
-                                <div className={`simon-boot-phase ${bootPhase === 'ready' ? 'active done' : ''}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>¡Sistemas operativos!</span>
-                                </div>
-                            </div>
-                            <div className="simon-boot-timer">
-                                <Clock size={11} />
-                                {bootTimer}s
-                            </div>
-                        </div>
-                    )}
-
-                    {bootPhase === 'error' && (
-                        <div className="simon-boot-error">
-                            <AlertCircle size={18} />
-                            <div>
-                                <strong>No se pudo conectar con Simon</strong>
-                                <p>El servidor puede estar en mantenimiento. Intentá de nuevo en unos minutos.</p>
-                            </div>
-                            <button className="simon-retry-btn" onClick={() => { setBootPhase('idle'); setSessionStarted(false); }}>
-                                Reintentar
-                            </button>
-                        </div>
-                    )}
-                </div>
-                <div className="simon-welcome-footer">
-                    Sanatorio Argentino · Powered by GPT-4o
-                </div>
-            </div>
-        )
-    }
 
     return (
         <div className="simon-modern-container">
