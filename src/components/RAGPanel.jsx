@@ -123,16 +123,25 @@ export default function RAGPanel() {
     const [showSidebar, setShowSidebar] = useState(true)
     const [showHelp, setShowHelp] = useState(false)
 
-    // Smart Guidance Layer
     const [suggestions, setSuggestions] = useState({ categories: [], top_queries: [] })
     const [showAutocomplete, setShowAutocomplete] = useState(false)
 
-    // Session state � Simon boot sequence
     const [sessionStarted, setSessionStarted] = useState(false)
-    const [bootPhase, setBootPhase] = useState('idle') // idle | waking | connecting | loading | ready | error
+    const [bootPhase, setBootPhase] = useState('idle')
     const [bootTimer, setBootTimer] = useState(0)
 
-    // File manager state
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    useEffect(() => {
+        if (isDarkMode) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }, [isDarkMode]);
+
     const [fileItems, setFileItems] = useState([])
     const [currentFolder, setCurrentFolder] = useState('')
     const [totalFiles, setTotalFiles] = useState(0)
@@ -140,21 +149,14 @@ export default function RAGPanel() {
     const [showNewFolder, setShowNewFolder] = useState(false)
     const [newFolderName, setNewFolderName] = useState('')
 
-    // Upload confirmation modal state
     const [showUploadModal, setShowUploadModal] = useState(false)
     const [pendingFiles, setPendingFiles] = useState([])
-    
-    // Custom confirm modal state
     const [confirmAction, setConfirmAction] = useState(null)
-
-    // Feedback state: { [msgIndex]: 'correct' | 'incorrect' | 'loading' }
     const [feedbackState, setFeedbackState] = useState({})
-
-    // Document Previewer state
     const [previewItem, setPreviewItem] = useState(null)
     const [previewData, setPreviewData] = useState(null)
     const [isPreviewLoading, setIsPreviewLoading] = useState(false)
-    const [previewTab, setPreviewTab] = useState('visual') // 'visual' | 'chunks'
+    const [previewTab, setPreviewTab] = useState('visual')
     const [chunkSearchQuery, setChunkSearchQuery] = useState('')
 
     const messagesEndRef = useRef(null)
@@ -162,20 +164,17 @@ export default function RAGPanel() {
     const folderInputRef = useRef(null)
     const bootTimerRef = useRef(null)
 
-    // Start Simon boot sequence
     async function startSimon() {
         setSessionStarted(true)
         setBootPhase('waking')
         setBootTimer(0)
 
-        // Start timer
         const startTime = Date.now()
         bootTimerRef.current = setInterval(() => {
             setBootTimer(Math.floor((Date.now() - startTime) / 1000))
         }, 1000)
 
-        // Phase 1: Wake up server
-        const maxAttempts = 30 // ~60 seconds max
+        const maxAttempts = 30
         let online = false
         for (let i = 0; i < maxAttempts; i++) {
             online = await checkRAGHealth()
@@ -191,29 +190,16 @@ export default function RAGPanel() {
         }
 
         setBackendOnline(true)
-
-        // Phase 2: Connect AI
         setBootPhase('connecting')
         await new Promise(r => setTimeout(r, 800))
-
-        // Phase 3: Load data
         setBootPhase('loading')
-        await Promise.all([
-            loadConversations(),
-            loadFiles(),
-            loadLearningStats(),
-        ])
-
-        // Phase 4: Ready!
+        await Promise.all([loadConversations(), loadFiles(), loadLearningStats()])
         setBootPhase('ready')
         clearInterval(bootTimerRef.current)
-
-        // Auto-dismiss after brief delay
         await new Promise(r => setTimeout(r, 1200))
         setBootPhase('done')
     }
 
-    // Load learning stats
     async function loadLearningStats() {
         try {
             const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || '/rag-api'
@@ -227,10 +213,8 @@ export default function RAGPanel() {
         }
     }
 
-    // Scroll to bottom on new messages and render mermaid diagrams
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-        
         if (window.mermaid && messages.length > 0) {
             setTimeout(() => {
                 try {
@@ -242,12 +226,10 @@ export default function RAGPanel() {
         }
     }, [messages])
 
-    // Load suggestions for Smart Guidance Layer
     useEffect(() => {
         fetchSuggestions().then(data => setSuggestions(data)).catch(() => {})
     }, [])
 
-    // Load conversations
     async function loadConversations() {
         try {
             const data = await listRAGConversations()
@@ -257,7 +239,6 @@ export default function RAGPanel() {
         }
     }
 
-    // Load files for current folder
     async function loadFiles(folder) {
         const f = folder !== undefined ? folder : currentFolder
         try {
@@ -269,26 +250,22 @@ export default function RAGPanel() {
         }
     }
 
-    // Navigate to folder
     function navigateToFolder(folderPath) {
         setCurrentFolder(folderPath)
         loadFiles(folderPath)
     }
 
-    // Go back one level
     function goBack() {
         const parts = currentFolder.split('/').filter(Boolean)
         parts.pop()
         navigateToFolder(parts.join('/'))
     }
 
-    // Get breadcrumb parts
     function getBreadcrumbs() {
         if (!currentFolder) return []
         return currentFolder.split('/').filter(Boolean)
     }
 
-    // Select a conversation
     async function selectConversation(conv) {
         setActiveConversation(conv.id)
         setError(null)
@@ -300,7 +277,6 @@ export default function RAGPanel() {
         }
     }
 
-    // Start new conversation
     function startNewConversation() {
         setActiveConversation(null)
         setMessages([])
@@ -308,50 +284,31 @@ export default function RAGPanel() {
         setInputValue('')
     }
 
-    // Send message
     async function handleSend() {
         if (!inputValue.trim() || isLoading) return
-
         const question = inputValue.trim()
         setInputValue('')
         setError(null)
-
-        // Add user message optimistically
         const userMsg = { role: 'user', content: question, created_at: new Date().toISOString() }
         setMessages(prev => [...prev, userMsg])
         setIsLoading(true)
-
         try {
             const result = await sendRAGMessage(question, activeConversation)
-
-            // If new conversation was created, update state
             if (!activeConversation && result.conversation_id) {
                 setActiveConversation(result.conversation_id)
                 loadConversations()
             }
-
-            // Handle disambiguation/clarification response
             if (result.type === 'clarification') {
-                const clarificationMsg = {
-                    role: 'assistant',
-                    content: result.answer,
-                    type: 'clarification',
-                    suggestions: result.suggestions || [],
-                    pipeline_info: result.pipeline,
-                    created_at: new Date().toISOString(),
-                }
-                setMessages(prev => [...prev, clarificationMsg])
+                setMessages(prev => [...prev, {
+                    role: 'assistant', content: result.answer, type: 'clarification',
+                    suggestions: result.suggestions || [], pipeline_info: result.pipeline,
+                    created_at: new Date().toISOString()
+                }])
             } else {
-                // Normal answer
-                const assistantMsg = {
-                    role: 'assistant',
-                    content: result.answer,
-                    sources: result.sources,
-                    pipeline_info: result.pipeline,
-                    created_at: new Date().toISOString(),
-                }
-                setMessages(prev => [...prev, assistantMsg])
-                // Refresh learning stats after successful answer
+                setMessages(prev => [...prev, {
+                    role: 'assistant', content: result.answer, sources: result.sources,
+                    pipeline_info: result.pipeline, created_at: new Date().toISOString()
+                }])
                 loadLearningStats()
             }
         } catch (e) {
@@ -361,10 +318,8 @@ export default function RAGPanel() {
         }
     }
 
-    // Supported extensions for filtering
     const SUPPORTED_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm', '.png', '.jpg', '.jpeg', '.webp']
 
-    // Handle file selection � show confirmation modal
     function handleFileSelect(event) {
         const files = Array.from(event.target.files || [])
         if (!files.length) return
@@ -372,13 +327,9 @@ export default function RAGPanel() {
         setShowUploadModal(true)
     }
 
-    // Get upload summary for the modal
     function getUploadSummary(files) {
-        const supported = []
-        const unsupported = []
-        let totalSize = 0
-        const typeCounts = {}
-
+        const supported = [], unsupported = []
+        let totalSize = 0, typeCounts = {}
         for (const file of files) {
             const ext = '.' + file.name.split('.').pop().toLowerCase()
             totalSize += file.size
@@ -389,45 +340,30 @@ export default function RAGPanel() {
                 unsupported.push(file)
             }
         }
-
-        // Detect folder name from webkitRelativePath
         let folderName = ''
-        if (files[0]?.webkitRelativePath) {
-            folderName = files[0].webkitRelativePath.split('/')[0]
-        }
-
+        if (files[0]?.webkitRelativePath) folderName = files[0].webkitRelativePath.split('/')[0]
         return { supported, unsupported, totalSize, typeCounts, folderName }
     }
 
-    // Confirm upload from modal
     async function confirmUpload() {
         setShowUploadModal(false)
         const files = pendingFiles
         setPendingFiles([])
-
         if (!files.length) return
-
         setIsUploading(true)
         setError(null)
-
-        // Filter to supported files only
-        const supportedFiles = files.filter(f => {
-            const ext = '.' + f.name.split('.').pop().toLowerCase()
-            return SUPPORTED_EXTS.includes(ext)
-        })
-
+        const supportedFiles = files.filter(f => SUPPORTED_EXTS.includes('.' + f.name.split('.').pop().toLowerCase()))
         if (supportedFiles.length === 0) {
             setError('Ninguno de los archivos seleccionados tiene un formato soportado')
             setIsUploading(false)
             return
         }
-
         if (supportedFiles.length === 1) {
             setUploadProgress(`Procesando "${supportedFiles[0].name}"...`)
             try {
                 const result = await uploadRAGDocument(supportedFiles[0], currentFolder, uploadTag)
                 loadFiles()
-                setUploadProgress(`�S& "${supportedFiles[0].name}" � ${result.total_chunks} chunks`)
+                setUploadProgress(`✅ "${supportedFiles[0].name}" - ${result.total_chunks} chunks`)
                 setTimeout(() => setUploadProgress(''), 4000)
             } catch (e) {
                 setError(e.message || 'Error al subir documento')
@@ -436,15 +372,15 @@ export default function RAGPanel() {
         } else {
             try {
                 const result = await uploadRAGBatch(supportedFiles, currentFolder, uploadTag, (p) => {
-                    const retryLabel = p.retrying ? ' �x Reintentando...' : ''
+                    const retryLabel = p.retrying ? ' 🔄 Reintentando...' : ''
                     const statusParts = [`Subiendo ${p.current}/${p.total}: "${p.filename}"${retryLabel}`]
-                    if (p.processed > 0) statusParts.push(`�S& ${p.processed}`)
-                    if (p.failed > 0) statusParts.push(`�R ${p.failed}`)
+                    if (p.processed > 0) statusParts.push(`✅ ${p.processed}`)
+                    if (p.failed > 0) statusParts.push(`❌ ${p.failed}`)
                     setUploadProgress(statusParts.join(' · '))
                 })
                 loadFiles()
-                const parts = [`�S& ${result.processed} procesados`, `${result.total_chunks} chunks`]
-                if (result.failed > 0) parts.push(`�R ${result.failed} fallidos`)
+                const parts = [`✅ ${result.processed} procesados`, `${result.total_chunks} chunks`]
+                if (result.failed > 0) parts.push(`❌ ${result.failed} fallidos`)
                 if (result.skipped > 0) parts.push(`⏭ ${result.skipped} omitidos`)
                 setUploadProgress(parts.join(' · '))
                 setTimeout(() => setUploadProgress(''), 8000)
@@ -453,14 +389,12 @@ export default function RAGPanel() {
                 setUploadProgress('')
             }
         }
-
         setIsUploading(false)
         setUploadTag('')
         if (fileInputRef.current) fileInputRef.current.value = ''
         if (folderInputRef.current) folderInputRef.current.value = ''
     }
 
-    // Cancel upload from modal
     function cancelUpload() {
         setShowUploadModal(false)
         setPendingFiles([])
@@ -468,7 +402,6 @@ export default function RAGPanel() {
         if (folderInputRef.current) folderInputRef.current.value = ''
     }
 
-    // Delete file
     async function handleDeleteFile(item) {
         setConfirmAction({
             title: 'Eliminar Archivo',
@@ -485,7 +418,6 @@ export default function RAGPanel() {
         });
     }
 
-    // Delete folder
     async function handleDeleteFolder(item) {
         setConfirmAction({
             title: 'Eliminar Carpeta',
@@ -501,7 +433,6 @@ export default function RAGPanel() {
         });
     }
 
-    // Create folder
     async function handleCreateFolder() {
         if (!newFolderName.trim()) return
         try {
@@ -514,7 +445,6 @@ export default function RAGPanel() {
         }
     }
 
-    // Download file
     async function handleDownload(item) {
         try {
             const path = item.storage_path || `${item.folder}/${item.name || item.filename}`.replace(/^\//, '')
@@ -524,7 +454,6 @@ export default function RAGPanel() {
         }
     }
 
-    // Open document previewer (inline without downloading)
     async function handleOpenPreview(item) {
         const path = item.storage_path || `${item.folder || ''}/${item.name || item.filename}`.replace(/^\//, '')
         setPreviewItem(item)
@@ -543,7 +472,6 @@ export default function RAGPanel() {
         }
     }
 
-    // Delete conversation
     async function handleDeleteConversation(convId, e) {
         e.stopPropagation()
         setConfirmAction({
@@ -552,9 +480,7 @@ export default function RAGPanel() {
             onConfirm: async () => {
                 try {
                     await deleteRAGConversation(convId)
-                    if (activeConversation === convId) {
-                        startNewConversation()
-                    }
+                    if (activeConversation === convId) startNewConversation()
                     loadConversations()
                 } catch (err) {
                     setError(err.message)
@@ -563,13 +489,9 @@ export default function RAGPanel() {
         });
     }
 
-    // Handle clicking a disambiguation suggestion
     function handleSuggestionClick(suggestion) {
         setInputValue(suggestion)
-        // Auto-send the suggestion
         setTimeout(() => {
-            const fakeEvent = { key: 'Enter', shiftKey: false, preventDefault: () => {} }
-            // Directly call handleSend with the suggestion
             setInputValue('')
             setError(null)
             const userMsg = { role: 'user', content: suggestion, created_at: new Date().toISOString() }
@@ -583,15 +505,14 @@ export default function RAGPanel() {
                     }
                     if (result.type === 'clarification') {
                         setMessages(prev => [...prev, {
-                            role: 'assistant', content: result.answer,
-                            type: 'clarification', suggestions: result.suggestions || [],
-                            pipeline_info: result.pipeline, created_at: new Date().toISOString(),
+                            role: 'assistant', content: result.answer, type: 'clarification',
+                            suggestions: result.suggestions || [], pipeline_info: result.pipeline,
+                            created_at: new Date().toISOString()
                         }])
                     } else {
                         setMessages(prev => [...prev, {
-                            role: 'assistant', content: result.answer,
-                            sources: result.sources, pipeline_info: result.pipeline,
-                            created_at: new Date().toISOString(),
+                            role: 'assistant', content: result.answer, sources: result.sources,
+                            pipeline_info: result.pipeline, created_at: new Date().toISOString()
                         }])
                         loadLearningStats()
                     }
@@ -601,51 +522,29 @@ export default function RAGPanel() {
         }, 50)
     }
 
-    // Feedback handler
     async function handleFeedback(assistantMsgIndex, isCorrect) {
         if (!activeConversation) return
         const key = `${activeConversation}-${assistantMsgIndex}`
-        
-        // Optimistic UI
-        setFeedbackState(prev => ({
-            ...prev,
-            [key]: 'loading'
-        }))
-        
+        setFeedbackState(prev => ({ ...prev, [key]: 'loading' }))
         try {
             await submitFeedback(activeConversation, assistantMsgIndex, isCorrect)
-            setFeedbackState(prev => ({
-                ...prev,
-                [key]: isCorrect ? 'correct' : 'incorrect'
-            }))
+            setFeedbackState(prev => ({ ...prev, [key]: isCorrect ? 'correct' : 'incorrect' }))
         } catch (e) {
             console.error('Feedback error:', e)
             setFeedbackState(prev => {
-                const next = { ...prev }
-                delete next[key]
-                return next
+                const next = { ...prev }; delete next[key]; return next
             })
             setError('Error al enviar feedback')
         }
     }
 
-    // Key press handler
-    function handleKeyPress(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            handleSend()
-        }
-    }
-
-    // Format file size
     function formatFileSize(bytes) {
-        if (!bytes) return '�'
+        if (!bytes) return '0 B'
         if (bytes < 1024) return `${bytes} B`
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     }
 
-    // Format time
     function formatTime(dateStr) {
         if (!dateStr) return ''
         const d = new Date(dateStr)
@@ -657,28 +556,13 @@ export default function RAGPanel() {
         return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })
     }
 
-    // Format full date with time
-    function formatFullDate(dateStr) {
-        if (!dateStr) return ''
-        const d = new Date(dateStr)
-        if (isNaN(d.getTime())) return ''
-        return d.toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
-    }
-
     const FILE_ICONS = {
-        '.pdf': '�x', '.docx': '�x�', '.xlsx': '�x`', '.xls': '�x`',
-        '.csv': '�x9', '.txt': '�x�', '.md': '�x�', '.json': '�x�',
-        '.xml': '�x�', '.html': '�xR�', '.htm': '�xR�',
-        '.png': '�x�️', '.jpg': '�x�️', '.jpeg': '�x�️', '.webp': '�x�️',
+        '.pdf': '📄', '.docx': '📝', '.xlsx': '📊', '.xls': '📊',
+        '.csv': '🔢', '.txt': '📄', '.md': '📄', '.json': '⚙️',
+        '.xml': '⚙️', '.html': '🌐', '.htm': '🌐',
+        '.png': '🖼️', '.jpg': '🖼️', '.jpeg': '🖼️', '.webp': '🖼️',
     }
 
-    // === WELCOME / BOOT SCREEN ===
     if (bootPhase !== 'done') {
         return (
             <div className="simon-welcome">
@@ -689,577 +573,141 @@ export default function RAGPanel() {
                     </div>
                     <h1 className="simon-name">Simon</h1>
                     <p className="simon-subtitle">Asistente IA Documental</p>
-                    <p className="simon-desc">
-                        Consultá documentos del Sanatorio Argentino con inteligencia artificial.
-                        Respuestas precisas con citación de fuentes.
-                    </p>
-
-                    {/* Pre-boot state */}
+                    <p className="simon-desc">Consultá documentos del Sanatorio Argentino con inteligencia artificial. Respuestas precisas con citación de fuentes.</p>
                     {bootPhase === 'idle' && (
                         <>
                             <button className="simon-start-btn" onClick={startSimon}>
-                                <Brain size={18} />
-                                Iniciar charla con Simon
+                                <Brain size={18} /> Iniciar charla con Simon
                             </button>
                             <div className="simon-sleep-info">
-                                <Clock size={13} />
-                                <span>
-                                    Simon se apaga tras <strong>15 min</strong> de inactividad y
-                                    demora entre <strong>30�60 seg</strong> en volver a encenderse
-                                </span>
+                                <Clock size={13} /> <span>Simon se apaga tras <strong>15 min</strong> de inactividad y demora entre <strong>30-60 seg</strong> en volver a encenderse</span>
                             </div>
                         </>
                     )}
-
-                    {/* Boot phases */}
                     {bootPhase !== 'idle' && bootPhase !== 'error' && (
                         <div className="simon-boot">
                             <div className="simon-boot-phases">
                                 <div className={`simon-boot-phase ${bootPhase === 'waking' ? 'active' : (bootPhase !== 'waking' ? 'done' : '')}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>Despertando servidor...</span>
-                                    {bootPhase === 'waking' && <Loader2 size={12} className="rag-spin" />}
-                                    {bootPhase !== 'waking' && <CheckCircle size={12} />}
+                                    <div className="simon-boot-dot" /> <span>Despertando servidor...</span>
                                 </div>
                                 <div className={`simon-boot-phase ${bootPhase === 'connecting' ? 'active' : (['loading', 'ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>Conectando IA...</span>
-                                    {bootPhase === 'connecting' && <Loader2 size={12} className="rag-spin" />}
-                                    {['loading', 'ready', 'done'].includes(bootPhase) && <CheckCircle size={12} />}
+                                    <div className="simon-boot-dot" /> <span>Conectando IA...</span>
                                 </div>
                                 <div className={`simon-boot-phase ${bootPhase === 'loading' ? 'active' : (['ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>Cargando documentos...</span>
-                                    {bootPhase === 'loading' && <Loader2 size={12} className="rag-spin" />}
-                                    {['ready', 'done'].includes(bootPhase) && <CheckCircle size={12} />}
+                                    <div className="simon-boot-dot" /> <span>Cargando documentos...</span>
                                 </div>
                                 <div className={`simon-boot-phase ${bootPhase === 'ready' ? 'active done' : ''}`}>
-                                    <div className="simon-boot-dot" />
-                                    <span>¡Simon está listo!</span>
-                                    {bootPhase === 'ready' && <Sparkles size={12} />}
+                                    <div className="simon-boot-dot" /> <span>¡Simon está listo!</span>
                                 </div>
                             </div>
-                            <div className="simon-boot-timer">
-                                <Clock size={11} />
-                                {bootTimer}s
-                            </div>
+                            <div className="simon-boot-timer"><Clock size={11} /> {bootTimer}s</div>
                         </div>
                     )}
-
-                    {/* Error state */}
                     {bootPhase === 'error' && (
                         <div className="simon-boot-error">
                             <AlertCircle size={18} />
-                            <div>
-                                <strong>No se pudo conectar con Simon</strong>
-                                <p>El servidor puede estar en mantenimiento. Intentá de nuevo en unos minutos.</p>
-                            </div>
-                            <button className="simon-retry-btn" onClick={() => { setBootPhase('idle'); setSessionStarted(false); }}>
-                                Reintentar
-                            </button>
+                            <div><strong>No se pudo conectar con Simon</strong><p>El servidor puede estar en mantenimiento.</p></div>
+                            <button className="simon-retry-btn" onClick={() => { setBootPhase('idle'); setSessionStarted(false); }}>Reintentar</button>
                         </div>
                     )}
                 </div>
-
-                <div className="simon-welcome-footer">
-                    Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.2
-                </div>
+                <div className="simon-welcome-footer">Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.2</div>
             </div>
         )
     }
 
     return (
         <div className="rag-container">
-            {/* Left: Conversation Sidebar */}
             {showSidebar && (
                 <div className="rag-sidebar">
                     <div className="rag-sidebar-header">
                         <button className="btn btn-primary rag-new-chat-btn" onClick={startNewConversation}>
-                            <Plus size={14} />
-                            Nueva Consulta
+                            <Plus size={14} /> Nueva Consulta
                         </button>
                     </div>
-
-                    {/* Tab switcher */}
                     <div className="rag-tabs">
-                        <button
-                            className={`rag-tab ${activeTab === 'chat' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('chat')}
-                        >
-                            <MessageSquare size={14} />
-                            Chat
+                        <button className={`rag-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+                            <MessageSquare size={14} /> Chat
                         </button>
-                        <button
-                            className={`rag-tab ${activeTab === 'documents' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('documents')}
-                        >
-                            {isUploading ? <Loader2 size={14} className="rag-spin" style={{ color: '#3b82f6' }} /> : <FileText size={14} />}
-                            Archivos ({totalFiles})
+                        <button className={`rag-tab ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
+                            {isUploading ? <Loader2 size={14} className="rag-spin" /> : <FileText size={14} />} Archivos ({totalFiles})
                         </button>
                     </div>
-
-                    {/* Conversation list */}
                     {activeTab === 'chat' && (
                         <div className="rag-conv-list">
                             {conversations.length === 0 ? (
-                                <div className="rag-empty-state">
-                                    <Brain size={32} />
-                                    <p>No hay conversaciones aún</p>
-                                    <span>Hacé una pregunta para comenzar</span>
-                                </div>
+                                <div className="rag-empty-state"><Brain size={32} /><p>No hay conversaciones</p></div>
                             ) : (
                                 conversations.map(conv => (
-                                    <div
-                                        key={conv.id}
-                                        className={`rag-conv-item ${activeConversation === conv.id ? 'active' : ''}`}
-                                        onClick={() => selectConversation(conv)}
-                                    >
+                                    <div key={conv.id} className={`rag-conv-item ${activeConversation === conv.id ? 'active' : ''}`} onClick={() => selectConversation(conv)}>
                                         <div className="rag-conv-item-content">
                                             <span className="rag-conv-title">{conv.title || 'Sin título'}</span>
-                                            <span className="rag-conv-time">
-                                                <Clock size={10} />
-                                                {formatTime(conv.updated_at)}
-                                            </span>
+                                            <span className="rag-conv-time"><Clock size={10} /> {formatTime(conv.updated_at)}</span>
                                         </div>
-                                        <button
-                                            className="rag-conv-delete"
-                                            onClick={(e) => handleDeleteConversation(conv.id, e)}
-                                            title="Eliminar conversación"
-                                        >
-                                            <Trash2 size={12} />
-                                        </button>
+                                        <button className="rag-conv-delete" onClick={(e) => handleDeleteConversation(conv.id, e)}><Trash2 size={12} /></button>
                                     </div>
                                 ))
                             )}
                         </div>
                     )}
-
-                    {/* File Manager placeholder in sidebar */}
-                    {activeTab === 'documents' && (
-                        <div className="rag-empty-state" style={{ margin: '16px', padding: '24px', background: 'white', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-                            <FolderOpen size={24} style={{ color: '#94a3b8', marginBottom: '8px' }} />
-                            <p style={{ fontSize: '13px', color: '#64748b' }}>Gestión de documentos abierta en el panel principal.</p>
-                        </div>
-                    )}
                 </div>
             )}
 
-            {/* Right: Main Area */}
-            <div className="rag-main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                <div className="rag-chat-area" style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
-                {/* Status bar */}
-                <div className="rag-status-bar">
-                    <button
-                        className="rag-sidebar-toggle"
-                        onClick={() => setShowSidebar(!showSidebar)}
-                        title={showSidebar ? 'Ocultar panel' : 'Mostrar panel'}
-                    >
-                        <ChevronRight size={16} style={{ transform: showSidebar ? 'rotate(180deg)' : 'none' }} />
-                    </button>
-                    <div className="rag-status-info">
-                        <img src="/simonminutes.webp" alt="Simon" className="rag-simon-mini" />
-                        <span className="rag-status-title">Simon</span>
+            <div className="simon-modern-container" style={{ display: activeTab === 'chat' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+                <div className="simon-glass-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button className="rag-sidebar-toggle" onClick={() => setShowSidebar(!showSidebar)}><ChevronRight size={16} style={{ transform: showSidebar ? 'rotate(180deg)' : 'none' }} /></button>
+                        <div>
+                            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Simon IA</h2>
+                        </div>
                     </div>
-                    <div className="rag-status-indicators">
-                        <span className={`rag-status-dot ${backendOnline ? 'online' : 'offline'}`} />
-                        <span className="rag-status-label">
-                            {backendOnline === null ? 'Verificando...' : backendOnline ? 'Backend Online' : 'Backend Offline'}
-                        </span>
-                        <span className="badge info" style={{ marginLeft: 8 }}>
-                            {totalFiles} docs
-                        </span>
-                        {learningStats && learningStats.learned_chunks > 0 && (
-                            <span className="badge positive" style={{ marginLeft: 4 }} title="Q&A aprendidos del historial">
-                                <GraduationCap size={10} style={{ marginRight: 3 }} />
-                                {learningStats.learned_chunks} aprendidos
-                            </span>
-                        )}
-                        <button
-                            className="rag-help-trigger"
-                            onClick={() => setShowHelp(true)}
-                            title="¿Cómo funciona?"
-                        >
-                            <HelpCircle size={15} />
-                        </button>
-                    </div>
+                    <button className="simon-theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? '☀️' : '🌙'}</button>
                 </div>
 
-                {/* Messages */}
-                <div className="rag-messages">
+                <div className="simon-messages-container">
                     {messages.length === 0 && !isLoading ? (
-                        <div className="rag-welcome">
-                            <div className="rag-welcome-icon">
-                                <img src="/simonminutes.webp" alt="Simon" style={{ width: 64, height: 64, borderRadius: 16, objectFit: 'cover' }} />
-                            </div>
-                            <h3>Simon</h3>
-                            <p>Preguntá lo que necesites sobre los documentos cargados. Las respuestas incluyen citación de fuentes.</p>
-                            <div className="rag-welcome-features">
-                                <div className="rag-feature">
-                                    <Search size={18} />
-                                    <span>Búsqueda Híbrida</span>
-                                </div>
-                                <div className="rag-feature">
-                                    <Sparkles size={18} />
-                                    <span>Re-ranking IA</span>
-                                </div>
-                                <div className="rag-feature">
-                                    <Layers size={18} />
-                                    <span>Multi-Query</span>
-                                </div>
-                                <div className="rag-feature">
-                                    <BookOpen size={18} />
-                                    <span>Citación Obligatoria</span>
-                                </div>
-                            </div>
-
-                            {/* Smart Guidance: Pre-chat suggestions */}
-                            {(suggestions.categories.length > 0 || suggestions.top_queries.length > 0) && (
-                                <div className="sg-prechat">
-                                    {suggestions.categories.length > 0 && (
-                                        <div className="sg-section">
-                                            <div className="sg-section-title"><Tag size={13} /> Temas disponibles</div>
-                                            <div className="sg-chips">
-                                                {suggestions.categories.slice(0, 8).map((cat, i) => (
-                                                    <button key={i} className="sg-chip category"
-                                                        onClick={() => { setInputValue(`¿Qué información hay sobre ${cat.name}?`); }}
-                                                    >
-                                                        <FolderOpen size={12} />
-                                                        {cat.name}
-                                                        {cat.count > 1 && <span className="sg-chip-count">{cat.count}</span>}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {suggestions.top_queries.length > 0 && (
-                                        <div className="sg-section">
-                                            <div className="sg-section-title"><Sparkles size={13} /> Preguntas frecuentes</div>
-                                            <div className="sg-chips">
-                                                {suggestions.top_queries.slice(0, 6).map((q, i) => (
-                                                    <button key={i} className="sg-chip query"
-                                                        onClick={() => { setInputValue(q.text); }}
-                                                    >
-                                                        <MessageSquare size={12} />
-                                                        {q.text.length > 60 ? q.text.slice(0, 57) + '...' : q.text}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                        <div className="rag-chat-empty">
+                            <Brain size={48} color="var(--blue-500)" />
+                            <h2>¿Qué necesitas consultar hoy?</h2>
                         </div>
                     ) : (
                         messages.map((msg, i) => (
-                            <div key={i} className={`rag-message ${msg.role}`}>
-                                <div className="rag-message-avatar">
-                                    {msg.role === 'user' ? (
-                                        <div className="rag-avatar-user-badge">U</div>
-                                    ) : (
-                                        <div className="rag-avatar-simon-container">
-                                            <img src="/simonminutes.webp" alt="Simon" className="rag-avatar-simon-img" />
-                                            <div className="rag-avatar-simon-status" />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="rag-message-content">
-                                    {(() => {
-                                        // Parse related questions from Simon's response
-                                        const parts = (msg.content || '').split(/---\s*\n�x�/);
-                                        const mainContent = parts[0];
-                                        let relatedQuestions = [];
-                                        if (msg.role === 'assistant' && parts.length > 1) {
-                                            const rqSection = parts[1];
-                                            const matches = rqSection.match(/- ¿([^?]+)\?/g) || [];
-                                            relatedQuestions = matches.map(m => m.replace(/^- /, '').trim());
-                                        }
-                                        return (
-                                            <>
-                                                <div
-                                                    className="rag-message-text"
-                                                    dangerouslySetInnerHTML={{ __html: renderMarkdown(mainContent) }}
-                                                />
-                                                {relatedQuestions.length > 0 && (
-                                                    <div className="sg-related">
-                                                        <div className="sg-related-title">
-                                                            <Lightbulb size={13} />
-                                                            También podrías preguntar:
-                                                        </div>
-                                                        <div className="sg-related-chips">
-                                                            {relatedQuestions.map((rq, ri) => (
-                                                                <button key={ri} className="sg-chip query small"
-                                                                    onClick={() => { setInputValue(rq); }}
-                                                                >
-                                                                    {rq}
-                                                                </button>
-                                                            ))}
-                                                        </div>
+                            <div key={i} className={`simon-message-band ${msg.role}`}>
+                                <div className="simon-message-inner">
+                                    <div className={`simon-message-avatar ${msg.role}`}>
+                                        {msg.role === 'assistant' ? <Brain size={16} /> : <span>U</span>}
+                                    </div>
+                                    <div className="simon-message-content">
+                                        <div className="rag-message-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                                        {msg.sources && msg.sources.length > 0 && (
+                                            <div className="rag-sources">
+                                                {msg.sources.map((src, j) => (
+                                                    <div key={j} className="rag-source-item">
+                                                        <span>{FILE_ICONS[src.file_type] || '📄'} {src.filename}</span>
                                                     </div>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
-                                    {/* Clarification Suggestions */}
-                                    {msg.type === 'clarification' && msg.suggestions && msg.suggestions.length > 0 && (
-                                        <div className="rag-clarification">
-                                            <div className="rag-clarification-header">
-                                                <Lightbulb size={14} />
-                                                Sugerencias
-                                            </div>
-                                            <div className="rag-suggestion-chips">
-                                                {msg.suggestions.map((suggestion, j) => (
-                                                    <button
-                                                        key={j}
-                                                        className="rag-suggestion-chip"
-                                                        onClick={() => handleSuggestionClick(suggestion)}
-                                                        disabled={isLoading}
-                                                    >
-                                                        <HelpCircle size={12} />
-                                                        {suggestion}
-                                                    </button>
                                                 ))}
                                             </div>
-                                        </div>
-                                    )}
-                                    {/* Sources */}
-                                    {msg.sources && msg.sources.length > 0 && (
-                                        <div className="rag-sources">
-                                            <div className="rag-sources-header">
-                                                <FileText size={12} />
-                                                Fuentes consultadas
-                                            </div>
-                                            {msg.sources.map((src, j) => (
-                                                <div key={j} className="rag-source-item">
-                                                    <span className="rag-source-icon">
-                                                        {src.source_type === 'chat_history' ? '�x��' : (FILE_ICONS[src.file_type] || '�x')}
-                                                    </span>
-                                                    <span className="rag-source-name">
-                                                        {src.source_type === 'chat_history' ? 'Aprendido de chat previo' : src.filename}
-                                                    </span>
-                                                    <span className="badge info">{src.chunks_used} chunks</span>
-                                                    {src.rerank_score > 0 && (
-                                                        <span className="badge positive">{src.rerank_score}/10</span>
-                                                    )}
-                                                    {src.source_type === 'chat_history' && (
-                                                        <span className="badge" style={{ background: '#7c3aed22', color: '#7c3aed', fontSize: '10px' }}>
-                                                            <GraduationCap size={9} /> Aprendido
-                                                        </span>
-                                                    )}
-                                                    {src.source_type !== 'chat_history' && src.storage_path && (
-                                                        <div style={{ display: 'flex', gap: 2 }}>
-                                                            <button
-                                                                className="rag-source-download"
-                                                                onClick={() => handleOpenPreview({ storage_path: src.storage_path, name: src.filename, file_type: src.file_type || ('.' + src.filename.split('.').pop()) })}
-                                                                title={`Visualizar ${src.filename}`}
-                                                            >
-                                                                <Eye size={11} />
-                                                            </button>
-                                                            <button
-                                                                className="rag-source-download"
-                                                                onClick={() => downloadRAGFile(src.storage_path)}
-                                                                title={`Descargar ${src.filename}`}
-                                                            >
-                                                                <Download size={11} />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {/* Pipeline info */}
-                                    {msg.pipeline_info && (
-                                        <div className="rag-pipeline-info">
-                                            <BarChart3 size={11} />
-                                            {msg.pipeline_info.disambiguation_triggered && (
-                                                <span style={{ color: '#f59e0b' }}>⚠️ Desambiguación</span>
-                                            )}
-                                            <span>HyDE: {msg.pipeline_info.hyde_generated ? 'Sí' : 'No'}</span>
-                                            <span>Queries: {(msg.pipeline_info.multi_queries || 0) + 1}</span>
-                                            <span>Buscados: {msg.pipeline_info.total_searched}</span>
-                                            <span>Únicos: {msg.pipeline_info.unique_results}</span>
-                                            {msg.pipeline_info.entity_detected && msg.pipeline_info.entity_detected.length > 0 && (
-                                                <span style={{ color: '#3b82f6' }}>
-                                                    🔍 {msg.pipeline_info.entity_detected.join(', ')}
-                                                    {msg.pipeline_info.entity_filter === 'strict' ? ' (estricto)' : ''}
-                                                </span>
-                                            )}
-                                            <span>Usados: {msg.pipeline_info.reranked_kept}</span>
-                                            {msg.pipeline_info.chat_learning && (
-                                                <span style={{ color: '#7c3aed' }}>🧠 Aprendido</span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {/* Feedback buttons for assistant messages */}
-                                    {msg.role === 'assistant' && msg.type !== 'clarification' && (() => {
-                                        // Calculate the assistant-only index for this message
-                                        const assistantIndex = messages
-                                            .slice(0, i + 1)
-                                            .filter(m => m.role === 'assistant' && m.type !== 'clarification')
-                                            .length - 1
-                                        const fbKey = `${activeConversation}-${assistantIndex}`
-                                        const fbState = feedbackState[fbKey]
-                                        const fbFromMsg = msg.feedback // from DB if loaded
-                                        const resolved = fbState || fbFromMsg
-                                        
-                                        return (
-                                            <div className={`rag-feedback-bar ${resolved ? 'resolved' : ''}`}>
-                                                {resolved === 'loading' ? (
-                                                    <span className="rag-feedback-loading">
-                                                        <Loader2 size={12} className="rag-spin" />
-                                                        Guardando...
-                                                    </span>
-                                                ) : resolved === 'correct' ? (
-                                                    <span className="rag-feedback-result correct">
-                                                        <ThumbsUp size={12} />
-                                                        Marcada como correcta
-                                                    </span>
-                                                ) : resolved === 'incorrect' ? (
-                                                    <span className="rag-feedback-result incorrect">
-                                                        <ThumbsDown size={12} />
-                                                        Marcada como incorrecta
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <span className="rag-feedback-label">¿Fue útil esta respuesta?</span>
-                                                        <div className="rag-feedback-buttons">
-                                                            <button
-                                                                className="rag-feedback-btn correct"
-                                                                onClick={() => handleFeedback(assistantIndex, true)}
-                                                                title="Respuesta correcta"
-                                                            >
-                                                                <ThumbsUp size={13} />
-                                                            </button>
-                                                            <button
-                                                                className="rag-feedback-btn incorrect"
-                                                                onClick={() => handleFeedback(assistantIndex, false)}
-                                                                title="Respuesta incorrecta"
-                                                            >
-                                                                <ThumbsDown size={13} />
-                                                            </button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )
-                                    })()}
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))
                     )}
-
-                    {/* Loading state */}
                     {isLoading && (
-                        <div className="rag-message assistant">
-                            <div className="rag-message-avatar">
-                                <div className="rag-avatar-simon-container">
-                                    <img src="/simonminutes.webp" alt="Simon" className="rag-avatar-simon-img pulsing" />
-                                    <div className="rag-avatar-simon-status calculating" />
-                                </div>
-                            </div>
-                            <div className="rag-message-content">
-                                <div className="rag-thinking-skeleton">
-                                    <div className="rag-thinking-pulse-line header" />
-                                    <div className="rag-thinking-pulse-line body-1" />
-                                    <div className="rag-thinking-pulse-line body-2" />
-                                    <div className="rag-thinking-status">
-                                        <Sparkles size={13} className="rag-sparkle-spin" />
-                                        <span>Simon está procesando y comparando las reglas del Sanatorio...</span>
+                        <div className="simon-message-band assistant">
+                            <div className="simon-message-inner">
+                                <div className="simon-message-avatar assistant"><Brain size={16} /></div>
+                                <div className="simon-message-content">
+                                    <div className="rag-typing" style={{ padding: '8px 0' }}>
+                                        <div className="rag-dot" /> <div className="rag-dot" /> <div className="rag-dot" />
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
-
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Error */}
-                {error && (
-                    <div className="rag-error">
-                        <AlertCircle size={14} />
-                        {error}
-                        <button onClick={() => setError(null)}><X size={12} /></button>
-                    </div>
-                )}
-
-                {/* Input with Autocomplete */}
-                <div className="rag-input-area">
-                    {/* Quick Actions / Smart Prompts */}
-                    <div className="rag-quick-actions" style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-                        <button 
-                            className="rag-quick-action-btn"
-                            onClick={() => setInputValue('Genera un mapa conceptual sobre las reglas de este documento. IMPORTANTE: Envuelve el código del diagrama EXCLUSIVAMENTE dentro de un bloque markdown tipo mermaid (empezando con ```mermaid y terminando con ```). Usa saltos de línea para cada nodo.')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                        >
-                            �x` Mapa Conceptual
-                        </button>
-                        <button 
-                            className="rag-quick-action-btn"
-                            onClick={() => setInputValue('Escribe un resumen estructurado con viñetas sobre los puntos más importantes.')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                        >
-                            �x� Resumen Estructurado
-                        </button>
-                    </div>
-
-                    <div className="rag-input-wrapper" style={{ position: 'relative' }}>
-                        <textarea
-                            className="rag-input"
-                            value={inputValue}
-                            onChange={(e) => {
-                                setInputValue(e.target.value);
-                                setShowAutocomplete(e.target.value.trim().length >= 2);
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Escape') setShowAutocomplete(false);
-                                handleKeyPress(e);
-                            }}
-                            onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
-                            onFocus={() => { if (inputValue.trim().length >= 2) setShowAutocomplete(true); }}
-                            placeholder="Escribí tu pregunta sobre los documentos..."
-                            rows={1}
-                            disabled={isLoading || !backendOnline}
-                        />
-                        <button
-                            className="rag-send-btn"
-                            onClick={handleSend}
-                            disabled={!inputValue.trim() || isLoading || !backendOnline}
-                        >
-                            {isLoading ? <Loader2 size={18} className="rag-spin" /> : <Send size={18} />}
-                        </button>
-
-                        {/* Autocomplete dropdown */}
-                        {showAutocomplete && inputValue.trim().length >= 2 && (() => {
-                            const query = inputValue.toLowerCase();
-                            const matches = (suggestions.top_queries || []).filter(q =>
-                                q.text.toLowerCase().includes(query)
-                            ).slice(0, 5);
-                            if (matches.length === 0) return null;
-                            return (
-                                <div className="sg-autocomplete">
-                                    {matches.map((m, i) => (
-                                        <button key={i} className="sg-autocomplete-item"
-                                            onMouseDown={(e) => {
-                                                e.preventDefault();
-                                                setInputValue(m.text);
-                                                setShowAutocomplete(false);
-                                            }}
-                                        >
-                                            <Search size={13} />
-                                            <span>{m.text}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            );
-                        })()}
-                    </div>
-                    <div className="rag-input-hint">
-                        Respuestas basadas exclusivamente en documentos cargados · Enter para enviar
-                    </div>
-                </div>
-            </div>
-            {/* End of rag-chat-area */}
 
             {/* Documents Area */}
             <div className="rag-documents-area" style={{ display: activeTab === 'documents' ? 'flex' : 'none', flex: 1, flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
@@ -1369,7 +817,7 @@ export default function RAGPanel() {
                                             ) : (
                                                 <tr key={item.name} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'white'}>
                                                     <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontWeight: 500 }}>
-                                                        <span style={{ fontSize: '18px' }}>{FILE_ICONS[item.file_type] || '�x'}</span> {item.name}
+                                                        <span style={{ fontSize: '18px' }}>{FILE_ICONS[item.file_type] || '📄'}</span> {item.name}
                                                     </td>
                                                     <td style={{ padding: '12px 16px', color: '#64748b' }}>{formatFileSize(item.file_size)}</td>
                                                     <td style={{ padding: '12px 16px', color: '#64748b' }}>{item.total_chunks}</td>
@@ -1451,7 +899,7 @@ export default function RAGPanel() {
                                     <div className="rag-modal-type-chips">
                                         {Object.entries(summary.typeCounts).map(([ext, count]) => (
                                             <span key={ext} className="rag-modal-type-chip">
-                                                {FILE_ICONS[ext] || '�x'} {ext} ({count})
+                                                {FILE_ICONS[ext] || '📄'} {ext} ({count})
                                             </span>
                                         ))}
                                     </div>
@@ -1535,7 +983,7 @@ export default function RAGPanel() {
                         <div className="rag-preview-header">
                             <div className="rag-preview-title-block">
                                 <span className="rag-preview-icon">
-                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || '�x'}
+                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || '📄'}
                                 </span>
                                 <div style={{ minWidth: 0 }}>
                                     <h3 className="rag-preview-filename" title={previewItem.name || previewItem.filename}>

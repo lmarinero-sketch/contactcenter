@@ -1,0 +1,392 @@
+/* SIMON IA - FUTURISTA CLÍNICO (REDISEÑO) */
+:root {
+  --simon-bg: #ffffff;
+  --simon-bg-alt: #f8fafc;
+  --simon-border: #e2e8f0;
+  --simon-text-main: #0f172a;
+  --simon-text-muted: #64748b;
+  --simon-glass: rgba(255, 255, 255, 0.85);
+  --simon-input-bg: #ffffff;
+}
+
+body.dark-theme {
+  --simon-bg: #0f172a;
+  --simon-bg-alt: #1e293b;
+  --simon-border: #334155;
+  --simon-text-main: #f8fafc;
+  --simon-text-muted: #94a3b8;
+  --simon-glass: rgba(15, 23, 42, 0.85);
+  --simon-input-bg: #1e293b;
+}
+
+.simon-modern-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: var(--simon-bg);
+  color: var(--simon-text-main);
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.simon-glass-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: var(--simon-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--simon-border);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.simon-theme-toggle {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background 0.2s;
+  color: var(--simon-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.simon-theme-toggle:hover {
+  background: var(--simon-bg-alt);
+}
+
+.simon-messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 80px 0 100px; /* Space for header and footer */
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: smooth;
+}
+
+.simon-message-band {
+  width: 100%;
+  padding: 24px 0;
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px solid transparent;
+}
+.simon-message-band.user {
+  background: transparent;
+}
+.simon-message-band.assistant {
+  background: var(--simon-bg-alt);
+  border-top: 1px solid var(--simon-border);
+  border-bottom: 1px solid var(--simon-border);
+}
+
+.simon-message-inner {
+  max-width: 800px;
+  width: 100%;
+  padding: 0 24px;
+  display: flex;
+  gap: 20px;
+}
+
+.simon-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: white;
+}
+.simon-message-avatar.user {
+  background: #3b82f6; /* Blue 500 */
+}
+.simon-message-avatar.assistant {
+  background: #10b981; /* Emerald 500 */
+}
+
+.simon-message-content {
+  flex: 1;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--simon-text-main);
+  min-width: 0; /* Prevents overflow */
+}
+
+.simon-floating-input-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, var(--simon-bg) 40%);
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  z-index: 10;
+}
+
+.simon-input-glass {
+  max-width: 800px;
+  width: 100%;
+  background: var(--simon-input-bg);
+  border: 1px solid var(--simon-border);
+  border-radius: 24px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.simon-input-glass:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.15);
+}
+
+.simon-input-glass textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--simon-text-main);
+  font-family: inherit;
+  font-size: 1rem;
+  resize: none;
+  outline: none;
+  max-height: 200px;
+  padding: 4px 0;
+  line-height: 1.5;
+}
+.simon-input-glass textarea::placeholder {
+  color: var(--simon-text-muted);
+}
+
+.simon-input-glass button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.simon-input-glass button:hover:not(:disabled) {
+  background: #2563eb;
+}
+.simon-input-glass button:disabled {
+  background: var(--simon-border);
+  color: var(--simon-text-muted);
+  cursor: not-allowed;
+}
+
+/* Simon Welcome Overrides for the Splash Screen */
+.simon-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--simon-bg);
+  color: var(--simon-text-main);
+  padding: 40px 20px;
+  position: relative;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.simon-welcome-header {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+
+.simon-welcome-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  animation: fadeUp 0.5s ease-out;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.simon-welcome-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.15));
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.1);
+}
+
+.simon-name {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--simon-text-main);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.simon-subtitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #3b82f6;
+  margin: 0 0 16px 0;
+}
+
+.simon-desc {
+  font-size: 1rem;
+  color: var(--simon-text-muted);
+  line-height: 1.6;
+  margin: 0 0 32px 0;
+}
+
+.simon-start-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 32px;
+  border: none;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: white;
+  font-size: 1.125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
+}
+.simon-start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.35);
+}
+
+.simon-boot {
+  width: 100%;
+  margin-top: 24px;
+  text-align: left;
+}
+
+.simon-boot-phases {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.simon-boot-phase {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--simon-bg-alt);
+  color: var(--simon-text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s;
+  opacity: 0.5;
+}
+.simon-boot-phase.active {
+  color: var(--simon-text-main);
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.simon-boot-phase.done {
+  opacity: 0.8;
+  color: var(--simon-text-main);
+}
+
+.simon-boot-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--simon-text-muted);
+  transition: all 0.3s;
+}
+.simon-boot-phase.active .simon-boot-dot {
+  background: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  animation: pulseDot 1.5s infinite;
+}
+.simon-boot-phase.done .simon-boot-dot {
+  background: #10b981;
+}
+
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.simon-boot-timer {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--simon-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.simon-boot-error {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+  color: #b91c1c;
+  font-size: 0.875rem;
+  text-align: center;
+}
+.simon-boot-error strong {
+  font-size: 1rem;
+}
+.simon-retry-btn {
+  padding: 10px 24px;
+  background: white;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.simon-retry-btn:hover {
+  background: #fee2e2;
+}
+
+.simon-welcome-footer {
+  margin-top: 48px;
+  font-size: 0.75rem;
+  color: var(--simon-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}

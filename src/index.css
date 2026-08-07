@@ -8506,3 +8506,5 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+@import './simon-redesign.css';

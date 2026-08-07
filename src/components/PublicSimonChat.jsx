@@ -108,6 +108,18 @@ export default function PublicSimonChat() {
     // Feedback state
     const [feedbackState, setFeedbackState] = useState({})
 
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    useEffect(() => {
+        if (isDarkMode) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }, [isDarkMode]);
+
     const messagesEndRef = useRef(null)
     const bootTimerRef = useRef(null)
 
@@ -260,115 +272,138 @@ export default function PublicSimonChat() {
     // Initial Splash Screen
     if (!sessionStarted || bootPhase !== 'done') {
         return (
-            <div className="rag-splash-screen" style={{ width: '100vw', height: '100vh' }}>
-                <div className="rag-splash-content">
-                    <div className="rag-splash-logo-container">
-                        <Brain size={64} className="rag-splash-logo" />
-                        <div className="rag-splash-glow"></div>
+            <div className="simon-welcome">
+                <div className="simon-welcome-header">
+                    <button className="simon-theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>
+                        {isDarkMode ? '☀️' : '🌙'}
+                    </button>
+                </div>
+                <div className="simon-welcome-content">
+                    <div className="simon-welcome-icon">
+                        <Brain size={64} />
                     </div>
-                    <h1>Simon IA</h1>
-                    <p className="rag-splash-subtitle">Asistente Virtual Público</p>
+                    <h1 className="simon-name">Simon</h1>
+                    <p className="simon-subtitle">Asistente Virtual Público</p>
+                    <p className="simon-desc">
+                        Bienvenido al chat inteligente del Sanatorio Argentino. Resolvé tus dudas sobre servicios, turnos y políticas de atención.
+                    </p>
                     
-                    {!sessionStarted ? (
-                        <button className="rag-splash-btn" onClick={startSimon}>
-                            <Sparkles size={18} />
-                            Iniciar Consulta
-                        </button>
-                    ) : (
-                        <div className="rag-boot-sequence">
-                            <div className={`rag-boot-step ${bootPhase !== 'waking' && bootPhase !== 'error' ? 'done' : bootPhase === 'error' ? 'error' : 'active'}`}>
-                                <div className="rag-boot-icon">{bootPhase !== 'waking' && bootPhase !== 'error' ? '✓' : bootPhase === 'error' ? '✕' : <Loader2 size={14} className="rag-spin" />}</div>
-                                <span>Verificando conexión neuronal... {bootPhase === 'waking' ? `${bootTimer}s` : ''}</span>
-                            </div>
-                            {(bootPhase === 'connecting' || bootPhase === 'loading' || bootPhase === 'ready') && (
-                                <div className={`rag-boot-step ${bootPhase !== 'connecting' ? 'done' : 'active'}`}>
-                                    <div className="rag-boot-icon">{bootPhase !== 'connecting' ? '✓' : <Loader2 size={14} className="rag-spin" />}</div>
-                                    <span>Sincronizando base de conocimiento documental...</span>
+                    {bootPhase === 'idle' && (
+                        <>
+                            <button className="simon-start-btn" onClick={startSimon}>
+                                <Brain size={18} />
+                                Iniciar Consulta
+                            </button>
+                        </>
+                    )}
+
+                    {bootPhase !== 'idle' && bootPhase !== 'error' && (
+                        <div className="simon-boot">
+                            <div className="simon-boot-phases">
+                                <div className={`simon-boot-phase ${bootPhase === 'waking' ? 'active' : (bootPhase !== 'waking' ? 'done' : '')}`}>
+                                    <div className="simon-boot-dot" />
+                                    <span>Verificando conexión neuronal...</span>
                                 </div>
-                            )}
-                            {(bootPhase === 'loading' || bootPhase === 'ready') && (
-                                <div className={`rag-boot-step ${bootPhase !== 'loading' ? 'done' : 'active'}`}>
-                                    <div className="rag-boot-icon">{bootPhase !== 'loading' ? '✓' : <Loader2 size={14} className="rag-spin" />}</div>
+                                <div className={`simon-boot-phase ${bootPhase === 'connecting' ? 'active' : (['loading', 'ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
+                                    <div className="simon-boot-dot" />
+                                    <span>Sincronizando base de conocimiento...</span>
+                                </div>
+                                <div className={`simon-boot-phase ${bootPhase === 'loading' ? 'active' : (['ready', 'done'].includes(bootPhase) ? 'done' : '')}`}>
+                                    <div className="simon-boot-dot" />
                                     <span>Alineando protocolo de atención...</span>
                                 </div>
-                            )}
-                            {bootPhase === 'ready' && (
-                                <div className="rag-boot-step done final">
-                                    <div className="rag-boot-icon">✓</div>
+                                <div className={`simon-boot-phase ${bootPhase === 'ready' ? 'active done' : ''}`}>
+                                    <div className="simon-boot-dot" />
                                     <span>¡Sistemas operativos!</span>
                                 </div>
-                            )}
-                            {bootPhase === 'error' && (
-                                <div className="rag-boot-error">
-                                    No se pudo establecer conexión con los servidores de Simon IA.
-                                    <button onClick={startSimon}>Reintentar</button>
-                                </div>
-                            )}
+                            </div>
+                            <div className="simon-boot-timer">
+                                <Clock size={11} />
+                                {bootTimer}s
+                            </div>
                         </div>
                     )}
+
+                    {bootPhase === 'error' && (
+                        <div className="simon-boot-error">
+                            <AlertCircle size={18} />
+                            <div>
+                                <strong>No se pudo conectar con Simon</strong>
+                                <p>El servidor puede estar en mantenimiento. Intentá de nuevo en unos minutos.</p>
+                            </div>
+                            <button className="simon-retry-btn" onClick={() => { setBootPhase('idle'); setSessionStarted(false); }}>
+                                Reintentar
+                            </button>
+                        </div>
+                    )}
+                </div>
+                <div className="simon-welcome-footer">
+                    Sanatorio Argentino · Powered by GPT-4o
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="rag-container" style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="rag-main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                <div className="rag-chat-area" style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
-                    <div className="rag-chat-header" style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div className="rag-header-logo">
-                                <Brain size={20} color="#3b82f6" />
-                            </div>
-                            <div>
-                                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    Simon IA <span className="rag-beta-badge">Público</span>
-                                </h2>
-                                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>Consultá sobre procedimientos y reglas</p>
-                            </div>
+        <div className="simon-modern-container">
+            <div className="simon-chat-area" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+                <div className="simon-glass-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="rag-header-logo">
+                            <Brain size={20} color="#3b82f6" />
+                        </div>
+                        <div>
+                            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                Simon IA <span className="rag-beta-badge">Público</span>
+                            </h2>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--simon-text-muted)', margin: 0 }}>Consultá sobre procedimientos y reglas</p>
                         </div>
                     </div>
+                    <button className="simon-theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>
+                        {isDarkMode ? '☀️' : '🌙'}
+                    </button>
+                </div>
 
-                    <div className="rag-chat-messages" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-                        {messages.length === 0 ? (
-                            <div className="rag-chat-empty">
-                                <div className="rag-empty-icon">
-                                    <Brain size={48} />
-                                </div>
-                                <h2>¡Hola! Soy Simon IA</h2>
-                                <p>Estoy acá para responder preguntas basadas en la base de datos documental del Sanatorio.</p>
-                                
-                                {(suggestions.categories.length > 0 || suggestions.top_queries.length > 0) && (
-                                    <div className="rag-suggestions-container">
-                                        <h3 className="rag-suggestions-title">Preguntas frecuentes</h3>
-                                        <div className="rag-suggestions-grid">
-                                            {suggestions.categories.slice(0, 4).map((cat, i) => (
-                                                <button key={i} className="rag-suggestion-card" onClick={() => handleSuggestionClick(cat.query)}>
-                                                    <span className="rag-suggestion-emoji">{cat.emoji}</span>
-                                                    <div className="rag-suggestion-text">
-                                                        <h4>{cat.label}</h4>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                            {suggestions.top_queries.slice(0, 4).map((q, i) => (
-                                                <button key={i} className="rag-suggestion-card" onClick={() => handleSuggestionClick(q)}>
-                                                    <span className="rag-suggestion-emoji">💡</span>
-                                                    <div className="rag-suggestion-text">
-                                                        <h4>{q}</h4>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                <div className="simon-messages-container">
+                    {messages.length === 0 ? (
+                        <div className="rag-chat-empty" style={{ paddingTop: '10vh' }}>
+                            <div className="rag-empty-icon" style={{ background: 'transparent' }}>
+                                <Brain size={56} color="var(--blue-500)" />
                             </div>
-                        ) : (
-                            messages.map((msg, i) => (
-                                <div key={i} className={`rag-message ${msg.role}`}>
-                                    <div className="rag-message-avatar">
-                                        {msg.role === 'assistant' ? <Brain size={16} /> : <span>U</span>}
+                            <h2 style={{ fontSize: '24px', fontWeight: 600 }}>¡Hola! Soy Simon IA</h2>
+                            <p style={{ color: 'var(--simon-text-muted)', fontSize: '16px' }}>Estoy acá para responder preguntas basadas en la base de datos documental del Sanatorio.</p>
+                            
+                            {(suggestions.categories.length > 0 || suggestions.top_queries.length > 0) && (
+                                <div className="rag-suggestions-container" style={{ maxWidth: '800px', margin: '40px auto 0' }}>
+                                    <div className="rag-suggestions-grid">
+                                        {suggestions.categories.slice(0, 4).map((cat, i) => (
+                                            <button key={i} className="rag-suggestion-card" onClick={() => handleSuggestionClick(cat.query)}>
+                                                <span className="rag-suggestion-emoji">{cat.emoji}</span>
+                                                <div className="rag-suggestion-text">
+                                                    <h4 style={{ color: 'var(--simon-text-main)' }}>{cat.label}</h4>
+                                                </div>
+                                            </button>
+                                        ))}
+                                        {suggestions.top_queries.slice(0, 4).map((q, i) => (
+                                            <button key={i} className="rag-suggestion-card" onClick={() => handleSuggestionClick(q)}>
+                                                <span className="rag-suggestion-emoji">💡</span>
+                                                <div className="rag-suggestion-text">
+                                                    <h4 style={{ color: 'var(--simon-text-main)' }}>{q}</h4>
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
-                                    <div className="rag-message-content">
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        messages.map((msg, i) => (
+                            <div key={i} className={`simon-message-band ${msg.role}`}>
+                                <div className="simon-message-inner">
+                                    <div className={`simon-message-avatar ${msg.role}`}>
+                                        {msg.role === 'assistant' ? <Brain size={16} /> : <span>SA</span>}
+                                    </div>
+                                    <div className="simon-message-content">
                                         {msg.type === 'clarification' ? (
                                             <div className="rag-clarification-notice">
                                                 <Sparkles size={16} />
@@ -438,57 +473,59 @@ export default function PublicSimonChat() {
                                         })()}
                                     </div>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))
+                    )}
                         
-                        {isLoading && (
-                            <div className="rag-message assistant">
-                                <div className="rag-message-avatar"><Brain size={16} /></div>
-                                <div className="rag-message-content">
-                                    <div className="rag-typing">
-                                        <div className="rag-dot"></div><div className="rag-dot"></div><div className="rag-dot"></div>
+                    {isLoading && (
+                        <div className="simon-message-band assistant">
+                            <div className="simon-message-inner">
+                                <div className="simon-message-avatar assistant"><Brain size={16} /></div>
+                                <div className="simon-message-content">
+                                    <div className="rag-typing" style={{ padding: '8px 0' }}>
+                                        <div className="rag-dot" style={{ background: 'var(--blue-500)' }}></div>
+                                        <div className="rag-dot" style={{ background: 'var(--blue-500)' }}></div>
+                                        <div className="rag-dot" style={{ background: 'var(--blue-500)' }}></div>
                                     </div>
                                 </div>
                             </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
 
-                    <div className="rag-chat-input-area" style={{ borderTop: '1px solid #e2e8f0', background: 'white', padding: '20px 24px' }}>
+                <div className="simon-floating-input-wrapper">
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '760px' }}>
                         {error && (
-                            <div className="rag-error-banner" style={{ background: '#fef2f2', color: '#ef4444', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="rag-error-banner" style={{ background: '#fef2f2', color: '#ef4444', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><AlertCircle size={14} /> <span style={{ fontSize: '13px' }}>{error}</span></div>
                                 <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><X size={14} /></button>
                             </div>
                         )}
                         
-                        <form onSubmit={handleSend} className="rag-input-form" style={{ position: 'relative', display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
-                            <div className="rag-input-wrapper" style={{ flex: 1, position: 'relative', background: '#f8fafc', borderRadius: '12px', border: '1px solid #cbd5e1', padding: '2px' }}>
-                                <textarea
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    placeholder="Escribí tu consulta sobre procedimientos o normativas..."
-                                    className="rag-textarea"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault()
-                                            handleSend(e)
-                                        }
-                                    }}
-                                    style={{ width: '100%', border: 'none', background: 'transparent', resize: 'none', minHeight: '52px', maxHeight: '160px', padding: '14px 16px', fontSize: '15px', color: '#334155', outline: 'none' }}
-                                />
-                            </div>
+                        <form onSubmit={handleSend} className="simon-floating-input">
+                            <textarea
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                placeholder="Consultá a Simon..."
+                                className="simon-input-textarea"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        handleSend(e)
+                                    }
+                                }}
+                            />
                             <button
                                 type="submit"
                                 disabled={!inputValue.trim() || isLoading}
-                                className="rag-send-btn"
-                                style={{ height: '52px', width: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '12px', cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed', opacity: inputValue.trim() && !isLoading ? 1 : 0.5 }}
+                                className="simon-btn-send"
                             >
-                                {isLoading ? <Loader2 size={20} className="rag-spin" /> : <Send size={20} />}
+                                {isLoading ? <Loader2 size={18} className="rag-spin" /> : <Send size={16} />}
                             </button>
                         </form>
-                        <div className="rag-input-hint" style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
-                            Respuestas generadas por Simon IA en base a documentos internos.
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--simon-text-muted)', marginTop: '8px' }}>
+                            Simon IA puede cometer errores. Considerá verificar la información importante.
                         </div>
                     </div>
                 </div>
