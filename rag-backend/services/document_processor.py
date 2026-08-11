@@ -121,11 +121,12 @@ def _extract_pdf_vision(file_path: str, max_pages: int = 10) -> str:
         from pdf2image import convert_from_path
         from config import openai_client, CHAT_MODEL
 
-        images = convert_from_path(file_path, dpi=200)
-        print(f"Vision: Processing {min(len(images), max_pages)}/{len(images)} pages...")
+        # Convert ONLY the first max_pages to avoid OOM on 512MB instances
+        images = convert_from_path(file_path, dpi=200, last_page=max_pages)
+        print(f"Vision: Processing {len(images)} pages...")
 
         pages = []
-        for i, image in enumerate(images[:max_pages], 1):
+        for i, image in enumerate(images, 1):
             # Convert PIL image to base64
             import io as _io
             buffer = _io.BytesIO()
@@ -185,8 +186,8 @@ def _extract_pdf_ocr(file_path: str) -> str:
         from pdf2image import convert_from_path
         import pytesseract
 
-        # Convert PDF pages to images
-        images = convert_from_path(file_path, dpi=300)
+        # Convert ONLY the first 10 pages to avoid OOM on 512MB instances
+        images = convert_from_path(file_path, dpi=200, last_page=10)
         print(f"OCR: Converting {len(images)} pages...")
 
         pages = []
