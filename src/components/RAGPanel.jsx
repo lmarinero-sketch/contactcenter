@@ -716,6 +716,31 @@ export default function RAGPanel() {
                     <div ref={messagesEndRef} />
                 </div>
 
+                {/* Input */}
+                <div className="rag-input-area">
+                    <div className="rag-input-wrapper">
+                        <textarea
+                            className="rag-input"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            placeholder="Escribí tu pregunta sobre los documentos..."
+                            rows={1}
+                            disabled={isLoading || !backendOnline}
+                        />
+                        <button
+                            className="rag-send-btn"
+                            onClick={handleSend}
+                            disabled={!inputValue.trim() || isLoading || !backendOnline}
+                        >
+                            {isLoading ? <Loader2 size={18} className="rag-spin" /> : <Send size={18} />}
+                        </button>
+                    </div>
+                    <div className="rag-input-hint">
+                        Respuestas basadas exclusivamente en documentos cargados · Enter para enviar
+                    </div>
+                </div>
+            </div>
 
             {/* Documents Area */}
             <div className="rag-documents-area" style={{ display: activeTab === 'documents' ? 'flex' : 'none', flex: 1, flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
