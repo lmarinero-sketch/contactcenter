@@ -135,6 +135,21 @@ export function AuthProvider({ children }) {
         return data
     }
 
+    const signUp = async (email, password, fullName) => {
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: fullName,
+                    role: 'simon'
+                }
+            }
+        })
+        if (error) throw error
+        return data
+    }
+
     const signOut = async () => {
         const userId = user?.id
         const { error } = await supabase.auth.signOut()
@@ -148,6 +163,7 @@ export function AuthProvider({ children }) {
     const isGerente = profile?.role === 'gerente'
     const isAgente = profile?.role === 'agente'
     const isRefuerzo = profile?.role === 'refuerzo'
+    const isSimon = profile?.role === 'simon'
 
     const canEditShifts = isCoordinador || isGerente
     const canWriteLogbook = isCoordinador || isGerente || isAgente
@@ -157,11 +173,13 @@ export function AuthProvider({ children }) {
         profile,
         loading,
         signIn,
+        signUp,
         signOut,
         isCoordinador,
         isGerente,
         isAgente,
         isRefuerzo,
+        isSimon,
         canEditShifts,
         canWriteLogbook,
     }

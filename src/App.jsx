@@ -51,7 +51,7 @@ const VIEW_DESCRIPTIONS = {
 }
 
 function App() {
-    const { user, profile, loading, signOut } = useAuth()
+    const { user, profile, loading, signOut, isSimon } = useAuth()
     const [activeView, setActiveView] = useState('overview')
     const [refreshKey, setRefreshKey] = useState(0)
     const [pendingTicketId, setPendingTicketId] = useState(null)
@@ -63,12 +63,15 @@ function App() {
 
     // Detect dedicated load mode
     const isDedicatedCargaMode = 
+        !isSimon && (
         window.location.pathname === '/cargar' || 
         window.location.search.includes('view=cargar') || 
-        window.location.hash === '#/cargar';
+        window.location.hash === '#/cargar'
+        );
 
     // Detect dedicated Simon mode
     const isDedicatedSimonMode = 
+        isSimon ||
         window.location.pathname === '/simon' || 
         window.location.search.includes('view=simon') || 
         window.location.hash === '#/simon';
@@ -106,6 +109,7 @@ function App() {
             gerente: 'Gte. Administrativo',
             agente: 'Agente',
             refuerzo: 'Refuerzo',
+            simon: 'Asistente Simon',
         }
         
         const roleColors = {
@@ -113,6 +117,7 @@ function App() {
             gerente: '#8b5cf6',
             agente: '#3b82f6',
             refuerzo: '#f59e0b',
+            simon: '#ec4899',
         }
         
         const userRole = profile?.role || 'operador'
@@ -186,6 +191,7 @@ function App() {
             gerente: 'Gte. Administrativo',
             agente: 'Agente',
             refuerzo: 'Refuerzo',
+            simon: 'Asistente Simon',
         }
         
         const roleColors = {
@@ -193,6 +199,7 @@ function App() {
             gerente: '#8b5cf6',
             agente: '#3b82f6',
             refuerzo: '#f59e0b',
+            simon: '#ec4899',
         }
         
         const userRole = profile?.role || 'operador'

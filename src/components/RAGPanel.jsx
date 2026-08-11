@@ -357,9 +357,12 @@ export default function RAGPanel() {
         if (!files.length) return
         setIsUploading(true)
         setError(null)
-        const supportedFiles = files.filter(f => SUPPORTED_EXTS.includes('.' + f.name.split('.').pop().toLowerCase()))
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+        const supportedFiles = files.filter(f => 
+            SUPPORTED_EXTS.includes('.' + f.name.split('.').pop().toLowerCase()) && f.size <= MAX_FILE_SIZE
+        )
         if (supportedFiles.length === 0) {
-            setError('Ninguno de los archivos seleccionados tiene un formato soportado')
+            setError('Ninguno de los archivos seleccionados tiene un formato soportado o excede el límite de 50MB')
             setIsUploading(false)
             return
         }

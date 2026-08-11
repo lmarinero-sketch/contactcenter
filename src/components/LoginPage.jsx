@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react'
+import { Lock, Mail, AlertCircle, Loader2, User } from 'lucide-react'
 
 export default function LoginPage({ isCargaMode = false, isSimonMode = false }) {
-    const { signIn } = useAuth()
+    const { signIn, signUp } = useAuth()
+    const [isRegistering, setIsRegistering] = useState(false)
+    const [fullName, setFullName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
@@ -15,12 +17,21 @@ export default function LoginPage({ isCargaMode = false, isSimonMode = false }) 
         setLoading(true)
 
         try {
-            await signIn(email, password)
+            if (isRegistering) {
+                await signUp(email, password, fullName)
+                // Usualmente signUp loguea de forma automática a menos que se requiera confirmar email.
+                // Si la sesión no inicia de inmediato, se podría mostrar un mensaje aquí,
+                // pero por ahora el AuthContext debería manejar el cambio de sesión.
+            } else {
+                await signIn(email, password)
+            }
         } catch (err) {
             if (err.message?.includes('Invalid login credentials')) {
                 setError('Email o contraseña incorrectos')
+            } else if (err.message?.includes('User already registered')) {
+                setError('Este correo electrónico ya está registrado')
             } else {
-                setError(err.message || 'Error al iniciar sesión')
+                setError(err.message || (isRegistering ? 'Error al registrar usuario' : 'Error al iniciar sesión'))
             }
         } finally {
             setLoading(false)
@@ -38,7 +49,7 @@ export default function LoginPage({ isCargaMode = false, isSimonMode = false }) 
                         </div>
                         <h1 className="login-title">{isSimonMode ? 'Asistente Documental' : (isCargaMode ? 'Portal de Carga' : 'Contact Center')}</h1>
                         <p className="login-subtitle">
-                            {isSimonMode ? 'Consultas a Simon IA' : (isCargaMode ? 'Carga exclusiva de datos — Simon IA' : 'Panel de Analytics y Gestión')}
+                            {isSimonMode ? 'Consultas a Simon IA' : (isCargaMode ? 'Carga exclusiva de datos — Simon IA' : (isRegistering ? 'Crea una cuenta para acceder' : 'Panel de Analytics y Gestión'))}
                         </p>
                     </div>
 
@@ -47,6 +58,26 @@ export default function LoginPage({ isCargaMode = false, isSimonMode = false }) 
                             <div className="login-error">
                                 <AlertCircle size={16} />
                                 <span>{error}</span>
+                            </div>
+                        )}
+
+                        {isRegistering && (
+                            <div className="login-field">
+                                <label className="login-label">Nombre Completo</label>
+                                <div className="login-input-wrap">
+                                    <User size={18} className="login-input-icon" />
+                                    <input
+                                        id="login-name"
+                                        type="text"
+                                        className="login-input"
+                                        placeholder="Ej: Juan Pérez"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        required
+                                        autoComplete="name"
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
                         )}
 
@@ -63,7 +94,7 @@ export default function LoginPage({ isCargaMode = false, isSimonMode = false }) 
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoComplete="email"
-                                    autoFocus
+                                    autoFocus={!isRegistering}
                                 />
                             </div>
                         </div>
@@ -80,7 +111,8 @@ export default function LoginPage({ isCargaMode = false, isSimonMode = false }) 
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    autoComplete="current-password"
+                                    autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                                    minLength={6}
                                 />
                             </div>
                         </div>
@@ -94,19 +126,32 @@ export default function LoginPage({ isCargaMode = false, isSimonMode = false }) 
                             {loading ? (
                                 <>
                                     <Loader2 size={18} className="spin" />
-                                    Ingresando...
+                                    {isRegistering ? 'Registrando...' : 'Ingresando...'}
                                 </>
                             ) : (
-                                'Iniciar Sesión'
+                                isRegistering ? 'Crear Cuenta' : 'Iniciar Sesión'
                             )}
                         </button>
                     </form>
 
-                    <div className="login-footer">
-                        <span>Sistema Contact Center v2.0</span>
-                        <span className="login-footer-credit">
-                            Innovación y Transformación Digital
-                        </span>
+                    <div className="login-footer" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary"
+                            onClick={() => {
+                                setIsRegistering(!isRegistering)
+                                setError('')
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontWeight: 500, cursor: 'pointer' }}
+                        >
+                            {isRegistering ? '¿Ya tienes cuenta? Inicia Sesión' : '¿No tienes cuenta? Regístrate'}
+                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                            <span>Sistema Contact Center v2.0</span>
+                            <span className="login-footer-credit">
+                                Innovación y Transformación Digital
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>

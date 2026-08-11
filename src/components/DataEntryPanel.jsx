@@ -50,7 +50,22 @@ export default function DataEntryPanel() {
                 const logs = []
                 let successCount = 0
                 
+                const SUPPORTED_EXTS = ['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt', '.md', '.json', '.xml', '.html', '.htm', '.png', '.jpg', '.jpeg', '.webp'];
+                const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+                
+                const validFiles = [];
                 for (const file of files) {
+                    const ext = '.' + file.name.split('.').pop().toLowerCase();
+                    if (!SUPPORTED_EXTS.includes(ext)) {
+                        logs.push({ name: file.name, status: 'error', message: `Formato no soportado (${ext}). Convertir a PDF o DOCX.` });
+                    } else if (file.size > MAX_FILE_SIZE) {
+                        logs.push({ name: file.name, status: 'error', message: `El archivo supera el límite de 50MB.` });
+                    } else {
+                        validFiles.push(file);
+                    }
+                }
+
+                for (const file of validFiles) {
                     const formData = new FormData()
                     formData.append('file', file)
                     formData.append('folder', dataType)
