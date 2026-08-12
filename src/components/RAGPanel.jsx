@@ -1248,7 +1248,7 @@ export default function RAGPanel() {
                             onFocus={() => { if (inputValue.trim().length >= 2) setShowAutocomplete(true); }}
                             placeholder="Escribí tu pregunta sobre los documentos..."
                             rows={1}
-                            disabled={isLoading || !backendOnline}
+                            disabled={isLoading}
                         />
                         <button
                             className="rag-send-btn"
