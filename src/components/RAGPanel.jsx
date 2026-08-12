@@ -1211,14 +1211,14 @@ export default function RAGPanel() {
                             onClick={() => setInputValue('Genera un mapa conceptual sobre las reglas de este documento. IMPORTANTE: Envuelve el código del diagrama EXCLUSIVAMENTE dentro de un bloque markdown tipo mermaid (empezando con ```mermaid y terminando con ```). Usa saltos de línea para cada nodo.')}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
-                            �x` Mapa Conceptual
+                            ⚡ Mapa Conceptual
                         </button>
                         <button 
                             className="rag-quick-action-btn"
                             onClick={() => setInputValue('Escribe un resumen estructurado con viñetas sobre los puntos más importantes.')}
                             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
-                            �x� Resumen Estructurado
+                            📝 Resumen Estructurado
                         </button>
                     </div>
 
@@ -1565,7 +1565,17 @@ export default function RAGPanel() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="rag-preview-header-actions">
+                            <div className="rag-preview-header-actions" style={{ display: 'flex', gap: '8px' }}>
+                                {previewData?.download_url && (
+                                    <button
+                                        className="rag-modal-btn cancel"
+                                        onClick={() => window.open(previewData.download_url, '_blank')}
+                                        title="Abrir documento en una pestaña nueva"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+                                    >
+                                        <ExternalLink size={13} /> Abrir en pestaña
+                                    </button>
+                                )}
                                 <button
                                     className="rag-modal-btn cancel"
                                     onClick={() => handleDownload(previewItem)}
@@ -1618,30 +1628,7 @@ export default function RAGPanel() {
                                             );
                                         }
 
-                                        if (['.pdf', '.txt', '.md', '.html', '.htm', '.json', '.xml', '.csv'].includes(ext)) {
-                                            return (
-                                                <iframe
-                                                    src={url}
-                                                    title={fname}
-                                                    className="rag-preview-iframe"
-                                                />
-                                            );
-                                        }
-
-                                        // Office documents or other formats (e.g. docx, xlsx)
-                                        const officeExts = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'];
-                                        if (officeExts.includes(ext)) {
-                                            const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
-                                            return (
-                                                <iframe
-                                                    src={officeViewerUrl}
-                                                    title={fname}
-                                                    className="rag-preview-iframe"
-                                                />
-                                            );
-                                        }
-
-                                        // Fallback for everything else
+                                        // Use Google Docs Viewer to render PDF, Office documents, text files seamlessly without Content-Disposition attachment blocking
                                         const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
                                         return (
                                             <iframe
