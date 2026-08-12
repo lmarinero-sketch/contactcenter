@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import '../simon-redesign.css'
 import {
     Send, Upload, FileText, Trash2, MessageSquare,
@@ -321,6 +321,13 @@ export default function RAGPanel() {
             setError(e.message || 'Error al procesar la pregunta')
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSend()
         }
     }
 
@@ -727,7 +734,7 @@ export default function RAGPanel() {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder="EscribÃ­ tu pregunta sobre los documentos..."
+                            placeholder="Escribí tu pregunta sobre los documentos..."
                             rows={1}
                             disabled={isLoading || !backendOnline}
                         />
