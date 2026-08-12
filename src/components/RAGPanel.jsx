@@ -162,6 +162,15 @@ export default function RAGPanel() {
     const fileInputRef = useRef(null)
     const folderInputRef = useRef(null)
     const bootTimerRef = useRef(null)
+    const chatInputRef = useRef(null)
+
+    // Auto-expand textarea upwards when typing multi-line prompt text
+    useEffect(() => {
+        if (chatInputRef.current) {
+            chatInputRef.current.style.height = 'auto';
+            chatInputRef.current.style.height = `${Math.min(chatInputRef.current.scrollHeight, 220)}px`;
+        }
+    }, [inputValue])
 
     // Start Simon boot sequence
     async function startSimon() {
@@ -1216,6 +1225,7 @@ export default function RAGPanel() {
 
                     <div className="rag-input-wrapper" style={{ position: 'relative' }}>
                         <textarea
+                            ref={chatInputRef}
                             className="rag-input"
                             value={inputValue}
                             onChange={(e) => {
@@ -1241,7 +1251,9 @@ export default function RAGPanel() {
                                 width: '100%',
                                 outline: 'none',
                                 border: 'none',
-                                resize: 'none'
+                                resize: 'none',
+                                maxHeight: '220px',
+                                overflowY: 'auto'
                             }}
                         />
                         <button
