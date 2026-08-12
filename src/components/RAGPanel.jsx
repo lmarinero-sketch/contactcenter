@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
+import '../simon-redesign.css'
 import {
     Send, Upload, FileText, Trash2, MessageSquare,
     Plus, Loader2, ChevronRight, Brain, BookOpen,
@@ -362,7 +363,7 @@ export default function RAGPanel() {
             SUPPORTED_EXTS.includes('.' + f.name.split('.').pop().toLowerCase()) && f.size <= MAX_FILE_SIZE
         )
         if (supportedFiles.length === 0) {
-            setError('Ninguno de los archivos seleccionados tiene un formato soportado o excede el límite de 50MB')
+            setError('Ninguno de los archivos seleccionados tiene un formato soportado o excede el lÃ­mite de 50MB')
             setIsUploading(false)
             return
         }
@@ -371,7 +372,7 @@ export default function RAGPanel() {
             try {
                 const result = await uploadRAGDocument(supportedFiles[0], currentFolder, uploadTag)
                 loadFiles()
-                setUploadProgress(`✅ "${supportedFiles[0].name}" - ${result.total_chunks} chunks`)
+                setUploadProgress(`âœ… "${supportedFiles[0].name}" - ${result.total_chunks} chunks`)
                 setTimeout(() => setUploadProgress(''), 4000)
             } catch (e) {
                 setError(e.message || 'Error al subir documento')
@@ -380,17 +381,17 @@ export default function RAGPanel() {
         } else {
             try {
                 const result = await uploadRAGBatch(supportedFiles, currentFolder, uploadTag, (p) => {
-                    const retryLabel = p.retrying ? ' 🔄 Reintentando...' : ''
+                    const retryLabel = p.retrying ? ' ðŸ”„ Reintentando...' : ''
                     const statusParts = [`Subiendo ${p.current}/${p.total}: "${p.filename}"${retryLabel}`]
-                    if (p.processed > 0) statusParts.push(`✅ ${p.processed}`)
-                    if (p.failed > 0) statusParts.push(`❌ ${p.failed}`)
-                    setUploadProgress(statusParts.join(' · '))
+                    if (p.processed > 0) statusParts.push(`âœ… ${p.processed}`)
+                    if (p.failed > 0) statusParts.push(`âŒ ${p.failed}`)
+                    setUploadProgress(statusParts.join(' Â· '))
                 })
                 loadFiles()
-                const parts = [`✅ ${result.processed} procesados`, `${result.total_chunks} chunks`]
-                if (result.failed > 0) parts.push(`❌ ${result.failed} fallidos`)
-                if (result.skipped > 0) parts.push(`⏭ ${result.skipped} omitidos`)
-                setUploadProgress(parts.join(' · '))
+                const parts = [`âœ… ${result.processed} procesados`, `${result.total_chunks} chunks`]
+                if (result.failed > 0) parts.push(`âŒ ${result.failed} fallidos`)
+                if (result.skipped > 0) parts.push(`â­ ${result.skipped} omitidos`)
+                setUploadProgress(parts.join(' Â· '))
                 setTimeout(() => setUploadProgress(''), 8000)
             } catch (e) {
                 setError(e.message || 'Error al subir archivos')
@@ -413,7 +414,7 @@ export default function RAGPanel() {
     async function handleDeleteFile(item) {
         setConfirmAction({
             title: 'Eliminar Archivo',
-            message: `¿Estás seguro de que deseás eliminar "${item.name}"?`,
+            message: `Â¿EstÃ¡s seguro de que deseÃ¡s eliminar "${item.name}"?`,
             onConfirm: async () => {
                 const path = item.storage_path || `${item.folder}/${item.name}`.replace(/^\//, '')
                 try {
@@ -429,7 +430,7 @@ export default function RAGPanel() {
     async function handleDeleteFolder(item) {
         setConfirmAction({
             title: 'Eliminar Carpeta',
-            message: `¿Eliminar la carpeta "${item.name}" y todo su contenido? Esta acción no se puede deshacer.`,
+            message: `Â¿Eliminar la carpeta "${item.name}" y todo su contenido? Esta acciÃ³n no se puede deshacer.`,
             onConfirm: async () => {
                 try {
                     await deleteRAGFolder(item.path)
@@ -483,8 +484,8 @@ export default function RAGPanel() {
     async function handleDeleteConversation(convId, e) {
         e.stopPropagation()
         setConfirmAction({
-            title: 'Eliminar Conversación',
-            message: '¿Estás seguro de que querés eliminar esta conversación del historial?',
+            title: 'Eliminar ConversaciÃ³n',
+            message: 'Â¿EstÃ¡s seguro de que querÃ©s eliminar esta conversaciÃ³n del historial?',
             onConfirm: async () => {
                 try {
                     await deleteRAGConversation(convId)
@@ -565,10 +566,10 @@ export default function RAGPanel() {
     }
 
     const FILE_ICONS = {
-        '.pdf': '📄', '.docx': '📝', '.xlsx': '📊', '.xls': '📊',
-        '.csv': '🔢', '.txt': '📄', '.md': '📄', '.json': '⚙️',
-        '.xml': '⚙️', '.html': '🌐', '.htm': '🌐',
-        '.png': '🖼️', '.jpg': '🖼️', '.jpeg': '🖼️', '.webp': '🖼️',
+        '.pdf': 'ðŸ“„', '.docx': 'ðŸ“', '.xlsx': 'ðŸ“Š', '.xls': 'ðŸ“Š',
+        '.csv': 'ðŸ”¢', '.txt': 'ðŸ“„', '.md': 'ðŸ“„', '.json': 'âš™ï¸',
+        '.xml': 'âš™ï¸', '.html': 'ðŸŒ', '.htm': 'ðŸŒ',
+        '.png': 'ðŸ–¼ï¸', '.jpg': 'ðŸ–¼ï¸', '.jpeg': 'ðŸ–¼ï¸', '.webp': 'ðŸ–¼ï¸',
     }
 
     if (bootPhase !== 'done') {
@@ -581,7 +582,7 @@ export default function RAGPanel() {
                     </div>
                     <h1 className="simon-name">Simon</h1>
                     <p className="simon-subtitle">Asistente IA Documental</p>
-                    <p className="simon-desc">Consultá documentos del Sanatorio Argentino con inteligencia artificial. Respuestas precisas con citación de fuentes.</p>
+                    <p className="simon-desc">ConsultÃ¡ documentos del Sanatorio Argentino con inteligencia artificial. Respuestas precisas con citaciÃ³n de fuentes.</p>
                     {bootPhase === 'idle' && (
                         <>
                             <button className="simon-start-btn" onClick={startSimon}>
@@ -605,7 +606,7 @@ export default function RAGPanel() {
                                     <div className="simon-boot-dot" /> <span>Cargando documentos...</span>
                                 </div>
                                 <div className={`simon-boot-phase ${bootPhase === 'ready' ? 'active done' : ''}`}>
-                                    <div className="simon-boot-dot" /> <span>¡Simon está listo!</span>
+                                    <div className="simon-boot-dot" /> <span>Â¡Simon estÃ¡ listo!</span>
                                 </div>
                             </div>
                             <div className="simon-boot-timer"><Clock size={11} /> {bootTimer}s</div>
@@ -619,10 +620,12 @@ export default function RAGPanel() {
                         </div>
                     )}
                 </div>
-                <div className="simon-welcome-footer">Sanatorio Argentino · Powered by GPT-4o + RAG Pipeline V3.2</div>
+                <div className="simon-welcome-footer">Sanatorio Argentino Â· Powered by GPT-4o + RAG Pipeline V3.2</div>
             </div>
         )
     }
+
+    const uploadSummary = showUploadModal ? getUploadSummary(pendingFiles) : null
 
     return (
         <div className="rag-container">
@@ -649,7 +652,7 @@ export default function RAGPanel() {
                                 conversations.map(conv => (
                                     <div key={conv.id} className={`rag-conv-item ${activeConversation === conv.id ? 'active' : ''}`} onClick={() => selectConversation(conv)}>
                                         <div className="rag-conv-item-content">
-                                            <span className="rag-conv-title">{conv.title || 'Sin título'}</span>
+                                            <span className="rag-conv-title">{conv.title || 'Sin tÃ­tulo'}</span>
                                             <span className="rag-conv-time"><Clock size={10} /> {formatTime(conv.updated_at)}</span>
                                         </div>
                                         <button className="rag-conv-delete" onClick={(e) => handleDeleteConversation(conv.id, e)}><Trash2 size={12} /></button>
@@ -669,14 +672,14 @@ export default function RAGPanel() {
                             <h2 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0 }}>Simon IA</h2>
                         </div>
                     </div>
-                    <button className="simon-theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? '☀️' : '🌙'}</button>
+                    <button className="simon-theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>{isDarkMode ? 'â˜€ï¸' : 'ðŸŒ™'}</button>
                 </div>
 
                 <div className="simon-messages-container">
                     {messages.length === 0 && !isLoading ? (
                         <div className="rag-chat-empty">
                             <Brain size={48} color="var(--blue-500)" />
-                            <h2>¿Qué necesitas consultar hoy?</h2>
+                            <h2>Â¿QuÃ© necesitas consultar hoy?</h2>
                         </div>
                     ) : (
                         messages.map((msg, i) => (
@@ -691,7 +694,7 @@ export default function RAGPanel() {
                                             <div className="rag-sources">
                                                 {msg.sources.map((src, j) => (
                                                     <div key={j} className="rag-source-item">
-                                                        <span>{FILE_ICONS[src.file_type] || '📄'} {src.filename}</span>
+                                                        <span>{FILE_ICONS[src.file_type] || 'ðŸ“„'} {src.filename}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -724,7 +727,7 @@ export default function RAGPanel() {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={handleKeyPress}
-                            placeholder="Escribí tu pregunta sobre los documentos..."
+                            placeholder="EscribÃ­ tu pregunta sobre los documentos..."
                             rows={1}
                             disabled={isLoading || !backendOnline}
                         />
@@ -737,7 +740,7 @@ export default function RAGPanel() {
                         </button>
                     </div>
                     <div className="rag-input-hint">
-                        Respuestas basadas exclusivamente en documentos cargados · Enter para enviar
+                        Respuestas basadas exclusivamente en documentos cargados Â· Enter para enviar
                     </div>
                 </div>
             </div>
@@ -746,8 +749,8 @@ export default function RAGPanel() {
             <div className="rag-documents-area" style={{ display: activeTab === 'documents' ? 'flex' : 'none', flex: 1, flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
                     <div className="rag-doc-header" style={{ padding: '24px 32px 16px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>Gestión de Archivos</h2>
-                            <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0' }}>Administrá los documentos disponibles para Simon IA</p>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>GestiÃ³n de Archivos</h2>
+                            <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0' }}>AdministrÃ¡ los documentos disponibles para Simon IA</p>
                         </div>
                         <div className="rag-fm-toolbar" style={{ borderBottom: 'none', padding: 0 }}>
                             <input ref={fileInputRef} type="file" onChange={handleFileSelect}
@@ -816,8 +819,8 @@ export default function RAGPanel() {
                         {fileItems.length === 0 ? (
                             <div className="rag-empty-state" style={{ background: 'white', borderRadius: '12px', padding: '48px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
                                 <BookOpen size={48} style={{ color: '#cbd5e1', marginBottom: '16px' }} />
-                                <p style={{ fontSize: '16px', fontWeight: 500, color: '#334155', margin: '0 0 8px 0' }}>{currentFolder ? 'Carpeta vacía' : 'No hay archivos'}</p>
-                                <span style={{ fontSize: '14px' }}>Subí archivos para que la IA pueda consultarlos</span>
+                                <p style={{ fontSize: '16px', fontWeight: 500, color: '#334155', margin: '0 0 8px 0' }}>{currentFolder ? 'Carpeta vacÃ­a' : 'No hay archivos'}</p>
+                                <span style={{ fontSize: '14px' }}>SubÃ­ archivos para que la IA pueda consultarlos</span>
                             </div>
                         ) : (
                             <div className="rag-doc-table-container" style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
@@ -825,7 +828,7 @@ export default function RAGPanel() {
                                     <thead>
                                         <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
                                             <th style={{ padding: '12px 16px', fontWeight: 600 }}>Nombre</th>
-                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>Tamaño</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>TamaÃ±o</th>
                                             <th style={{ padding: '12px 16px', fontWeight: 600, width: '100px' }}>Chunks</th>
                                             <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>Tag</th>
                                             <th style={{ padding: '12px 16px', fontWeight: 600, width: '100px', textAlign: 'right' }}>Acciones</th>
@@ -838,9 +841,9 @@ export default function RAGPanel() {
                                                     <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontWeight: 500 }}>
                                                         <Folder size={18} color="#3b82f6" /> {item.name}
                                                     </td>
-                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>�</td>
-                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>�</td>
-                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>�</td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>ï¿½</td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>ï¿½</td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>ï¿½</td>
                                                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(item) }} title="Eliminar carpeta" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px', borderRadius: '4px', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
                                                             <Trash2 size={14} />
@@ -850,7 +853,7 @@ export default function RAGPanel() {
                                             ) : (
                                                 <tr key={item.name} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'white'}>
                                                     <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontWeight: 500 }}>
-                                                        <span style={{ fontSize: '18px' }}>{FILE_ICONS[item.file_type] || '📄'}</span> {item.name}
+                                                        <span style={{ fontSize: '18px' }}>{FILE_ICONS[item.file_type] || 'ðŸ“„'}</span> {item.name}
                                                     </td>
                                                     <td style={{ padding: '12px 16px', color: '#64748b' }}>{formatFileSize(item.file_size)}</td>
                                                     <td style={{ padding: '12px 16px', color: '#64748b' }}>{item.total_chunks}</td>
@@ -876,106 +879,104 @@ export default function RAGPanel() {
                             </div>
                         )}
                     </div>
-                </div>
             </div>
 
             {/* Upload Confirmation Modal */}
-            {showUploadModal && (() => {
-                const summary = getUploadSummary(pendingFiles)
-                return (
-                    <div className="rag-modal-overlay" onClick={cancelUpload}>
-                        <div className="rag-modal" onClick={(e) => e.stopPropagation()}>
-                            <div className="rag-modal-header">
-                                <div className="rag-modal-icon">
-                                    <Upload size={24} />
+            {showUploadModal && uploadSummary && (
+                <div className="rag-modal-overlay" onClick={cancelUpload}>
+                    <div className="rag-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="rag-modal-header">
+                            <div className="rag-modal-icon">
+                                <Upload size={24} />
+                            </div>
+                            <h3>Confirmar carga de archivos</h3>
+                            <button className="rag-modal-close" onClick={cancelUpload}>
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="rag-modal-body">
+                            {/* Folder info */}
+                            {uploadSummary.folderName && (
+                                <div className="rag-modal-folder">
+                                    <Folder size={16} />
+                                    <span>Carpeta: <strong>{uploadSummary.folderName}</strong></span>
                                 </div>
-                                <h3>Confirmar carga de archivos</h3>
-                                <button className="rag-modal-close" onClick={cancelUpload}>
-                                    <X size={16} />
-                                </button>
+                            )}
+
+                            {/* Summary stats */}
+                            <div className="rag-modal-stats">
+                                <div className="rag-modal-stat">
+                                    <FileText size={18} />
+                                    <div>
+                                        <span className="rag-modal-stat-value">{uploadSummary.supported.length}</span>
+                                        <span className="rag-modal-stat-label">archivos compatibles</span>
+                                    </div>
+                                </div>
+                                <div className="rag-modal-stat">
+                                    <BarChart3 size={18} />
+                                    <div>
+                                        <span className="rag-modal-stat-value">
+                                            {uploadSummary.totalSize < 1024 * 1024
+                                                ? `${(uploadSummary.totalSize / 1024).toFixed(1)} KB`
+                                                : `${(uploadSummary.totalSize / (1024 * 1024)).toFixed(1)} MB`}
+                                        </span>
+                                        <span className="rag-modal-stat-label">tamaÃ±o total</span>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="rag-modal-body">
-                                {/* Folder info */}
-                                {summary.folderName && (
-                                    <div className="rag-modal-folder">
-                                        <Folder size={16} />
-                                        <span>Carpeta: <strong>{summary.folderName}</strong></span>
-                                    </div>
-                                )}
-
-                                {/* Summary stats */}
-                                <div className="rag-modal-stats">
-                                    <div className="rag-modal-stat">
-                                        <FileText size={18} />
-                                        <div>
-                                            <span className="rag-modal-stat-value">{summary.supported.length}</span>
-                                            <span className="rag-modal-stat-label">archivos compatibles</span>
-                                        </div>
-                                    </div>
-                                    <div className="rag-modal-stat">
-                                        <BarChart3 size={18} />
-                                        <div>
-                                            <span className="rag-modal-stat-value">
-                                                {summary.totalSize < 1024 * 1024
-                                                    ? `${(summary.totalSize / 1024).toFixed(1)} KB`
-                                                    : `${(summary.totalSize / (1024 * 1024)).toFixed(1)} MB`}
-                                            </span>
-                                            <span className="rag-modal-stat-label">tamaño total</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* File types breakdown */}
-                                <div className="rag-modal-types">
-                                    <span className="rag-modal-types-label">Tipos de archivo:</span>
-                                    <div className="rag-modal-type-chips">
-                                        {Object.entries(summary.typeCounts).map(([ext, count]) => (
-                                            <span key={ext} className="rag-modal-type-chip">
-                                                {FILE_ICONS[ext] || '📄'} {ext} ({count})
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Unsupported files warning */}
-                                {summary.unsupported.length > 0 && (
-                                    <div className="rag-modal-warning">
-                                        <FileWarning size={14} />
-                                        <span>
-                                            <strong>{summary.unsupported.length}</strong> archivo(s) no soportado(s) serán omitidos
-                                            {summary.unsupported.length <= 5 && (
-                                                <span className="rag-modal-warning-files">
-                                                    : {summary.unsupported.map(f => f.name).join(', ')}
-                                                </span>
-                                            )}
+                            {/* File types breakdown */}
+                            <div className="rag-modal-types">
+                                <span className="rag-modal-types-label">Tipos de archivo:</span>
+                                <div className="rag-modal-type-chips">
+                                    {Object.entries(uploadSummary.typeCounts).map(([ext, count]) => (
+                                        <span key={ext} className="rag-modal-type-chip">
+                                            {FILE_ICONS[ext] || 'ðŸ“„'} {ext} ({count})
                                         </span>
-                                    </div>
-                                )}
+                                    ))}
+                                </div>
+                            </div>
 
-                                {/* Destination info */}
-                                <div className="rag-modal-destination">
-                                    <Info size={13} />
+                            {/* Unsupported files warning */}
+                            {uploadSummary.unsupported.length > 0 && (
+                                <div className="rag-modal-warning">
+                                    <FileWarning size={14} />
                                     <span>
-                                        Destino: <strong>{currentFolder || 'Raíz'}</strong>
-                                        {uploadTag && <> · Tag: <strong>{uploadTag}</strong></>}
+                                        <strong>{uploadSummary.unsupported.length}</strong> archivo(s) no soportado(s) serÃ¡n omitidos
+                                        {uploadSummary.unsupported.length <= 5 && (
+                                            <span className="rag-modal-warning-files">
+                                                : {uploadSummary.unsupported.map(f => f.name).join(', ')}
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="rag-modal-footer">
-                                <button className="rag-modal-btn cancel" onClick={cancelUpload}>
-                                    Cancelar
-                                </button>
-                                <button className="rag-modal-btn confirm" onClick={confirmUpload}>
-                                    <Upload size={14} />
-                                    Cargar {summary.supported.length} archivo{summary.supported.length !== 1 ? 's' : ''}
-                                </button>
+                            {/* Destination info */}
+                            <div className="rag-modal-destination">
+                                <Info size={13} />
+                                <span>
+                                    Destino: <strong>{currentFolder || 'RaÃ­z'}</strong>
+                                    {uploadTag && <> Â· Tag: <strong>{uploadTag}</strong></>}
+                                </span>
                             </div>
                         </div>
+
+                        <div className="rag-modal-footer">
+                            <button className="rag-modal-btn cancel" onClick={cancelUpload}>
+                                Cancelar
+                            </button>
+                            <button className="rag-modal-btn confirm" onClick={confirmUpload}>
+                                <Upload size={14} />
+                                Cargar {uploadSummary.supported.length} archivo{uploadSummary.supported.length !== 1 ? 's' : ''}
+                            </button>
+                        </div>
                     </div>
-                )
-            })()}
+                </div>
+            )}
+
+
             {/* Custom Confirm Modal */}
             {confirmAction && (
                 <div className="rag-modal-overlay" onClick={() => setConfirmAction(null)}>
@@ -1016,7 +1017,7 @@ export default function RAGPanel() {
                         <div className="rag-preview-header">
                             <div className="rag-preview-title-block">
                                 <span className="rag-preview-icon">
-                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || '📄'}
+                                    {FILE_ICONS[previewItem.file_type || ('.' + (previewItem.name || previewItem.filename || '').split('.').pop().toLowerCase())] || 'ðŸ“„'}
                                 </span>
                                 <div style={{ minWidth: 0 }}>
                                     <h3 className="rag-preview-filename" title={previewItem.name || previewItem.filename}>
@@ -1062,7 +1063,7 @@ export default function RAGPanel() {
                                 className={`rag-preview-tab ${previewTab === 'chunks' ? 'active' : ''}`}
                                 onClick={() => setPreviewTab('chunks')}
                             >
-                                <FileText size={13} /> Texto Extraído / Chunks IA ({previewData?.chunks?.length || 0})
+                                <FileText size={13} /> Texto ExtraÃ­do / Chunks IA ({previewData?.chunks?.length || 0})
                             </button>
                         </div>
 
@@ -1126,7 +1127,7 @@ export default function RAGPanel() {
                                         <AlertCircle size={28} color="#f59e0b" />
                                         <p>No se pudo generar la URL directa de vista previa.</p>
                                         <button className="btn btn-primary" onClick={() => setPreviewTab('chunks')}>
-                                            Ver texto extraído por la IA
+                                            Ver texto extraÃ­do por la IA
                                         </button>
                                     </div>
                                 )
@@ -1166,7 +1167,7 @@ export default function RAGPanel() {
                                                 <div key={idx} className="rag-chunk-card">
                                                     <div className="rag-chunk-header">
                                                         <span className="badge info">Fragmento #{chunk.chunk_index}</span>
-                                                        {chunk.metadata?.page && <span className="badge neutral">Pág. {chunk.metadata.page}</span>}
+                                                        {chunk.metadata?.page && <span className="badge neutral">PÃ¡g. {chunk.metadata.page}</span>}
                                                     </div>
                                                     <div className="rag-chunk-content">
                                                         {chunk.content}

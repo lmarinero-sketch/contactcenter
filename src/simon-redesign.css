@@ -200,13 +200,78 @@ body.dark-theme {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background: var(--simon-bg);
-  color: var(--simon-text-main);
+  min-height: 100%;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8ecf5 30%, #f8fafc 100%);
+  animation: simonBgPulse 8s ease-in-out infinite;
   padding: 40px 20px;
-  position: relative;
+  color: var(--simon-text-main);
   transition: background-color 0.3s, color 0.3s;
 }
+
+@keyframes simonBgPulse {
+  0%, 100% { background: linear-gradient(135deg, #f0f4ff 0%, #e8ecf5 30%, #f8fafc 100%); }
+  50% { background: linear-gradient(135deg, #e8ecf5 0%, #f0f4ff 30%, #eef2ff 100%); }
+}
+
+.simon-welcome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 420px;
+  padding: 48px 40px 36px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(59, 130, 246, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+  animation: simonCardIn 0.6s ease-out;
+}
+
+@keyframes simonCardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Avatar */
+.simon-avatar-container {
+  position: relative;
+  margin-bottom: 20px;
+  display: inline-flex;
+}
+
+.simon-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  object-fit: cover;
+  position: relative;
+  z-index: 2;
+  border: 3px solid white;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.simon-avatar-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.15));
+  z-index: 1;
+  opacity: 0.6;
+  filter: blur(8px);
+  animation: simonGlow 3s ease-in-out infinite;
+}
+
+@keyframes simonGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+
 
 .simon-welcome-header {
   position: absolute;
@@ -384,9 +449,30 @@ body.dark-theme {
 }
 
 .simon-welcome-footer {
-  margin-top: 48px;
+  margin-top: 24px;
   font-size: 0.75rem;
   color: var(--simon-text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+/* Empty chat state */
+.rag-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  color: var(--simon-text-muted);
+  text-align: center;
+  padding: 40px;
+  animation: fadeUp 0.4s ease-out;
+}
+
+.rag-chat-empty h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--simon-text-main);
+  margin: 0;
 }
