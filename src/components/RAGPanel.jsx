@@ -258,12 +258,22 @@ export default function RAGPanel() {
         }
     }
 
-    // Load files for current folder
+    // Load files for current folder (folders first, files ordered by created_at DESC — most recent first)
     async function loadFiles(folder) {
         const f = folder !== undefined ? folder : currentFolder
         try {
             const data = await listRAGFiles(f)
-            setFileItems(data.items || [])
+            const rawItems = data.items || []
+
+            const folders = rawItems.filter(i => i.type === 'folder').sort((a, b) => a.name.localeCompare(b.name))
+            const files = rawItems.filter(i => i.type !== 'folder').sort((a, b) => {
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                if (dateB !== dateA) return dateB - dateA
+                return a.name.localeCompare(b.name)
+            })
+
+            setFileItems([...folders, ...files])
             setTotalFiles(data.total_files || 0)
         } catch (e) {
             console.error('Error loading files:', e)
@@ -1363,9 +1373,10 @@ export default function RAGPanel() {
                                     <thead>
                                         <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
                                             <th style={{ padding: '12px 16px', fontWeight: 600 }}>Nombre</th>
-                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>Tamaño</th>
-                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '100px' }}>Chunks</th>
-                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '120px' }}>Tag</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '150px' }}>Fecha</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '110px' }}>Tamaño</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '90px' }}>Chunks</th>
+                                            <th style={{ padding: '12px 16px', fontWeight: 600, width: '110px' }}>Tag</th>
                                             <th style={{ padding: '12px 16px', fontWeight: 600, width: '100px', textAlign: 'right' }}>Acciones</th>
                                         </tr>
                                     </thead>
@@ -1379,6 +1390,7 @@ export default function RAGPanel() {
                                                     <td style={{ padding: '12px 16px', color: '#94a3b8' }}>—</td>
                                                     <td style={{ padding: '12px 16px', color: '#94a3b8' }}>—</td>
                                                     <td style={{ padding: '12px 16px', color: '#94a3b8' }}>—</td>
+                                                    <td style={{ padding: '12px 16px', color: '#94a3b8' }}>—</td>
                                                     <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                         <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(item) }} title="Eliminar carpeta" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '6px', borderRadius: '4px', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'none'}>
                                                             <Trash2 size={14} />
@@ -1389,6 +1401,9 @@ export default function RAGPanel() {
                                                 <tr key={item.name} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'white'}>
                                                     <td style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontWeight: 500 }}>
                                                         <span style={{ fontSize: '18px' }}>{FILE_ICONS[item.file_type] || '📄'}</span> {item.name}
+                                                    </td>
+                                                    <td style={{ padding: '12px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                                        {item.created_at ? formatFullDate(item.created_at) : '—'}
                                                     </td>
                                                     <td style={{ padding: '12px 16px', color: '#64748b' }}>{formatFileSize(item.file_size)}</td>
                                                     <td style={{ padding: '12px 16px', color: '#64748b' }}>{item.total_chunks}</td>
