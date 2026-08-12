@@ -922,59 +922,41 @@ export default function RAGPanel() {
                             </div>
                             <h3>Simon</h3>
                             <p>Preguntá lo que necesites sobre los documentos cargados. Las respuestas incluyen citación de fuentes.</p>
-                            <div className="rag-welcome-features">
-                                <div className="rag-feature">
-                                    <Search size={18} />
-                                    <span>Búsqueda Híbrida</span>
+                            {/* Guía práctica para formular consultas */}
+                            <div className="simon-guide-box" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px 22px', margin: '16px 0', textAlign: 'left', maxWidth: '640px', width: '100%', boxSizing: 'border-box' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', color: '#1e293b', fontWeight: 600, fontSize: '14px' }}>
+                                    <Lightbulb size={18} color="#3b82f6" />
+                                    <span>¿Cómo formular tu consulta para obtener mejores respuestas?</span>
                                 </div>
-                                <div className="rag-feature">
-                                    <Sparkles size={18} />
-                                    <span>Re-ranking IA</span>
-                                </div>
-                                <div className="rag-feature">
-                                    <Layers size={18} />
-                                    <span>Multi-Query</span>
-                                </div>
-                                <div className="rag-feature">
-                                    <BookOpen size={18} />
-                                    <span>Citación Obligatoria</span>
-                                </div>
+                                <ul style={{ margin: 0, paddingLeft: '20px', color: '#475569', fontSize: '13px', lineHeight: '1.6' }}>
+                                    <li style={{ marginBottom: '6px' }}>
+                                        <strong>Especificá la Obra Social / Convenio:</strong> Ej. <em>"¿Qué prácticas bioquímicas avala la obra social OSDE?"</em> o <em>"Criterios de internación en Medisalud"</em>.
+                                    </li>
+                                    <li style={{ marginBottom: '6px' }}>
+                                        <strong>Indicá el código o nombre del procedimiento:</strong> Ej. <em>"¿Cuál es el total del bisturí armónico en código 042?"</em> o <em>"Requisitos para ablación endocárdica"</em>.
+                                    </li>
+                                    <li>
+                                        <strong>Preguntá sobre requisitos, aranceles o normas internas:</strong> Simon buscará en la documentación cargada del Sanatorio y te responderá indicando la fuente.
+                                    </li>
+                                </ul>
                             </div>
 
-                            {/* Smart Guidance: Pre-chat suggestions */}
-                            {(suggestions.categories.length > 0 || suggestions.top_queries.length > 0) && (
-                                <div className="sg-prechat">
-                                    {suggestions.categories.length > 0 && (
-                                        <div className="sg-section">
-                                            <div className="sg-section-title"><Tag size={13} /> Temas disponibles</div>
-                                            <div className="sg-chips">
-                                                {suggestions.categories.slice(0, 8).map((cat, i) => (
-                                                    <button key={i} className="sg-chip category"
-                                                        onClick={() => { setInputValue(`¿Qué información hay sobre ${cat.name}?`); }}
-                                                    >
-                                                        <FolderOpen size={12} />
-                                                        {cat.name}
-                                                        {cat.count > 1 && <span className="sg-chip-count">{cat.count}</span>}
-                                                    </button>
-                                                ))}
-                                            </div>
+                            {/* Smart Guidance: Pre-chat suggestions (Preguntas frecuentes) */}
+                            {suggestions.top_queries.length > 0 && (
+                                <div className="sg-prechat" style={{ marginTop: '8px', maxWidth: '640px', width: '100%' }}>
+                                    <div className="sg-section">
+                                        <div className="sg-section-title" style={{ justifyContent: 'center', marginBottom: '8px' }}><Sparkles size={13} /> Preguntas frecuentes de ejemplo</div>
+                                        <div className="sg-chips" style={{ justifyContent: 'center' }}>
+                                            {suggestions.top_queries.slice(0, 6).map((q, i) => (
+                                                <button key={i} className="sg-chip query"
+                                                    onClick={() => { setInputValue(q.text); }}
+                                                >
+                                                    <MessageSquare size={12} />
+                                                    {q.text.length > 60 ? q.text.slice(0, 57) + '...' : q.text}
+                                                </button>
+                                            ))}
                                         </div>
-                                    )}
-                                    {suggestions.top_queries.length > 0 && (
-                                        <div className="sg-section">
-                                            <div className="sg-section-title"><Sparkles size={13} /> Preguntas frecuentes</div>
-                                            <div className="sg-chips">
-                                                {suggestions.top_queries.slice(0, 6).map((q, i) => (
-                                                    <button key={i} className="sg-chip query"
-                                                        onClick={() => { setInputValue(q.text); }}
-                                                    >
-                                                        <MessageSquare size={12} />
-                                                        {q.text.length > 60 ? q.text.slice(0, 57) + '...' : q.text}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
                         </div>
