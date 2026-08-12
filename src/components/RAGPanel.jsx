@@ -424,32 +424,48 @@ export default function RAGPanel() {
         }
 
         if (supportedFiles.length === 1) {
-            setUploadProgress(`Procesando "${supportedFiles[0].name}"...`)
+            const fileName = supportedFiles[0].name
+            let seconds = 0
+            setUploadProgress(`Procesando "${fileName}" (0s) · Extrayendo texto y generando vectores IA...`)
+            const timer = setInterval(() => {
+                seconds += 1
+                setUploadProgress(`Procesando "${fileName}" (${seconds}s) · Extrayendo texto y generando vectores IA...`)
+            }, 1000)
+
             try {
                 const result = await uploadRAGDocument(supportedFiles[0], currentFolder, uploadTag)
+                clearInterval(timer)
                 loadFiles()
-                setUploadProgress(`�S& "${supportedFiles[0].name}" � ${result.total_chunks} chunks`)
-                setTimeout(() => setUploadProgress(''), 4000)
+                setUploadProgress(`✅ "${fileName}" listo — ${result.total_chunks} chunks indizados`)
+                setTimeout(() => setUploadProgress(''), 5000)
             } catch (e) {
+                clearInterval(timer)
                 setError(e.message || 'Error al subir documento')
                 setUploadProgress('')
             }
         } else {
+            let seconds = 0
+            const timer = setInterval(() => {
+                seconds += 1
+            }, 1000)
+
             try {
                 const result = await uploadRAGBatch(supportedFiles, currentFolder, uploadTag, (p) => {
-                    const retryLabel = p.retrying ? ' �x Reintentando...' : ''
-                    const statusParts = [`Subiendo ${p.current}/${p.total}: "${p.filename}"${retryLabel}`]
-                    if (p.processed > 0) statusParts.push(`�S& ${p.processed}`)
-                    if (p.failed > 0) statusParts.push(`�R ${p.failed}`)
+                    const retryLabel = p.retrying ? ' 🔄 Reintentando...' : ''
+                    const statusParts = [`Subiendo ${p.current}/${p.total}: "${p.filename}" (${seconds}s)${retryLabel}`]
+                    if (p.processed > 0) statusParts.push(`✅ ${p.processed}`)
+                    if (p.failed > 0) statusParts.push(`❌ ${p.failed}`)
                     setUploadProgress(statusParts.join(' · '))
                 })
+                clearInterval(timer)
                 loadFiles()
-                const parts = [`�S& ${result.processed} procesados`, `${result.total_chunks} chunks`]
-                if (result.failed > 0) parts.push(`�R ${result.failed} fallidos`)
+                const parts = [`✅ ${result.processed} procesados`, `${result.total_chunks} chunks`]
+                if (result.failed > 0) parts.push(`❌ ${result.failed} fallidos`)
                 if (result.skipped > 0) parts.push(`⏭ ${result.skipped} omitidos`)
                 setUploadProgress(parts.join(' · '))
                 setTimeout(() => setUploadProgress(''), 8000)
             } catch (e) {
+                clearInterval(timer)
                 setError(e.message || 'Error al subir archivos')
                 setUploadProgress('')
             }
