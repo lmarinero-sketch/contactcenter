@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RefreshCw, Loader2, Menu, Check } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './components/LoginPage'
@@ -50,9 +50,62 @@ const VIEW_DESCRIPTIONS = {
     'data-entry': 'Apartado exclusivo para cargar datos y métricas al sistema',
 }
 
+const VIEW_TO_PATH = {
+    overview: '/overview',
+    rag: '/simon',
+    'rag-rules': '/simon-rules',
+    'rag-analytics': '/simon-analytics',
+    agents: '/agentes',
+    chatbot: '/chatbot',
+    conversations: '/conversaciones',
+    'agent-control': '/control-agentes',
+    shifts: '/turnos',
+    logbook: '/bitacora',
+    'bi-turnos': '/bi-turnos',
+    'bi-canales': '/bi-canales',
+    'data-entry': '/cargar',
+}
+
+const PATH_TO_VIEW = {
+    '/': 'overview',
+    '/overview': 'overview',
+    '/simon': 'rag',
+    '/simon-rules': 'rag-rules',
+    '/simon-reglas': 'rag-rules',
+    '/simon-analytics': 'rag-analytics',
+    '/agentes': 'agents',
+    '/chatbot': 'chatbot',
+    '/conversaciones': 'conversations',
+    '/control-agentes': 'agent-control',
+    '/turnos': 'shifts',
+    '/bitacora': 'logbook',
+    '/bi-turnos': 'bi-turnos',
+    '/bi-canales': 'bi-canales',
+    '/cargar': 'data-entry',
+}
+
+function getViewFromLocation() {
+    const path = window.location.pathname.toLowerCase()
+    const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '/')
+    const params = new URLSearchParams(window.location.search)
+    const viewParam = params.get('view')
+
+    if (viewParam) {
+        if (PATH_TO_VIEW['/' + viewParam]) return PATH_TO_VIEW['/' + viewParam]
+        if (VIEW_TITLES[viewParam]) return viewParam
+    }
+
+    if (hash && PATH_TO_VIEW['/' + hash]) return PATH_TO_VIEW['/' + hash]
+    if (hash && PATH_TO_VIEW[hash]) return PATH_TO_VIEW[hash]
+
+    if (path && PATH_TO_VIEW[path]) return PATH_TO_VIEW[path]
+
+    return 'overview'
+}
+
 function App() {
     const { user, profile, loading, signOut, isSimon } = useAuth()
-    const [activeView, setActiveView] = useState('overview')
+    const [activeView, setActiveView] = useState(() => getViewFromLocation())
     const [refreshKey, setRefreshKey] = useState(0)
     const [pendingTicketId, setPendingTicketId] = useState(null)
     const [mobileOpen, setMobileOpen] = useState(false)
@@ -64,17 +117,17 @@ function App() {
     // Detect dedicated load mode
     const isDedicatedCargaMode = 
         !isSimon && (
-        window.location.pathname === '/cargar' || 
-        window.location.search.includes('view=cargar') || 
-        window.location.hash === '#/cargar'
+        window.location.pathname === '/cargar-portal' || 
+        window.location.search.includes('view=cargar-portal') || 
+        window.location.hash === '#/cargar-portal'
         );
 
-    // Detect dedicated Simon mode
+    // Detect dedicated Simon mode (for user with simon role or explicit standalone portal path)
     const isDedicatedSimonMode = 
         isSimon ||
-        window.location.pathname === '/simon' || 
-        window.location.search.includes('view=simon') || 
-        window.location.hash === '#/simon';
+        window.location.pathname === '/simon-portal' || 
+        window.location.search.includes('view=simon-portal') || 
+        window.location.hash === '#/simon-portal';
 
     // Detect public Simon mode (no auth required)
     const isPublicSimonMode = 
@@ -266,6 +319,28 @@ function App() {
         )
     }
 
+    useEffect(() => {
+        const handleLocationChange = (event) => {
+            const view = event.state?.view || getViewFromLocation()
+            setActiveView(view)
+        }
+
+        window.addEventListener('popstate', handleLocationChange)
+        window.addEventListener('hashchange', handleLocationChange)
+
+        // Ensure history has an entry for current view
+        const currentView = getViewFromLocation()
+        const targetPath = VIEW_TO_PATH[currentView] || `/${currentView}`
+        if (window.location.pathname !== targetPath && window.location.pathname === '/') {
+            window.history.replaceState({ view: currentView }, '', targetPath)
+        }
+
+        return () => {
+            window.removeEventListener('popstate', handleLocationChange)
+            window.removeEventListener('hashchange', handleLocationChange)
+        }
+    }, [])
+
     const handleRefresh = () => {
         setIsRefreshing(true)
         setShowRefreshDone(false)
@@ -279,14 +354,21 @@ function App() {
         }, 3000)
     }
 
-    const navigateToConversation = (ticketId) => {
-        setPendingTicketId(ticketId)
-        setActiveView('conversations')
-    }
-
-    const handleViewChange = (view) => {
+    const handleViewChange = (view, pushHistory = true) => {
         setActiveView(view)
         setMobileOpen(false) // Close sidebar on mobile after selecting
+
+        if (pushHistory) {
+            const targetPath = VIEW_TO_PATH[view] || `/${view}`
+            if (window.location.pathname !== targetPath) {
+                window.history.pushState({ view }, '', targetPath)
+            }
+        }
+    }
+
+    const navigateToConversation = (ticketId) => {
+        setPendingTicketId(ticketId)
+        handleViewChange('conversations')
     }
 
     const renderView = () => {
