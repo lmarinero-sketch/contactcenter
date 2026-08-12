@@ -1249,6 +1249,18 @@ export default function RAGPanel() {
                             placeholder="Escribí tu pregunta sobre los documentos..."
                             rows={1}
                             disabled={isLoading}
+                            style={{
+                                color: '#0f172a',
+                                backgroundColor: 'transparent',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                lineHeight: '1.5',
+                                caretColor: '#3b82f6',
+                                width: '100%',
+                                outline: 'none',
+                                border: 'none',
+                                resize: 'none'
+                            }}
                         />
                         <button
                             className="rag-send-btn"
