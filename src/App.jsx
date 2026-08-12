@@ -114,6 +114,28 @@ function App() {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [showRefreshDone, setShowRefreshDone] = useState(false)
 
+    useEffect(() => {
+        const handleLocationChange = (event) => {
+            const view = event.state?.view || getViewFromLocation()
+            setActiveView(view)
+        }
+
+        window.addEventListener('popstate', handleLocationChange)
+        window.addEventListener('hashchange', handleLocationChange)
+
+        // Ensure history has an entry for current view
+        const currentView = getViewFromLocation()
+        const targetPath = VIEW_TO_PATH[currentView] || `/${currentView}`
+        if (window.location.pathname !== targetPath && window.location.pathname === '/') {
+            window.history.replaceState({ view: currentView }, '', targetPath)
+        }
+
+        return () => {
+            window.removeEventListener('popstate', handleLocationChange)
+            window.removeEventListener('hashchange', handleLocationChange)
+        }
+    }, [])
+
     // Detect dedicated load mode
     const isDedicatedCargaMode = 
         !isSimon && (
@@ -318,28 +340,6 @@ function App() {
             </div>
         )
     }
-
-    useEffect(() => {
-        const handleLocationChange = (event) => {
-            const view = event.state?.view || getViewFromLocation()
-            setActiveView(view)
-        }
-
-        window.addEventListener('popstate', handleLocationChange)
-        window.addEventListener('hashchange', handleLocationChange)
-
-        // Ensure history has an entry for current view
-        const currentView = getViewFromLocation()
-        const targetPath = VIEW_TO_PATH[currentView] || `/${currentView}`
-        if (window.location.pathname !== targetPath && window.location.pathname === '/') {
-            window.history.replaceState({ view: currentView }, '', targetPath)
-        }
-
-        return () => {
-            window.removeEventListener('popstate', handleLocationChange)
-            window.removeEventListener('hashchange', handleLocationChange)
-        }
-    }, [])
 
     const handleRefresh = () => {
         setIsRefreshing(true)
