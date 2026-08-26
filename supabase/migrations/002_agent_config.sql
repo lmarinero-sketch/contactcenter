@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS cc_agent_config (
 -- Insertar agentes conocidos
 INSERT INTO cc_agent_config (agent_name, role, display_name) VALUES
   ('Betina', 'bot', 'Bot Sanatorio'),
-  ('Antonella', 'human', 'Antonella'),
+  ('Erica', 'human', 'Erica'),
   ('Sofia', 'human', 'Sofía'),
   ('Daniela', 'human', 'Daniela')
 ON CONFLICT (agent_name) DO UPDATE SET

@@ -133,9 +133,9 @@ FROM auth.users WHERE email = 'daniela@contactcenter.com'
 ON CONFLICT (id) DO UPDATE SET full_name = 'Daniela', role = 'agente';
 
 INSERT INTO cc_profiles (id, full_name, role)
-SELECT id, 'Antonella', 'agente'
-FROM auth.users WHERE email = 'antonela@contactcenter.com'
-ON CONFLICT (id) DO UPDATE SET full_name = 'Antonella', role = 'agente';
+SELECT id, 'Erica', 'agente'
+FROM auth.users WHERE email = 'erica@contactcenter.com'
+ON CONFLICT (id) DO UPDATE SET full_name = 'Erica', role = 'agente';
 
 INSERT INTO cc_profiles (id, full_name, role)
 SELECT id, 'Sofia', 'agente'

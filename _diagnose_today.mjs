@@ -53,7 +53,7 @@ for (const t of sofiaTickets.slice(0, 3)) {
     })
 }
 
-// 4. Check Daniela + Antonella first messages
+// 4. Check Daniela + Erica first messages
 console.log(`\n=== DANIELA (should start ~09:00) ===`)
 const danielaMsgs = outMsgs.filter(m => ticketMap[m.ticket_id]?.agent_name === 'Daniela')
 console.log(`Total OUT msgs in Daniela tickets: ${danielaMsgs.length}`)
@@ -63,9 +63,9 @@ for (const m of first5) {
     console.log(`  ${m.message_timestamp.substring(11,19)} | ticket=${m.ticket_id} | ${short}`)
 }
 
-console.log(`\n=== ANTONELLA (should start ~13:20) ===`)
-const antMsgs = outMsgs.filter(m => ticketMap[m.ticket_id]?.agent_name === 'Antonella')
-console.log(`Total OUT msgs in Antonella tickets: ${antMsgs.length}`)
+console.log(`\n=== ERICA (should start ~13:20) ===`)
+const antMsgs = outMsgs.filter(m => ticketMap[m.ticket_id]?.agent_name === 'Erica')
+console.log(`Total OUT msgs in Erica tickets: ${antMsgs.length}`)
 const first5a = antMsgs.slice(0, 10)
 for (const m of first5a) {
     const short = (m.message || '').substring(0, 80)

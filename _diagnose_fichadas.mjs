@@ -10,7 +10,7 @@ const supabase = createClient(env.VITE_SUPABASE_URL,
 
 const AGENT_MAP = {
     'Sofia': '%OLIVIER%SOFIA%',
-    'Antonella': '%ESQUIVEL%ANTONELL%',
+    'Erica': '%ESQUIVEL%ERICA%',
     'Daniela': '%AGUILERA%DANIELA%',
 }
 

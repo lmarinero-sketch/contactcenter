@@ -10,7 +10,7 @@ async function check() {
   const { data, error } = await supabase
     .from('salus_visitas')
     .select('fecha_hora_creacion')
-    .in('usuario_creacion', ['OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ANTONELLA', 'AGUILERA CARDOZO, DANIELA ROMINA'])
+    .in('usuario_creacion', ['OLIVIER ESQUIVEL, SOFIA FERNANDA', 'ACOSTA ESQUIVEL, MARIA ERICA', 'AGUILERA CARDOZO, DANIELA ROMINA'])
     .gte('fecha_hora_creacion', '2025-06-01')
     .limit(10);
     

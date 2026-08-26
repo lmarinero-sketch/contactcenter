@@ -1232,7 +1232,7 @@ const FICHADAS_AUTH = import.meta.env.VITE_HUB_SUPABASE_ANON_KEY
 // Must match the names used in cc_tickets.agent_name
 const NOMBRE_TO_CC_AGENT = {
     'OLIVIER SOFIA': 'Sofia',
-    'ACOSTA ESQUIVEL MARIA ANTONELL': 'Antonella',
+    'ACOSTA ESQUIVEL MARIA ERICA': 'Erica',
     'AGUILERA DANIELA ROMINA': 'Daniela',
     'MARINERO LUCAS MAXIMILIANO': 'Lucas',
     'VIRGINIA': 'Virginia',

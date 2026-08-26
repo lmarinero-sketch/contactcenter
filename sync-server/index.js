@@ -428,7 +428,7 @@ app.get('/api/visitas/stats/contact-center', async (req, res) => {
 
         // Las 3 chicas
         const operadoras = [
-            'ACOSTA ESQUIVEL, MARIA ANTONELLA',
+            'ACOSTA ESQUIVEL, MARIA ERICA',
             'AGUILERA CARDOZO, DANIELA ROMINA',
             'OLIVIER ESQUIVEL, SOFIA FERNANDA'
         ].map(n => `'${n}'`).join(',');
