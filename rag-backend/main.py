@@ -1,5 +1,5 @@
-"""
-RAG Backend — FastAPI Entry Point
+﻿"""
+RAG Backend â€” FastAPI Entry Point
 Sanatorio Argentino - Contact Center
 """
 import sys
@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.chat import router as chat_router
 from routes.documents import router as documents_router
+from routes.audio import router as audio_router
 
 app = FastAPI(
     title="Simon IA - Sanatorio Argentino",
@@ -21,7 +22,7 @@ app = FastAPI(
     version="3.1.0"
 )
 
-# CORS — allow all origins (Vercel + local dev)
+# CORS â€” allow all origins (Vercel + local dev)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,7 +35,9 @@ app.add_middleware(
 # Routes
 app.include_router(chat_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
+app.include_router(audio_router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "service": "rag-backend"}
+
