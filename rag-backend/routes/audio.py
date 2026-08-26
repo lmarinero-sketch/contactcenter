@@ -1,51 +1,77 @@
 ﻿import os
 import json
-import tempfile
+import asyncio
+import websockets as ws_client
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from openai import AsyncOpenAI
 
 router = APIRouter()
-client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+DEEPGRAM_API_KEY = "896c8da735b5edce67498d67fc58422f11962dce"
 
 @router.websocket("/ws/transcribe")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     
+    # Endpoint de Deepgram con diarizacion activada
+    dg_url = "wss://api.deepgram.com/v1/listen?model=nova-2&language=es&diarize=true&smart_format=true"
+    
     try:
-        while True:
-            data = await websocket.receive_bytes()
+        async with ws_client.connect(dg_url, extra_headers={"Authorization": f"Token {DEEPGRAM_API_KEY}"}) as dg_ws:
             
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
-                temp_audio.write(data)
-                temp_audio_path = temp_audio.name
-                
-            try:
-                with open(temp_audio_path, "rb") as audio_file:
-                    transcription = await client.audio.transcriptions.create(
-                        file=audio_file,
-                        model="whisper-1",
-                        language="es",
-                        response_format="text",
-                        prompt="Entrevista de gobernanza y auditorÃ­a de datos, Sanatorio Argentino.",
-                        temperature=0.2
-                    )
-                
-                await websocket.send_text(json.dumps({
-                    "type": "transcript",
-                    "text": transcription
-                }))
-                
-            except Exception as inner_e:
-                print(f"Error procesando chunk: {inner_e}")
+            async def sender():
                 try:
-                    await websocket.send_text(json.dumps({"type": "error", "message": str(inner_e)}))
-                except:
-                    pass
-            finally:
-                if os.path.exists(temp_audio_path):
-                    os.remove(temp_audio_path)
+                    while True:
+                        data = await websocket.receive_bytes()
+                        await dg_ws.send(data)
+                except WebSocketDisconnect:
+                    await dg_ws.send(json.dumps({"type": "CloseStream"}))
+                except Exception as e:
+                    print(f"Error reading from client: {e}")
                     
-    except WebSocketDisconnect:
-        print("Cliente desconectado de la transcripcion")
+            async def receiver():
+                try:
+                    async for message in dg_ws:
+                        msg = json.loads(message)
+                        if msg.get("type") == "Results":
+                            is_final = msg.get("is_final", False)
+                            if is_final:
+                                transcript = msg["channel"]["alternatives"][0]["transcript"]
+                                if not transcript.strip():
+                                    continue
+                                    
+                                words = msg["channel"]["alternatives"][0].get("words", [])
+                                formatted_transcript = ""
+                                
+                                if words:
+                                    current_speaker = None
+                                    current_text = ""
+                                    for w in words:
+                                        speaker = w.get("speaker", 0)
+                                        word = w.get("punctuated_word", w["word"])
+                                        if speaker != current_speaker:
+                                            if current_speaker is not None:
+                                                formatted_transcript += f"\n[Participante {current_speaker}]: {current_text.strip()} "
+                                            current_speaker = speaker
+                                            current_text = word
+                                        else:
+                                            current_text += f" {word}"
+                                            
+                                    if current_speaker is not None:
+                                        formatted_transcript += f"\n[Participante {current_speaker}]: {current_text.strip()} "
+                                else:
+                                    formatted_transcript = transcript
+                                    
+                                await websocket.send_text(json.dumps({
+                                    "type": "transcript",
+                                    "text": formatted_transcript.strip()
+                                }))
+                except Exception as e:
+                    print(f"Error reading from deepgram: {e}")
+
+            await asyncio.gather(sender(), receiver())
+            
     except Exception as e:
-        print(f"Error WS: {e}")
+        print(f"Error connecting to Deepgram: {e}")
+        try:
+            await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
+        except:
+            pass
