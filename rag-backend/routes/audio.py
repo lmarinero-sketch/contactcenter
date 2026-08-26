@@ -35,6 +35,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     "text": transcription
                 }))
                 
+            except Exception as inner_e:
+                print(f"Error procesando chunk: {inner_e}")
+                try:
+                    await websocket.send_text(json.dumps({"type": "error", "message": str(inner_e)}))
+                except:
+                    pass
             finally:
                 if os.path.exists(temp_audio_path):
                     os.remove(temp_audio_path)
@@ -43,7 +49,3 @@ async def websocket_endpoint(websocket: WebSocket):
         print("Cliente desconectado de la transcripcion")
     except Exception as e:
         print(f"Error WS: {e}")
-        try:
-            await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
-        except:
-            pass
