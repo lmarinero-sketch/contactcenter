@@ -15,7 +15,7 @@ async def websocket_endpoint(websocket: WebSocket):
     dg_url = "wss://api.deepgram.com/v1/listen?model=nova-2&language=es&diarize=true&smart_format=true"
     
     try:
-        async with ws_client.connect(dg_url, extra_headers={"Authorization": f"Token {DEEPGRAM_API_KEY}"}) as dg_ws:
+        async with ws_client.connect(dg_url, additional_headers={"Authorization": f"Token {DEEPGRAM_API_KEY}"}) as dg_ws:
             
             async def sender():
                 try:
