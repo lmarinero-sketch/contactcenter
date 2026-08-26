@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.chat import router as chat_router
 from routes.documents import router as documents_router
 from routes.audio import router as audio_router
+from routes.gobernanza import router as gobernanza_router
 
 app = FastAPI(
     title="Simon IA - Sanatorio Argentino",
@@ -36,8 +37,10 @@ app.add_middleware(
 app.include_router(chat_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(audio_router, prefix="/api")
+app.include_router(gobernanza_router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "service": "rag-backend"}
+
 
