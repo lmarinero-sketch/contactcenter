@@ -311,3 +311,20 @@ export async function fetchSuggestions() {
         return { categories: [], top_queries: [] };
     }
 }
+
+export async function submitProposedRule(triggerQuestion, ruleContent, proposedBy) {
+    const response = await safeFetch(`${RAG_API_BASE}/rules/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            trigger_question: triggerQuestion,
+            rule_content: ruleContent,
+            proposed_by: proposedBy,
+        }),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Error al enviar regla propuesta' }));
+        throw new Error(error.detail || 'Error al enviar regla propuesta');
+    }
+    return response.json();
+}

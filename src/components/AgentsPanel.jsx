@@ -7,9 +7,9 @@ import {
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-    LineChart, Line
+    LineChart, Line, LabelList
 } from 'recharts'
-import { fetchAgentStats, exportToCSV, fetchAgentProfile, fetchHandoffEvolution } from '../services/dataService'
+import { fetchAgentStats, exportToCSV, fetchAgentProfile, fetchHandoffEvolution, fetchAgentMonthlyMessages, fetchAgentMonthlyActivity } from '../services/dataService'
 import DateFilter from './DateFilter'
 
 export default function AgentsPanel() {
@@ -358,6 +358,34 @@ function AgentDetail({ agent }) {
     const [aiProfile, setAiProfile] = useState(null)
     const [aiLoading, setAiLoading] = useState(false)
     const [aiError, setAiError] = useState(null)
+    const [monthlyActivity, setMonthlyActivity] = useState([])
+    const [loadingMonthly, setLoadingMonthly] = useState(true)
+    const [metricView, setMetricView] = useState('chats') // 'chats' (Personas atendidas) | 'mensajes'
+
+    useEffect(() => {
+        let active = true
+        async function loadMonthly() {
+            setLoadingMonthly(true)
+            try {
+                const data = await fetchAgentMonthlyActivity(agent.agent_name)
+                if (active) setMonthlyActivity(data)
+            } catch (err) {
+                console.error('Error loading agent monthly activity:', err)
+            } finally {
+                if (active) setLoadingMonthly(false)
+            }
+        }
+        loadMonthly()
+        return () => { active = false }
+    }, [agent.agent_name])
+
+    const totalMonthlyChats = useMemo(() => {
+        return monthlyActivity.reduce((sum, item) => sum + (item.chats || 0), 0)
+    }, [monthlyActivity])
+
+    const totalMonthlyMessages = useMemo(() => {
+        return monthlyActivity.reduce((sum, item) => sum + (item.mensajes || 0), 0)
+    }, [monthlyActivity])
 
     async function generateProfile() {
         try {
@@ -406,6 +434,129 @@ function AgentDetail({ agent }) {
             background: '#f8fafc', padding: '20px',
             borderTop: '2px solid #1a6bb5',
         }}>
+            {/* Personas Atendidas / Chats Asignados Mes por Mes */}
+            <div className="card" style={{
+                marginBottom: '20px',
+                background: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+                <div className="card-header" style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '16px 20px', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '12px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            width: '36px', height: '36px', borderRadius: '8px',
+                            background: '#eff6ff', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', color: '#1a6bb5'
+                        }}>
+                            {metricView === 'chats' ? <Users size={20} /> : <MessageSquare size={20} />}
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#1e293b' }}>
+                                {metricView === 'chats'
+                                    ? `Personas Atendidas (Chats Asignados) Mes por Mes — ${agent.agent_name}`
+                                    : `Mensajes Respondidos Mes por Mes — ${agent.agent_name}`
+                                }
+                            </h3>
+                            <span style={{ fontSize: '12px', color: '#64748b' }}>
+                                {metricView === 'chats'
+                                    ? `Total de pacientes atendidos mes a mes por ${agent.agent_name}`
+                                    : `Volumen total de mensajes salientes emitidos por ${agent.agent_name}`
+                                }
+                            </span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Selector de métrica */}
+                        <div style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
+                            <button
+                                type="button"
+                                onClick={() => setMetricView('chats')}
+                                style={{
+                                    border: 'none',
+                                    padding: '5px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    background: metricView === 'chats' ? '#1a6bb5' : 'transparent',
+                                    color: metricView === 'chats' ? '#ffffff' : '#64748b',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                👥 Chats Asignados
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMetricView('mensajes')}
+                                style={{
+                                    border: 'none',
+                                    padding: '5px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    background: metricView === 'mensajes' ? '#1a6bb5' : 'transparent',
+                                    color: metricView === 'mensajes' ? '#ffffff' : '#64748b',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                💬 Mensajes
+                            </button>
+                        </div>
+                        <span style={{
+                            background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0',
+                            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600
+                        }}>
+                            Total: {metricView === 'chats'
+                                ? `${totalMonthlyChats.toLocaleString('es-AR')} pacientes`
+                                : `${totalMonthlyMessages.toLocaleString('es-AR')} mensajes`
+                            }
+                        </span>
+                    </div>
+                </div>
+                <div className="card-body" style={{ padding: '20px', height: '270px' }}>
+                    {loadingMonthly ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                            <Loader2 size={32} style={{ color: '#1a6bb5', animation: 'spin 1s linear infinite' }} />
+                        </div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={monthlyActivity} margin={{ top: 25, right: 30, left: 10, bottom: 5 }}>
+                                <defs>
+                                    <linearGradient id={`agentGrad-${agent.agent_name}`} x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#1a6bb5" stopOpacity={1} />
+                                        <stop offset="100%" stopColor="#2563eb" stopOpacity={0.7} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+                                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(val) => val.toLocaleString('es-AR')} />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(241, 245, 249, 0.7)' }}
+                                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}
+                                    formatter={(value) => [
+                                        `${value.toLocaleString('es-AR')} ${metricView === 'chats' ? 'personas / chats' : 'mensajes'}`,
+                                        metricView === 'chats' ? 'Chats Asignados' : 'Mensajes Respondidos'
+                                    ]}
+                                />
+                                <Bar dataKey={metricView} fill={`url(#agentGrad-${agent.agent_name})`} radius={[6, 6, 0, 0]} maxBarSize={60}>
+                                    <LabelList
+                                        dataKey={metricView}
+                                        position="top"
+                                        formatter={(val) => val > 0 ? val.toLocaleString('es-AR') : '0'}
+                                        style={{ fontSize: '11px', fontWeight: 700, fill: '#334155' }}
+                                    />
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+
             {/* Row 1: Radar + Tone + Keywords */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                 <div className="card">

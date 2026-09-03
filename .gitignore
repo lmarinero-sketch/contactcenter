@@ -36,6 +36,8 @@ _deploy*.bat
 _test_*.mjs
 bulk-upload*.mjs
 bulk-upload-progress.json
+scripts/_*
+scripts/*.json
 
 # Antigravity skills (external)
 antigravity-awesome-skills/

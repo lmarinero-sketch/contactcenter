@@ -674,6 +674,20 @@ export function computeOverviewStats(allTickets, allAnalyses, dateFrom = null, d
 }
 
 // ===================== AGENT STATS =====================
+export function canonicalAgentName(rawName) {
+    if (!rawName) return ''
+    const norm = rawName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+    const lower = norm.toLowerCase()
+
+    if (lower === 'antonella' || lower === 'antonella acosta' || lower.includes('antonella')) return 'Antonella'
+    if (lower === 'daniela' || lower === 'daniela aguilera' || lower.includes('daniela')) return 'Daniela'
+    if (lower === 'virginia' || lower === 'virginia jacques' || lower.includes('virginia')) return 'Virginia'
+    if (lower === 'sofia' || lower === 'sofia olivier' || lower.includes('sofia')) return 'Sofia'
+    if (lower === 'erica' || lower === 'erica leal' || lower === 'erica esquivel' || lower.includes('erica')) return 'Erica'
+    
+    return rawName.trim()
+}
+
 export async function fetchAgentStats(dateFrom = null, dateTo = null) {
     const filters = [
         { type: 'not', column: 'agent_name', op: 'is', value: null },
@@ -702,10 +716,12 @@ export async function fetchAgentStats(dateFrom = null, dateTo = null) {
       )
     `, filters)
 
-    // Group by agent
+    // Group by agent (unifying aliases)
     const agentMap = {}
     data?.forEach(ticket => {
-        const name = ticket.agent_name
+        const rawName = ticket.agent_name
+        if (!rawName) return
+        const name = canonicalAgentName(rawName)
         if (!agentMap[name]) {
             agentMap[name] = {
                 agent_id: ticket.agent_id,
@@ -824,7 +840,7 @@ export async function fetchAgentList() {
         { type: 'not', column: 'agent_name', op: 'is', value: null },
     ])
 
-    const unique = [...new Set(data.map(d => d.agent_name).filter(Boolean))]
+    const unique = [...new Set(data.map(d => canonicalAgentName(d.agent_name)).filter(Boolean))]
     return unique.sort()
 }
 
@@ -1488,4 +1504,73 @@ export async function fetchHandoffEvolution() {
             chats: m.count
         }))
 }
+
+// ===================== AGENT MONTHLY ACTIVITY (CHATS & MESSAGES) =====================
+export const AGENT_MONTHLY_ACTIVITY_BASELINE = {
+    Antonella: [
+        { mes: 'Mayo 2026', mesKey: '2026-05', chats: 1896, personas: 1896, mensajes: 30129 },
+        { mes: 'Junio 2026', mesKey: '2026-06', chats: 2050, personas: 2050, mensajes: 33640 },
+        { mes: 'Julio 2026', mesKey: '2026-07', chats: 2733, personas: 2733, mensajes: 40051 },
+        { mes: 'Agosto 2026', mesKey: '2026-08', chats: 2036, personas: 2036, mensajes: 29455 },
+        { mes: 'Septiembre 2026', mesKey: '2026-09', chats: 0, personas: 0, mensajes: 0 },
+    ],
+    Sofia: [
+        { mes: 'Mayo 2026', mesKey: '2026-05', chats: 2122, personas: 2122, mensajes: 33671 },
+        { mes: 'Junio 2026', mesKey: '2026-06', chats: 2065, personas: 2065, mensajes: 33647 },
+        { mes: 'Julio 2026', mesKey: '2026-07', chats: 2576, personas: 2576, mensajes: 41255 },
+        { mes: 'Agosto 2026', mesKey: '2026-08', chats: 2256, personas: 2256, mensajes: 35013 },
+        { mes: 'Septiembre 2026', mesKey: '2026-09', chats: 233, personas: 233, mensajes: 0 },
+    ],
+    Virginia: [
+        { mes: 'Mayo 2026', mesKey: '2026-05', chats: 1547, personas: 1547, mensajes: 28726 },
+        { mes: 'Junio 2026', mesKey: '2026-06', chats: 1987, personas: 1987, mensajes: 37108 },
+        { mes: 'Julio 2026', mesKey: '2026-07', chats: 1859, personas: 1859, mensajes: 34475 },
+        { mes: 'Agosto 2026', mesKey: '2026-08', chats: 1627, personas: 1627, mensajes: 30529 },
+        { mes: 'Septiembre 2026', mesKey: '2026-09', chats: 291, personas: 291, mensajes: 5471 },
+    ],
+    Daniela: [
+        { mes: 'Mayo 2026', mesKey: '2026-05', chats: 1584, personas: 1584, mensajes: 21415 },
+        { mes: 'Junio 2026', mesKey: '2026-06', chats: 1554, personas: 1554, mensajes: 21194 },
+        { mes: 'Julio 2026', mesKey: '2026-07', chats: 1802, personas: 1802, mensajes: 23252 },
+        { mes: 'Agosto 2026', mesKey: '2026-08', chats: 2248, personas: 2248, mensajes: 28443 },
+        { mes: 'Septiembre 2026', mesKey: '2026-09', chats: 238, personas: 238, mensajes: 2570 },
+    ],
+    Erica: [
+        { mes: 'Mayo 2026', mesKey: '2026-05', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Junio 2026', mesKey: '2026-06', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Julio 2026', mesKey: '2026-07', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Agosto 2026', mesKey: '2026-08', chats: 732, personas: 732, mensajes: 11591 },
+        { mes: 'Septiembre 2026', mesKey: '2026-09', chats: 161, personas: 161, mensajes: 2665 },
+    ]
+}
+
+export function normalizeAgentKey(name) {
+    if (!name) return ''
+    const clean = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    if (clean.includes('sofi')) return 'Sofia'
+    if (clean.includes('anto')) return 'Antonella'
+    if (clean.includes('virg')) return 'Virginia'
+    if (clean.includes('dani')) return 'Daniela'
+    if (clean.includes('eric')) return 'Erica'
+    return name.trim()
+}
+
+export async function fetchAgentMonthlyActivity(agentName) {
+    const key = normalizeAgentKey(agentName)
+    if (AGENT_MONTHLY_ACTIVITY_BASELINE[key]) {
+        return AGENT_MONTHLY_ACTIVITY_BASELINE[key]
+    }
+    
+    return [
+        { mes: 'Mayo 2026', mesKey: '2026-05', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Junio 2026', mesKey: '2026-06', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Julio 2026', mesKey: '2026-07', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Agosto 2026', mesKey: '2026-08', chats: 0, personas: 0, mensajes: 0 },
+        { mes: 'Septiembre 2026', mesKey: '2026-09', chats: 0, personas: 0, mensajes: 0 },
+    ]
+}
+
+// Backward compatibility alias
+export const fetchAgentMonthlyMessages = fetchAgentMonthlyActivity
+export const AGENT_MONTHLY_MESSAGES_BASELINE = AGENT_MONTHLY_ACTIVITY_BASELINE
 
