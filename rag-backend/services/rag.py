@@ -47,6 +47,16 @@ def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | 
     # But with context they might be valid follow-ups
     has_context = len(conversation_history) >= 2
     
+    # Questions about doctors, parameters, fees, or operational terms are NEVER ambiguous
+    lower_q = question.lower()
+    operational_triggers = [
+        "parametro", "parámetro", "dra", "dr", "doctor", "doctora", "medico", "médico",
+        "arancel", "cobro", "plus", "coseguro", "alias", "obra social", "osde", "iosfa",
+        "sancor", "pami", "galeno", "turno", "seña", "horario", "atiende", "hace", "cuanto", "cuánto"
+    ]
+    if any(t in lower_q for t in operational_triggers):
+        return None
+
     # Skip disambiguation for very clear questions (optimization)
     # Questions with specific keywords/entities are usually clear
     if len(question.split()) >= 8:
