@@ -21,7 +21,7 @@ def _enrich_rule(raw_text: str) -> dict:
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             temperature=0,
-            max_tokens=500,
+            max_completion_tokens=500,
             messages=[
                 {
                     "role": "system",

@@ -19,8 +19,8 @@ supabase: Client = create_client(
 # --- Model Config ---
 EMBEDDING_MODEL = "text-embedding-3-large"
 EMBEDDING_DIMENSIONS = 1536
-CHAT_MODEL = "gpt-4o"
-RERANK_MODEL = "gpt-4o-mini"
+CHAT_MODEL = "gpt-5.4"
+RERANK_MODEL = "gpt-5.4-mini"
 
 # --- Chunking Config ---
 CHUNK_SIZE = 1200

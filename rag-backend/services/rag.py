@@ -74,7 +74,7 @@ def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | 
         response = openai_client.chat.completions.create(
             model=RERANK_MODEL,  # Use lighter model for speed
             temperature=0,
-            max_tokens=400,
+            max_completion_tokens=400,
             timeout=OPENAI_CALL_TIMEOUT,
             messages=[
                 {
@@ -136,34 +136,44 @@ def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | 
 
 def _extract_topic_entities(question: str) -> dict:
     """
-    Extract key entities and topics from the question.
+    Extract key entities, topics, canonical query and keywords from the question.
+    Handles colloquial language (e.g. 'que planes recibimos de nobis?').
     Returns a dict with:
-      - entities: list of proper nouns/brands (e.g., "OSDE", "Swiss Medical", "PAMI")
-      - topic: the main topic keyword (e.g., "autorizaciones", "turnos")
+      - entities: list of proper nouns/brands (e.g., ["Nobis"], ["OSDE"], ["PAMI"])
+      - topic: the main topic keyword (e.g., "convenios", "autorizaciones", "turnos")
+      - canonical_query: normalized formal query for institutional search
+      - keywords: list of essential search terms/synonyms
       - strict: whether to enforce strict entity filtering
     """
     try:
         response = openai_client.chat.completions.create(
-            model=RERANK_MODEL,  # gpt-4o-mini for speed
+            model=RERANK_MODEL,  # gpt-5.4-mini for speed and intelligence
             temperature=0,
-            max_tokens=200,
+            max_completion_tokens=400,
             timeout=OPENAI_CALL_TIMEOUT,
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "Extraé las entidades clave de la pregunta del usuario. "
-                        "Entidades son: nombres propios, marcas, instituciones, obras sociales, "
-                        "departamentos, servicios específicos, etc.\n\n"
-                        "Reglas:\n"
-                        "1. Si la pregunta menciona una obra social específica (OSDE, Swiss Medical, PAMI, "
-                        "Galeno, Medifé, IOMA, Provincia, etc.), esa es la entidad PRINCIPAL.\n"
-                        "2. Si la pregunta menciona un sector/servicio (UTI, laboratorio, quirófano, "
-                        "farmacia, etc.), ese es la entidad.\n"
-                        "3. Si la pregunta es genérica (sin entidad específica), devolvé entities vacío.\n"
-                        "4. 'strict' = true si la pregunta claramente se refiere a UNA entidad específica "
-                        "y mezclar con otras sería incorrecto.\n\n"
-                        "Respondé SOLO JSON: {\"entities\": [\"nombre1\"], \"topic\": \"tema\", \"strict\": true/false}"
+                        "Sos un experto en lingüística clínica, administrativa y comprensión semántica de Sanatorio Argentino.\n"
+                        "Tu tarea es analizar la consulta del usuario (que puede ser informal, coloquial, con modismos o incompleta) "
+                        "y transformarla en una representación estructurada para el motor de búsqueda documental RAG.\n\n"
+                        "REGLAS DE INTERPRETACIÓN COLOQUIAL:\n"
+                        "1. Modismos como 'recibir / entra / se recibe / atienden / toman / agarran X': significan 'convenio vigente, cartilla de obra social o prepaga, planes aceptados o cobertura'.\n"
+                        "2. Entidades Principales: Obras sociales y prepagas (Nobis, OSDE, Swiss Medical, PAMI, Galeno, Medifé, SanCor, OSECAC, etc.), servicios/sectores (Guardia, UTI, Quirófano, Maternidad, Laboratorio) y médicos.\n"
+                        "3. 'canonical_query': reformulá la pregunta coloquial en una consulta formal, técnica e institucional de Sanatorio Argentino.\n"
+                        "   Ejemplo: 'que planes recibimos de nobis?' -> 'Convenio y planes de cobertura de la obra social o prepaga Nobis aceptados en Sanatorio Argentino'\n"
+                        "   Ejemplo: 'atiende pami en guardia?' -> 'Cobertura y atención de urgencia de PAMI en el servicio de guardia'\n"
+                        "4. 'keywords': lista de 5 a 8 palabras clave esenciales y sinónimos para matching léxico y vectorial (ej: ['nobis', 'obra social', 'prepaga', 'planes', 'convenio', 'cartilla', 'cobertura', 'admisión']).\n"
+                        "5. 'strict': true si la pregunta se refiere a UNA entidad específica y mezclar con otras causaría desinformación.\n\n"
+                        "Respondé ÚNICAMENTE un JSON válido con este esquema:\n"
+                        "{\n"
+                        '  "entities": ["Nobis"],\n'
+                        '  "topic": "convenios_obras_sociales",\n'
+                        '  "canonical_query": "Convenio y planes de cobertura de la obra social Nobis aceptados en Sanatorio Argentino",\n'
+                        '  "keywords": ["nobis", "obra social", "prepaga", "planes", "convenio", "cartilla", "cobertura"],\n'
+                        '  "strict": true\n'
+                        "}"
                     )
                 },
                 {
@@ -180,16 +190,30 @@ def _extract_topic_entities(question: str) -> dict:
         
         entities = result.get("entities", [])
         topic = result.get("topic", "")
+        canonical_query = result.get("canonical_query", question)
+        keywords = result.get("keywords", [])
         strict = result.get("strict", False)
         
-        if entities:
-            print(f"[Entity] Entities extracted: {entities} (strict={strict}, topic={topic})")
+        if entities or canonical_query != question:
+            print(f"[Entity/Query] Entities: {entities} | Canonical: '{canonical_query}' | Keywords: {keywords} (strict={strict})")
         
-        return {"entities": entities, "topic": topic, "strict": strict}
+        return {
+            "entities": entities,
+            "topic": topic,
+            "canonical_query": canonical_query,
+            "keywords": keywords,
+            "strict": strict
+        }
     
     except Exception as e:
         print(f"Entity extraction failed (proceeding without filter): {e}")
-        return {"entities": [], "topic": "", "strict": False}
+        return {
+            "entities": [],
+            "topic": "",
+            "canonical_query": question,
+            "keywords": [],
+            "strict": False
+        }
 
 
 def _filter_by_entity(documents: list[dict], entity_info: dict, 
@@ -279,17 +303,18 @@ def _generate_hyde_response(question: str) -> str:
     try:
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
-            temperature=0.7,
-            max_tokens=500,
+            temperature=0.6,
+            max_completion_tokens=500,
             timeout=OPENAI_CALL_TIMEOUT,
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "Basándote en la siguiente pregunta, generá una respuesta hipotética detallada "
-                        "como si tuvieras acceso a los documentos relevantes. Esta respuesta se usará "
-                        "para buscar documentos similares, así que incluí términos técnicos y específicos "
-                        "que probablemente aparezcan en los documentos."
+                        "Basándote en la siguiente pregunta (incluso si es coloquial como 'qué planes recibimos de X'), "
+                        "generá una respuesta o fragmento institucional hipotético y formal de Sanatorio Argentino como si "
+                        "tuvieras acceso a los convenios y reglamentos internos. Incluí terminología técnica (obras sociales, prepagas, "
+                        "planes vigentes, cartilla, autorizaciones, coseguros, cobertura ambulatoria o de internación) "
+                        "que probablemente aparezca en los documentos institucionales."
                     )
                 },
                 {"role": "user", "content": question}
@@ -301,33 +326,26 @@ def _generate_hyde_response(question: str) -> str:
         return ""
 
 
-# ============================================================
-# STEP 2: Multi-Query (Entity-Aware)
-# ============================================================
-
 def _generate_multi_queries(question: str) -> list[str]:
     """
     Step 2: Multi-Query (Entity-Aware)
     Generate 3 reformulations of the question from different angles.
-    Preserves key entities in all reformulations to prevent topic drift.
+    Preserves key entities and bridges colloquial terms to formal clinical/administrative terms.
     """
     try:
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
             temperature=0.5,
-            max_tokens=300,
+            max_completion_tokens=300,
             timeout=OPENAI_CALL_TIMEOUT,
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "Generá exactamente 3 reformulaciones diferentes de la siguiente pregunta. "
-                        "Cada reformulación debe abordar la pregunta desde un ángulo diferente. "
-                        "IMPORTANTE: Si la pregunta menciona una entidad específica (obra social, "
-                        "servicio, departamento, institución), TODAS las reformulaciones deben "
-                        "mantener esa entidad. No generalices ni la reemplaces por sinónimos.\n"
-                        "Ejemplo: si pregunta por 'OSDE', las 3 reformulaciones deben mencionar 'OSDE'.\n"
-                        "Respondé SOLO con las 3 preguntas, una por línea, sin numeración ni explicación."
+                        "Generá exactamente 3 reformulaciones técnicas y complementarias de la siguiente pregunta para buscar en los documentos del Sanatorio Argentino.\n"
+                        "Si el usuario pregunta de forma coloquial (ej. 'recibimos X', 'entra X', 'atiende X'), traduce la intención a términos documentales formales (convenio, planes aceptados, cartilla, cobertura, aranceles, normativas).\n"
+                        "IMPORTANTE: Si la pregunta menciona una entidad específica (obra social, prepaga, servicio, departamento, médico), TODAS las reformulaciones deben mantener esa entidad.\n"
+                        "Respondé SOLO con las 3 preguntas, una por línea, sin numeración ni explicaciones."
                     )
                 },
                 {"role": "user", "content": question}
@@ -339,11 +357,6 @@ def _generate_multi_queries(question: str) -> list[str]:
     except Exception as e:
         print(f"Multi-query generation failed: {e}")
         return []
-
-
-# ============================================================
-# STEP 5: Re-ranking
-# ============================================================
 
 def _rerank_single_document(question: str, doc: dict, 
                             entity_info: dict | None = None) -> dict | None:
@@ -392,7 +405,7 @@ def _rerank_single_document(question: str, doc: dict,
         response = openai_client.chat.completions.create(
             model=RERANK_MODEL,
             temperature=0,
-            max_tokens=100,
+            max_completion_tokens=150,
             timeout=OPENAI_CALL_TIMEOUT,
             messages=[
                 {
@@ -543,7 +556,7 @@ def _generate_final_answer(question: str, documents: list[dict],
         )
 
     today_str = datetime.now().strftime("%d/%m/%Y")
-    system_prompt = f"""Sos Simon, el Asistente de IA Avanzado y Consultor Documental del Sanatorio Argentino (Motor: GPT-5.1).
+    system_prompt = f"""Sos Simon, el Asistente de IA Avanzado y Consultor Documental del Sanatorio Argentino (Motor: GPT-5.4).
 Tu función es analizar profundamente la información proporcionada y entregar respuestas definitivas, estructuradas y de nivel experto.
 Fecha actual: {today_str}
 
@@ -570,6 +583,12 @@ DIRECTRICES CORE (Cumplimiento Estricto):
 - ¿Pregunta relacionada 2?
 - ¿Pregunta relacionada 3?
 
+11. INTERPRETACIÓN DE PREGUNTAS COLOQUIALES:
+Los usuarios suelen consultar con lenguaje informal o abreviado (ej. "qué planes recibimos de Nobis", "entra X obra social?", "atiende tal médico?", "cuánto sale?").
+Entendé siempre la intención institucional de fondo:
+- "recibir / se recibe / entra X": se refiere a convenios vigentes, obras sociales y prepagas aceptadas, planes autorizados, requisitos o coseguros en Sanatorio Argentino.
+- Respondé siempre con precisión técnica e institucional formal, destacando con claridad los planes específicos recibidos o no recibidos según los documentos oficiales.
+
 [CONTEXTO]
 {context}{rules_section}{learned_section}"""
 
@@ -588,7 +607,7 @@ DIRECTRICES CORE (Cumplimiento Estricto):
     response = openai_client.chat.completions.create(
         model=CHAT_MODEL,
         temperature=0,
-        max_tokens=3000,
+        max_completion_tokens=3500,
         timeout=OPENAI_CALL_TIMEOUT * 2,  # Double timeout for generation
         messages=messages
     )
@@ -691,9 +710,17 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
     pipeline_info["hyde_generated"] = bool(hyde_response)
     pipeline_info["multi_queries"] = len(multi_queries)
     pipeline_info["entity_detected"] = entity_info.get("entities", [])
+    pipeline_info["canonical_query"] = entity_info.get("canonical_query", question)
+    pipeline_info["keywords_detected"] = entity_info.get("keywords", [])
 
     # === STEP 3: Hybrid Search × N (PARALLEL) ===
     search_queries = [question]
+    canonical_query = entity_info.get("canonical_query")
+    if canonical_query and canonical_query != question:
+        search_queries.append(canonical_query)
+    keywords = entity_info.get("keywords", [])
+    if keywords:
+        search_queries.append(" ".join(keywords))
     if hyde_response:
         search_queries.append(hyde_response)
     search_queries.extend(multi_queries)

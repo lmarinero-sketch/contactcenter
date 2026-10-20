@@ -136,7 +136,7 @@ def _extract_pdf_vision(file_path: str, max_pages: int = 10) -> str:
             try:
                 response = openai_client.chat.completions.create(
                     model=CHAT_MODEL,
-                    max_tokens=2000,
+                    max_completion_tokens=2000,
                     timeout=60,
                     messages=[
                         {
@@ -391,7 +391,7 @@ def _extract_image_vision(file_path: str) -> str:
         print(f"Vision: Processing single image {file_path}...")
         response = openai_client.chat.completions.create(
             model=CHAT_MODEL,
-            max_tokens=2000,
+            max_completion_tokens=2000,
             timeout=60,
             messages=[
                 {

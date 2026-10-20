@@ -29,7 +29,7 @@ def _generate_document_summary(text: str, filename: str) -> str:
         response = openai_client.chat.completions.create(
             model=RERANK_MODEL,  # gpt-4o-mini — cheap and fast
             temperature=0,
-            max_tokens=150,
+            max_completion_tokens=150,
             timeout=10,
             messages=[
                 {
