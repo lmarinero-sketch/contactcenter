@@ -12,29 +12,34 @@ router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    question: str
+    question: str = ""
     conversation_id: str | None = None
+    user_id: str | None = None
+    attachments: list[dict] | None = None
 
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
     """Process a RAG question and return the answer with sources.
     
+    Supports multimodal input (images and documents) processed by GPT-5.4 Vision.
     Uses asyncio.to_thread to run the synchronous RAG pipeline
     without blocking the event loop. Includes a timeout guard.
-    
-    V3.0: Now supports disambiguation responses (type: "clarification")
     """
-    if not request.question.strip():
-        raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía")
+    question = request.question.strip() if request.question else ""
+    attachments = request.attachments or []
+    if not question and not attachments:
+        raise HTTPException(status_code=400, detail="La pregunta o el archivo adjunto no pueden estar vacíos")
 
     try:
         # Run the sync pipeline in a separate thread with timeout
         result = await asyncio.wait_for(
             asyncio.to_thread(
                 process_question,
-                question=request.question.strip(),
+                question=question,
                 conversation_id=request.conversation_id,
+                attachments=attachments,
+                user_id=request.user_id,
             ),
             timeout=PIPELINE_TIMEOUT,
         )

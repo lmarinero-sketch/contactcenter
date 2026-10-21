@@ -29,6 +29,114 @@ OPENAI_CALL_TIMEOUT = 30
 PIPELINE_TIMEOUT = 120
 
 
+
+# ============================================================
+# MULTIMODAL VISION: Image and Document Interpreter (GPT-5.4)
+# ============================================================
+
+def _analyze_attachments(attachments: list[dict], user_prompt: str) -> dict | None:
+    """
+    Analyzes images and documents attached to the chat using GPT-5.4 Vision.
+    Extracts key medical/administrative entities and formulates an enriched RAG query.
+    """
+    if not attachments:
+        return None
+
+    import base64
+    import io
+
+    image_items = []
+    doc_texts = []
+
+    for att in attachments:
+        mime = att.get("mime_type", "")
+        data = att.get("data", "")
+        name = att.get("name", "archivo")
+
+        if mime.startswith("image/") or att.get("isImage"):
+            image_items.append({"mime": mime or "image/jpeg", "data": data, "name": name})
+        elif "pdf" in mime or name.lower().endswith(".pdf"):
+            try:
+                raw_bytes = base64.b64decode(data)
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
+                    pages_text = []
+                    for p in pdf.pages[:5]:
+                        t = p.extract_text()
+                        if t:
+                            pages_text.append(t)
+                    if pages_text:
+                        doc_texts.append(f"Documento PDF ({name}):\n" + "\n".join(pages_text))
+            except Exception as pe:
+                print(f"Error parsing PDF attachment: {pe}")
+
+    if not image_items and not doc_texts:
+        return None
+
+    prompt_instructions = (
+        "Sos el Asistente Clínico y de Gestión de Sanatorio Argentino (Simón IA).\n"
+        "Tu tarea es analizar detalladamente la imagen o documento adjunto (orden médica, carnet de obra social/prepaga, "
+        "receta, pedido quirúrgico, resultado de estudio o circular administrativa).\n\n"
+        "Extrae con rigor clínico e institucional:\n"
+        "1. Tipo de documento (Ej: Pedido médico / Orden de consulta / Carnet de Obra Social / Informe ecográfico)\n"
+        "2. Obra Social o Prepaga y Plan exacto (Ej: OSDEPYM, OSDE 210, Swiss Medical, PAMI, etc.)\n"
+        "3. Médico o Profesional firmante / solicitado (Ej: Dr. Gonzalo Llarena)\n"
+        "4. Paciente (Nombre y DNI si están visibles)\n"
+        "5. Prácticas, Códigos nomencladores o Estudios indicados\n"
+        "6. Diagnóstico o motivo de consulta si figura\n\n"
+        "Devuelve ESTRICTAMENTE un JSON válido con la siguiente estructura:\n"
+        "{\n"
+        '  "summary": "Resumen conciso del documento identificado (Ej: Orden médica de consulta ginecológica del Dr. Gonzalo Llarena para afiliada a OSDEPYM)",\n'
+        '  "tipo_documento": "...",\n'
+        '  "obra_social": "...",\n'
+        '  "plan": "...",\n'
+        '  "medico": "...",\n'
+        '  "practica": "...",\n'
+        '  "codigo": "...",\n'
+        '  "search_query": "Consulta clara y directa para el motor RAG de Sanatorio Argentino",\n'
+        '  "key_details": "Detalles clínicos o administrativos relevantes detectados"\n'
+        "}"
+    )
+
+    user_content = []
+    text_part = f"Consulta del usuario: {user_prompt or '¿Qué normativas, cobertura y aranceles aplican a este documento en Sanatorio Argentino?'}\n"
+    if doc_texts:
+        text_part += "\nContenido extraído del documento:\n" + "\n---\n".join(doc_texts)
+    user_content.append({"type": "text", "text": text_part})
+
+    for img in image_items[:3]:
+        user_content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{img['mime']};base64,{img['data']}",
+                "detail": "high"
+            }
+        })
+
+    try:
+        response = openai_client.chat.completions.create(
+            model=CHAT_MODEL,
+            temperature=0.1,
+            max_completion_tokens=600,
+            messages=[
+                {"role": "system", "content": prompt_instructions},
+                {"role": "user", "content": user_content}
+            ]
+        )
+        raw_resp = response.choices[0].message.content.strip()
+        if raw_resp.startswith("```"):
+            raw_resp = re.sub(r"^```(?:json)?\n?", "", raw_resp)
+            raw_resp = re.sub(r"\n?```$", "", raw_resp)
+        parsed = json.loads(raw_resp.strip())
+        return parsed
+    except Exception as e:
+        print(f"Attachment vision analysis error: {e}")
+        return {
+            "summary": "Documento / imagen adjunta cargada por el usuario",
+            "search_query": user_prompt or "normativas generales sanatorio argentino",
+            "key_details": str(e)
+        }
+
 # ============================================================
 # STEP 0: Ambiguity Detection & Disambiguation
 # ============================================================
@@ -498,7 +606,8 @@ def _rerank_documents(question: str, documents: list[dict],
 # ============================================================
 
 def _generate_final_answer(question: str, documents: list[dict],
-                           conversation_history: list[dict]) -> str:
+                           conversation_history: list[dict],
+                           interpreted_doc: dict | None = None) -> str:
     """
     Step 6: Final answer generation with strict source citation.
     Optimized for both narrative text and tabular/Excel data.
@@ -555,6 +664,16 @@ def _generate_final_answer(question: str, documents: list[dict],
             f"{rules_context}"
         )
 
+    interpreted_doc_section = ""
+    if interpreted_doc:
+        interpreted_doc_section = (
+            f"El usuario adjuntó una imagen/documento interpretada:\n"
+            f"- Resumen: {interpreted_doc.get('summary', 'Documento adjunto')}\n"
+            f"- Obra Social: {interpreted_doc.get('obra_social', 'N/D')} | Plan: {interpreted_doc.get('plan', 'N/D')}\n"
+            f"- Médico: {interpreted_doc.get('medico', 'N/D')} | Práctica: {interpreted_doc.get('practica', 'N/D')}\n"
+            f"- Detalles clave: {interpreted_doc.get('key_details', 'N/D')}\n\n"
+            f"IMPORTANTE: Confirma al inicio de tu respuesta qué documento fue identificado, y luego responde con la normativa oficial aplicable de Sanatorio Argentino.\n"
+        )
     today_str = datetime.now().strftime("%d/%m/%Y")
     system_prompt = f"""Sos Simon, el Asistente de IA Avanzado y Consultor Documental del Sanatorio Argentino (Motor: GPT-5.4).
 Tu función es analizar profundamente la información proporcionada y entregar respuestas definitivas, estructuradas y de nivel experto.
@@ -588,6 +707,9 @@ Los usuarios suelen consultar con lenguaje informal o abreviado (ej. "qué plane
 Entendé siempre la intención institucional de fondo:
 - "recibir / se recibe / entra X": se refiere a convenios vigentes, obras sociales y prepagas aceptadas, planes autorizados, requisitos o coseguros en Sanatorio Argentino.
 - Respondé siempre con precisión técnica e institucional formal, destacando con claridad los planes específicos recibidos o no recibidos según los documentos oficiales.
+
+[DOCUMENTO ADJUNTO INTERPRETADO]
+{interpreted_doc_section}
 
 [CONTEXTO]
 {context}{rules_section}{learned_section}"""
@@ -638,7 +760,7 @@ def _execute_search(query: str) -> list[dict]:
 # MAIN PIPELINE
 # ============================================================
 
-def process_question(question: str, conversation_id: str | None = None) -> dict:
+def process_question(question: str, conversation_id: str | None = None, attachments: list[dict] | None = None, user_id: str | None = None) -> dict:
     """
     Main RAG pipeline — Process a user question through 8 stages.
     Returns the answer, sources, and pipeline metadata.
@@ -655,7 +777,24 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
         "reranked_kept": 0,
         "disambiguation_triggered": False,
         "chat_learning": False,
+        "multimodal_attachment": bool(attachments),
     }
+
+    # === STEP -1: Multimodal Vision & Attachment Analysis ===
+    interpreted_doc = None
+    if attachments:
+        try:
+            interpreted_doc = _analyze_attachments(attachments, question)
+            if interpreted_doc:
+                pipeline_info["interpreted_doc"] = interpreted_doc
+                # Enrich question if user wrote nothing or brief text
+                doc_query = interpreted_doc.get("search_query", "")
+                if not question.strip():
+                    question = doc_query or interpreted_doc.get("summary", "Consulta sobre documento adjunto")
+                else:
+                    question = f"{question} (Documento adjunto: {interpreted_doc.get('summary', '')})"
+        except Exception as e:
+            print(f"Error in multimodal attachment analysis: {e}")
 
     # Load conversation history early (needed for disambiguation)
     conversation_history = []
@@ -802,7 +941,7 @@ def process_question(question: str, conversation_id: str | None = None) -> dict:
         pipeline_info["rerank_fallback"] = True
 
     # === STEP 6: Generate Final Answer ===
-    answer = _generate_final_answer(question, reranked, conversation_history)
+    answer = _generate_final_answer(question, reranked, conversation_history, interpreted_doc)
 
     # Build sources summary
     sources = _build_sources(reranked)
@@ -885,6 +1024,7 @@ def _build_response(answer: str, sources: list[dict], pipeline_info: dict,
         "model": CHAT_MODEL,
         "conversation_id": conversation_id,
         "pipeline": pipeline_info,
+        "interpreted_doc": pipeline_info.get("interpreted_doc"),
         "type": "answer",
     }
 
