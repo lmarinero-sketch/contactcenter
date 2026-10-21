@@ -158,9 +158,18 @@ def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | 
     # Questions about doctors, parameters, fees, or operational terms are NEVER ambiguous
     lower_q = question.lower()
     operational_triggers = [
+        # Médicos y turnos
         "parametro", "parámetro", "dra", "dr", "doctor", "doctora", "medico", "médico",
-        "arancel", "cobro", "plus", "coseguro", "alias", "obra social", "osde", "iosfa",
-        "sancor", "pami", "galeno", "turno", "seña", "horario", "atiende", "hace", "cuanto", "cuánto"
+        "arancel", "cobro", "plus", "coseguro", "alias", "turno", "seña", "horario",
+        "atiende", "hace", "cuanto", "cuánto", "precio", "costo",
+        # Obras sociales, prepagas y convenios sanatoriales
+        "obra social", "obras sociales", "prepaga", "prepagas", "convenio", "convenios",
+        "cartilla", "plan", "planes", "recibe", "recibimos", "reciben", "acepta", "aceptan",
+        "entra", "entran", "cobertura", "afiliado", "afiliados", "credencial",
+        "osde", "iosfa", "sancor", "pami", "galeno", "nobis", "swiss medical", "medife",
+        "medifé", "omint", "prevencion", "prevención", "osecac", "damsu", "apross",
+        "ospedyc", "osprera", "union personal", "unión personal", "accord", "jerarquicos",
+        "jerárquicos", "bancarios", "federada", "osdepym"
     ]
     if any(t in lower_q for t in operational_triggers):
         return None
@@ -196,7 +205,8 @@ def _check_ambiguity(question: str, conversation_history: list[dict]) -> dict | 
                         "2. Si la pregunta es ambigua, muy vaga, o podría referirse a múltiples temas → responde con sugerencias\n"
                         "3. Si hay CONTEXTO DE CONVERSACIÓN y la pregunta es una continuación lógica → {\"clear\": true}\n"
                         "4. Preguntas de 1-2 palabras SIN contexto previo generalmente necesitan clarificación\n"
-                        "5. NO seas demasiado estricto — si la pregunta tiene al menos un tema identificable, es clara\n\n"
+                        "5. NO seas demasiado estricto — si la pregunta tiene al menos un tema identificable, es clara\n"
+                        "6. PREGUNTAS DE CONVENIOS O PLANES: Preguntas sobre si el sanatorio 'recibe', 'atiende', 'acepta' o qué 'planes' entran de una obra social/prepaga (ej: '¿qué planes de Nobis recibimos?') NUNCA son ambiguas → responde: {\"clear\": true}\n\n"
                         "Formato de respuesta para preguntas ambiguas:\n"
                         "{\n"
                         "  \"clear\": false,\n"
