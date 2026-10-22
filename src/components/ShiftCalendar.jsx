@@ -61,7 +61,8 @@ const HOLIDAYS = {
     '2026-07-09': 'Día de la Independencia',
     '2026-08-17': 'San Martín',
     '2026-10-12': 'Diversidad Cultural',
-    '2026-11-20': 'Soberanía Nacional',
+    '2026-11-09': 'Feriado',
+    '2026-11-23': 'Soberanía Nacional',
     '2026-12-08': 'Inmaculada Concepción',
     '2026-12-25': 'Navidad',
     // 2027
